@@ -25,7 +25,15 @@ struct PolicyData{N,M,NN,MM,MN,NNN,MNN}
     K::Vector{MN}
     k::Vector{M}
 
-    K_candidate::Vector{MN}
+    # TODO: modify to include eta and theta for δs
+    Ku::Vector{MN} # β
+    ku::Vector{M} # α
+
+    Ks::Vector{MN} # θ
+    ks::Vector{M} # η
+
+    # What is the K_candidate for?
+    K_candidate::Vector{MN} 
     k_candidate::Vector{M}
 
     # value function approximation

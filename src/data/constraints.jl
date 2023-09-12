@@ -2,9 +2,11 @@
     Constraints Data
 """
 
-"""
-Put the dual variables in the constraints struct.
-"""
+struct Duals{T}
+    eq::Vector{T} # equality constraint dual λ
+    ineq::Vector{T} # inequality constraint dual s
+    delta_ineq::Vector{T} # δs
+end
 
 struct ConstraintsData{T,C,CX,CU}
     constraints::Constraints{T}
@@ -12,15 +14,8 @@ struct ConstraintsData{T,C,CX,CU}
     jacobian_state::Vector{CX}
     jacobian_action::Vector{CU}
     duals::Duals{T}
-    perturbation::Vector{T} # μ
+    perturbation::Vector{T} # μ Should this be moved elsewhere since IPDPP is for a fixed parameter μ?
 end
-
-struct Duals{T}
-    eq::Vector{T} # equality constraint dual λ
-    ineq::Vector{T} # inequality constraint dual s
-    delta_ineq::Vector{T} # δs
-end
-
 
 function constraint_data(model::Model, constraints::Constraints) 
     H = length(constraints)
