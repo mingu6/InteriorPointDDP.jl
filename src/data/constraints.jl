@@ -1,12 +1,26 @@
 """
     Constraints Data
 """
+
+"""
+Put the dual variables in the constraints struct.
+"""
+
 struct ConstraintsData{T,C,CX,CU}
     constraints::Constraints{T}
     violations::Vector{C}
     jacobian_state::Vector{CX}
     jacobian_action::Vector{CU}
+    duals::Duals{T}
+    perturbation::Vector{T} # μ
 end
+
+struct Duals{T}
+    λ::Vector{T} # equality constraint dual
+    s::Vector{T} # inequality constraint dual
+    δs::Vector{T}
+end
+
 
 function constraint_data(model::Model, constraints::Constraints) 
     H = length(constraints)
