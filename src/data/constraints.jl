@@ -16,9 +16,9 @@ struct ConstraintsData{T,C,CX,CU}
 end
 
 struct Duals{T}
-    λ::Vector{T} # equality constraint dual
-    s::Vector{T} # inequality constraint dual
-    δs::Vector{T}
+    eq::Vector{T} # equality constraint dual λ
+    ineq::Vector{T} # inequality constraint dual s
+    delta_ineq::Vector{T} # δs
 end
 
 
