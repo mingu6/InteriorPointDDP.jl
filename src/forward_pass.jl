@@ -1,10 +1,3 @@
-
-function update_action(policy::PolicyData, problem::ProblemData, data::SolverData)
-    return action + policy.K + policy.k * (x)
-
-end
-
-
 function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverData;
     line_search=:armijo,
     min_step_size=1.0e-5,
