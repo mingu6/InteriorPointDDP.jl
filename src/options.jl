@@ -13,3 +13,16 @@ Base.@kwdef mutable struct Options{T}
     reset_cache::Bool=false
     verbose=true
 end
+
+Base.@kwdef mutable struct BackwardPassParams{T}
+    reg::Int8 = 0
+    failed::Bool = false
+    feasible::Bool = false
+    opterr::Float64 = 0.0
+    recovery::Float64 = 0.0 
+end 
+
+Base.@kwdef mutable struct ForwardPassParams{T}
+    step::Int8 = 0
+    failed::Bool = false 
+end 

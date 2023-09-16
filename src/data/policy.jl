@@ -35,6 +35,8 @@ struct PolicyData{N,M,NN,MM,MN,NNN,MNN}
     action_value::ActionValue{N,M,NN,MM,MN}
 
     # pre-allocated memory
+    x_tmp::Vector{N}
+    u_tmp::Vector{M}
 	xx̂_tmp::Vector{NNN}
 	ux̂_tmp::Vector{MNN}
 	uu_tmp::Vector{MM}
@@ -66,6 +68,8 @@ function policy_data(dynamics::Vector{Dynamics{T}}) where T
 
     action_value = ActionValue(Qx, Qu, Qxx, Quu, Qux)
 
+    x_tmp = [zeros(d.num_state) for d in dynamics]
+    u_tmp = [zeros(d.num_action) for d in dynamics]
 	xx̂_tmp = [zeros(d.num_state, d.num_next_state) for d in dynamics]
 	ux̂_tmp = [zeros(d.num_action, d.num_next_state) for d in dynamics]
 	uu_tmp = [zeros(d.num_action, d.num_action) for d in dynamics]
@@ -74,5 +78,5 @@ function policy_data(dynamics::Vector{Dynamics{T}}) where T
     PolicyData(K, k, K_candidate, k_candidate, 
         value,
         action_value,
-        xx̂_tmp, ux̂_tmp, uu_tmp, ux_tmp)
+        x_tmp, u_tmp, xx̂_tmp, ux̂_tmp, uu_tmp, ux_tmp)
 end
