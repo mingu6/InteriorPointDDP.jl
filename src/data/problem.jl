@@ -5,7 +5,8 @@ mutable struct ProblemData{T,X,U,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX}
     states::Vector{X}
     actions::Vector{U}
 
-    # disturbance trajectory
+    # disturbance trajectory 
+    # TODO: Ignore the disturbance trajectory
     parameters::Vector{D}
 
     # nominal trajectory
