@@ -2,19 +2,23 @@
     Constraints Data
 """
 
-struct Duals{T}
-    eq::Vector{T} # equality constraint dual λ
-    ineq::Vector{T} # inequality constraint dual s
-    delta_ineq::Vector{T} # δs
-end
+
+# TODO: consider splitting eq and inequality constraints apart rather than using indices_inequality to determine inequalities
+
+# struct Duals{T}
+    # dual::Vector{Vector{T}} # duals (both eq and ineq) for each timestep
+    # eq::Vector{T} # equality constraint dual λ
+    # ineq::Vector{T} # inequality constraint dual s
+    # delta_ineq::Vector{T} # δs
+# end
 
 struct ConstraintsData{T,C,CX,CU}
     constraints::Constraints{T}
     violations::Vector{C}
     jacobian_state::Vector{CX}
     jacobian_action::Vector{CU}
-    duals::Duals{T}
-    perturbation::Vector{T} # μ Should this be moved elsewhere since IPDPP is for a fixed parameter μ?
+    duals::Vector{Vector{T}}
+    # delta_ineq::Vector{T} # Unneeded??
 end
 
 function constraint_data(model::Model, constraints::Constraints) 
@@ -22,7 +26,11 @@ function constraint_data(model::Model, constraints::Constraints)
     c = [zeros(constraints[t].num_constraint) for t = 1:H]
     cx = [zeros(constraints[t].num_constraint, t < H ? model[t].num_state : model[H-1].num_next_state) for t = 1:H]
     cu = [zeros(constraints[t].num_constraint, model[t].num_action) for t = 1:H-1]
-    ConstraintsData(constraints, c, cx, cu)
+    # each constraint
+    constraint_duals = [zeros(constraints[t].num_constraint) for t = 1:H]
+    # eq = [zeros(constraints[t].num_constraint) for t = 1:H]
+    # ineq = [zeros(constraints[t].num_constraint) for t = 1:H]
+    ConstraintsData(constraints, c, cx, cu, constraint_duals)
 end
 
 function constraint!(constraint_data::ConstraintsData, x, u, w)

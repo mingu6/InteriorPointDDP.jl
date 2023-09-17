@@ -41,7 +41,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         #         @show norm(data.gradient)
         #     end
         # end
-        if (J <= J_prev + c1 * data.step_size[1] * delta_grad_product)
+        if (J <= J_prev + c1 * data.step_size[1] * delta_grad_product) # this is with respect to cost
             # update nominal
             update_nominal_trajectory!(problem)
             data.objective[1] = J
