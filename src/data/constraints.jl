@@ -1,8 +1,6 @@
 """
     Constraints Data
 """
-
-
 # TODO: consider splitting eq and inequality constraints apart rather than using indices_inequality to determine inequalities
 
 # struct Duals{T}
@@ -12,13 +10,17 @@
     # delta_ineq::Vector{T} # δs
 # end
 
-struct ConstraintsData{T,C,CX,CU}
+struct ConstraintsData{T,C,CX,CU,S}
     constraints::Constraints{T}
     violations::Vector{C}
     jacobian_state::Vector{CX}
     jacobian_action::Vector{CU}
-    duals::Vector{Vector{T}}
-    # delta_ineq::Vector{T} # Unneeded??
+    duals::Vector{T} # duals (both eq and ineq) for each timestep
+    ineq::Vector{T} # only ineq duals for each timestep
+    nominal_ineq :: Vector{T}
+    μ :: Float32
+    # nominal_duals::Vector{Vector{T}}
+    # delta_ineq::Vector{T} # TODO: Check if unneeded??
 end
 
 function constraint_data(model::Model, constraints::Constraints) 
@@ -26,11 +28,17 @@ function constraint_data(model::Model, constraints::Constraints)
     c = [zeros(constraints[t].num_constraint) for t = 1:H]
     cx = [zeros(constraints[t].num_constraint, t < H ? model[t].num_state : model[H-1].num_next_state) for t = 1:H]
     cu = [zeros(constraints[t].num_constraint, model[t].num_action) for t = 1:H-1]
-    # each constraint
+    
     constraint_duals = [zeros(constraints[t].num_constraint) for t = 1:H]
-    # eq = [zeros(constraints[t].num_constraint) for t = 1:H]
-    # ineq = [zeros(constraints[t].num_constraint) for t = 1:H]
-    ConstraintsData(constraints, c, cx, cu, constraint_duals)
+    
+    # Initialize ineq and nominal_ineq with Float64 arrays
+    ineq = [zeros(length(constraints[t].indices_inequality)) for t = 1:H]
+    nominal_ineq = [zeros(length(constraints[t].indices_inequality)) for t = 1:H]
+
+    μ = 0.001
+    
+    # Create ConstraintsData object with consistent types
+    return ConstraintsData(constraints, c, cx, cu, constraint_duals, ineq, nominal_ineq, μ)
 end
 
 function constraint!(constraint_data::ConstraintsData, x, u, w)

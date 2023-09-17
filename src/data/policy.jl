@@ -20,7 +20,7 @@ end
 """
     Policy Data
 """
-struct PolicyData{N,M,NN,MM,MN,NNN,MNN}
+struct PolicyData{N,M,NN,MM,MN,NNN,MNN,S,SN} # TODO: add S and SN
     # policy u = ū + K * (x - x̄) + k
     K::Vector{MN} # β
     k::Vector{M}  # α
@@ -30,8 +30,10 @@ struct PolicyData{N,M,NN,MM,MN,NNN,MNN}
     # Ku::Vector{MN} # β
     # ku::Vector{M} # α
 
-    Ks::Vector{MN} # θ
-    ks::Vector{M} # η
+    # S = # of inequality dual variables
+    # N = # of states
+    Ks::Vector{SN} # θ
+    ks::Vector{S} # η
 
     # TODO: NOT IMPORTANT AND FLAG
     # What is the K_candidate for?
@@ -58,6 +60,7 @@ function policy_data(dynamics::Vector{Dynamics{T}}) where T
 	K = [zeros(d.num_action, d.num_state) for d in dynamics]
     k = [zeros(d.num_action) for d in dynamics]
 
+    # TODO: make sure dimensions are number of inequalities 
 	Ks = [zeros(d.num_action, d.num_state) for d in dynamics]
     ks = [zeros(d.num_action) for d in dynamics]
 

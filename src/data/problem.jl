@@ -21,9 +21,6 @@ mutable struct ProblemData{T,X,U,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX}
 
     # trajectory: z = (x1,..., xT, u1,..., uT-1) | Δz = (Δx1..., ΔxT, Δu1,..., ΔuT-1)
     trajectory::Vector{T}
-
-    ## Make this a vector, but a vector of scalar multiplied by a 1s vector, put in problem
-    # perturbation::Vector{T} # μ Should this be moved elsewhere since IPDPP is for a fixed parameter μ?
 end
 
 function problem_data(dynamics, costs; 

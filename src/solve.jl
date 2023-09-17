@@ -20,7 +20,7 @@ function ilqr_solve!(solver::Solver;
 
     obj_prev = data.objective[1]
     for i = 1:solver.options.max_iterations
-        forward_pass!(policy, problem, data,
+        forward_pass!(policy, problem, data, constraints,
             min_step_size=solver.options.min_step_size,
             line_search=solver.options.line_search,
             verbose=solver.options.verbose)

@@ -29,12 +29,13 @@ function cost!(data::SolverData, problem::ProblemData;
 	return data.objective
 end
 
-function update_nominal_trajectory!(data::ProblemData) 
+function update_nominal_trajectory!(data::ProblemData, constraints::ConstraintsData) 
     H = length(data.states) 
     for t = 1:H 
         data.nominal_states[t] .= data.states[t] 
         t == H && continue 
-        data.nominal_actions[t] .= data.actions[t] 
+        data.nominal_actions[t] .= data.actions[t]
+        constraints.nominal_ineq[t] .= constraints.ineq[t]
     end 
 end
 
