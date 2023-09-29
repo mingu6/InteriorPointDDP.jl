@@ -117,6 +117,7 @@ function constrained_ilqr_solve!(solver::Solver; augmented_lagrangian_callback!:
 		solver.data.max_violation[1] <= solver.options.constraint_tolerance && break
 
         # dual ascent
+        ## here is where you update mu
 		augmented_lagrangian_update!(solver.problem.objective.costs,
 			scaling_penalty=solver.options.scaling_penalty,
             max_penalty=solver.options.max_penalty)
@@ -140,4 +141,73 @@ end
 
 function solve!(solver::Solver{T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O}, args...; kwargs...) where {T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O<:AugmentedLagrangianCosts{T}}
     constrained_ilqr_solve!(solver, args...; kwargs...)
+end
+
+
+
+function ipddp_solve!(solver::Solver; 
+    iteration=true)
+
+    (solver.options.verbose && iteration==1) && solver_info()
+
+	# data
+	policy = solver.policy
+    problem = solver.problem
+    reset!(problem.model)
+    reset!(problem.objective)
+	data = solver.data
+    solver.options.reset_cache && reset!(data)
+
+	cost!(data, problem,
+        mode=:nominal)
+    gradients!(problem,
+        mode=:nominal)
+    backward_pass!(policy, problem, 
+        mode=:nominal)
+
+    obj_prev = data.objective[1]
+    for i = 1:solver.options.max_iterations
+        while (true)
+            bp = backward_pass!(policy, problem, constraints,
+                mode=:nominal)
+            if not (bp.failed) 
+                break
+            end
+        end
+
+        f = forward_pass!(policy, problem, data, constraints,
+            min_step_size=solver.options.min_step_size,
+            line_search=solver.options.line_search,
+            verbose=solver.options.verbose)
+        if solver.options.line_search != :none
+            gradients!(problem,
+                mode=:nominal)
+            backward_pass!(policy, problem,
+                mode=:nominal)
+            lagrangian_gradient!(data, policy, problem)
+        end
+
+        # gradient norm
+        gradient_norm = norm(data.gradient, Inf)
+
+        # info
+        data.iterations[1] += 1
+        solver.options.verbose && println(
+            "iter:                  $i
+             cost:                  $(data.objective[1])
+			 gradient_norm:         $(gradient_norm)
+			 max_violation:         $(data.max_violation[1])
+			 step_size:             $(data.step_size[1])")
+
+        # check convergence
+        if max(solver.options.opterr, perturbation) <= options.objective_tolerance
+            print("Optimality reached")
+        end
+
+        if options.solver.opterr <= 0.2 * perturbation
+            perturbation = max(options.objective_tolerance/10.0, min(0.2 * perturbation, perturbation^1.2))
+        end
+    end
+
+    return nothing
 end

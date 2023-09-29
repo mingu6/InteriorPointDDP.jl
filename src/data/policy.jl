@@ -24,11 +24,7 @@ struct PolicyData{N,M,NN,MM,MN,NNN,MNN,S,SN} # TODO: add S and SN
     # policy u = ū + K * (x - x̄) + k
     K::Vector{MN} # β
     k::Vector{M}  # α
-    ## refactor to Ku and ku
-
-    # TODO: modify to include eta and theta for δs
-    # Ku::Vector{MN} # β
-    # ku::Vector{M} # α
+    ## TODO: refactor to Ku and ku
 
     # S = # of inequality dual variables
     # N = # of states
@@ -55,14 +51,14 @@ struct PolicyData{N,M,NN,MM,MN,NNN,MNN,S,SN} # TODO: add S and SN
 	ux_tmp::Vector{MN}
 end
 
-function policy_data(dynamics::Vector{Dynamics{T}}) where T
+function policy_data(dynamics::Vector{Dynamics{T}}, constraints::ConstraintsData) where T
     # policy
 	K = [zeros(d.num_action, d.num_state) for d in dynamics]
     k = [zeros(d.num_action) for d in dynamics]
 
-    # TODO: make sure dimensions are number of inequalities 
-	Ks = [zeros(d.num_action, d.num_state) for d in dynamics]
-    ks = [zeros(d.num_action) for d in dynamics]
+    H = length(dynamics) # number of time steps
+	Ks = [zeros(constraints[t].num_inequality, dynamics[t].num_state) for t = 1:H] # S by N
+    ks = [zeros(c.num_inequality) for c in constraints] # S-length vector
 
     K_candidate = [zeros(d.num_action, d.num_state) for d in dynamics]
     k_candidate = [zeros(d.num_action) for d in dynamics]

@@ -10,6 +10,7 @@ struct Constraint{T}
     jacobian_state_cache::Matrix{T}
     jacobian_action_cache::Matrix{T}
     indices_inequality::Vector{Int}
+    num_inequality::Int
 end
 
 Constraints{T} = Vector{Constraint{T}} where T
@@ -33,13 +34,14 @@ function Constraint(f::Function, num_state::Int, num_action::Int;
     jacobian_action_func = eval(Symbolics.build_function(jacobian_action, x, u, w)[2])
 
     num_constraint = length(evaluate)
+    num_inequality = length(indices_inequality) # Add this for bookkeeping of number of inequalities
 
     return Constraint(
         evaluate_func,
         jacobian_state_func, jacobian_action_func,
         num_constraint, num_state, num_action, num_parameter,
         zeros(num_constraint), zeros(num_constraint, num_state), zeros(num_constraint, num_action),
-        indices_inequality)
+        indices_inequality, num_inequality)
 end
 
 function Constraint()
@@ -48,7 +50,7 @@ function Constraint()
         (jx, x, u, w) -> nothing, (ju, x, u, w) -> nothing,
         0, 0, 0, 0,
         Float64[], Array{Float64}(undef, 0, 0), Array{Float64}(undef, 0, 0),
-        collect(1:0))
+        collect(1:0), 0)
 end
 
 function Constraint(f::Function, fx::Function, fu::Function, num_constraint::Int, num_state::Int, num_action::Int;
@@ -60,14 +62,20 @@ function Constraint(f::Function, fx::Function, fu::Function, num_constraint::Int
         fx, fu,
         num_constraint, num_state, num_action, num_parameter,
         zeros(num_constraint), zeros(num_constraint, num_state), zeros(num_constraint, num_action),
-        indices_inequality)
+        indices_inequality, length(indices_inequality))
 end
 
-function constraint!(violations, constraints::Constraints{T}, states, actions, parameters) where T
+function constraint!(violations, inequalities, constraints::Constraints{T}, states, actions, parameters) where T
     for (t, con) in enumerate(constraints)
         con.num_constraint == 0 && continue
         con.evaluate(con.evaluate_cache, states[t], actions[t], parameters[t])
         @views violations[t] .= con.evaluate_cache
+
+        # take inequalities and package them together
+        for (i, index) in enumerate(con.indices_inequality)
+            inequalities[t][i] = con.evaluate_cache[index]
+        end
+
         fill!(con.evaluate_cache, 0.0) # TODO: confirm this is necessary
     end
 end

@@ -38,7 +38,7 @@ function rollout!(policy::PolicyData, problem::ProblemData, constraints::Constra
         mul!(u[t], K[t], x̄[t], -1.0, 1.0)
 
         # s[t] .= s̄[t] + Ks[t] * (x[t] -x̄[t]) + step_size * ks[t]
-        s_temp = s[t]
+        # s_temp = s[t]
         s[t] .*= step_size
         s[t] .+= s̄[t]
         mul!(s[t], K[t], x[t], 1.0, 1.0)  # s[t] = s[t] + step_size * ks[t] + Ks[t] * x[t] 
@@ -67,7 +67,7 @@ function rollout!(policy::PolicyData, problem::ProblemData, constraints::Constra
         end
 
         x[t+1] .= dynamics!(d, x[t], u[t], w[t])
-        
+        return is_satisfied
     end
 end
 
