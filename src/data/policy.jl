@@ -22,8 +22,8 @@ end
 """
 struct PolicyData{N,M,NN,MM,MN,NNN,MNN,S,SN} # TODO: add S and SN
     # policy u = ū + K * (x - x̄) + k
-    K::Vector{MN} # β
-    k::Vector{M}  # α
+    Ku::Vector{MN} # β
+    ku::Vector{M}  # α
     ## TODO: refactor to Ku and ku
 
     # S = # of inequality dual variables
@@ -33,11 +33,6 @@ struct PolicyData{N,M,NN,MM,MN,NNN,MNN,S,SN} # TODO: add S and SN
 
     Ky::Vector{SN} # χ
     ky::Vector{S} # ζ
-
-    # TODO: NOT IMPORTANT AND FLAG
-    # What is the K_candidate for?
-    K_candidate::Vector{MN} 
-    k_candidate::Vector{M}
 
     # value function approximation
     value::Value{N,NN}
@@ -56,8 +51,8 @@ end
 
 function policy_data(dynamics::Vector{Dynamics{T}}, constraints::ConstraintsData) where T
     # policy
-	K = [zeros(d.num_action, d.num_state) for d in dynamics]
-    k = [zeros(d.num_action) for d in dynamics]
+	Ku = [zeros(d.num_action, d.num_state) for d in dynamics]
+    ku = [zeros(d.num_action) for d in dynamics]
 
     H = length(dynamics) # number of time steps
 	Ks = [zeros(constraints[t].num_inequality, dynamics[t].num_state) for t = 1:H] # S by N
@@ -65,9 +60,6 @@ function policy_data(dynamics::Vector{Dynamics{T}}, constraints::ConstraintsData
 
 	Ky = [zeros(constraints[t].num_inequality, dynamics[t].num_state) for t = 1:H] # S by N
     ky = [zeros(c.num_inequality) for c in constraints] # S-length vector
-
-    K_candidate = [zeros(d.num_action, d.num_state) for d in dynamics]
-    k_candidate = [zeros(d.num_action) for d in dynamics]
 
     # value function approximation
     P = [[zeros(d.num_state, d.num_state) for d in dynamics]..., 
@@ -93,7 +85,7 @@ function policy_data(dynamics::Vector{Dynamics{T}}, constraints::ConstraintsData
 	uu_tmp = [zeros(d.num_action, d.num_action) for d in dynamics]
 	ux_tmp = [zeros(d.num_action, d.num_state) for d in dynamics]
 
-    PolicyData(K, k, Ks, ks, Ky, ky, K_candidate, k_candidate, 
+    PolicyData(Ku, ku, Ks, ks, Ky, ky,
         value,
         action_value,
         x_tmp, u_tmp, xx̂_tmp, ux̂_tmp, uu_tmp, ux_tmp)

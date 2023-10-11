@@ -27,23 +27,26 @@ function rollout_infeasible!(policy::PolicyData, problem::ProblemData; perturbat
     dynamics = problem.model.dynamics
 
     # trajectories
-    x = problem.states
-    u = problem.actions
-    w = problem.parameters
-    x̄ = problem.nominal_states # old states
-    ū = problem.nominal_actions # old actions
+    states = problem.states
+    actions = problem.actions
+    params = problem.parameters
+    nominal_states = problem.nominal_states # old states
+    nominal_actions = problem.nominal_actions # old actions
 
     # initial state
-    x[1] .= x̄[1]
+    states[1] .= nominal_states[1]
 
     constr_data = problem.objective.costs.constraint_data
 
     # policy
-    K = policy.K
-    k = policy.k
+    Ku = policy.Ku
+    ku = policy.ku
 
     Ks = policy.Ks
     ks = policy.ks
+
+    Ky = policy.Ky
+    ky = policy.ky
 
     tau = max(0.99, 1 - perturbation)
 
@@ -52,17 +55,14 @@ function rollout_infeasible!(policy::PolicyData, problem::ProblemData; perturbat
 
     slacks = constr_data.slacks
     nominal_slacks = constr_data.nominal_slacks # current slack variables
-    
-    Ky = policy.Ky
-    ky = policy.ky
 
     for (t, d) in enumerate(dynamics)
         # s[t] .= s̄[t] + Ks[t] * (x[t] -x̄[t]) + step_size * ks[t]
-        update!(ineq_duals[t], nominal_ineq_duals[t], Ks[t], ks[t], x[t], x̄[t], step_size)
+        update!(ineq_duals[t], nominal_ineq_duals[t], Ks[t], ks[t], states[t], nominal_states[t], step_size)
 
 
         # y[t] .= ȳ[t] + Ky[t] * (x[t] -x̄[t]) + step_size * ky[t]
-        update!(slacks[t], nominal_slacks[t], Ky[t], ky[t], x[t], x̄[t], step_size)
+        update!(slacks[t], nominal_slacks[t], Ky[t], ky[t], states[t], nominal_states[t], step_size)
 
         # check slack and dual positivity
         num_ineq = constr_data.constraints.num_inequality 
@@ -73,9 +73,9 @@ function rollout_infeasible!(policy::PolicyData, problem::ProblemData; perturbat
         end
         
         # u[t] .= ū[t] + K[t] * (x[t] - x̄[t]) + step_size * k[t]
-        update!(u[t], ū[t], K[t], k[t], x[t], x̄[t], step_size)
+        update!(actions[t], nominal_actions[t], Ku[t], ku[t], states[t], nominal_states[t], step_size)
         
-        x[t+1] .= dynamics!(d, x[t], u[t], w[t])
+        states[t+1] .= dynamics!(d, states[t], actions[t], params[t])
     end        
     return true
 end
@@ -98,8 +98,8 @@ function rollout_feasible!(policy::PolicyData, problem::ProblemData; perturbatio
     constr_data = problem.objective.costs.constraint_data
 
     # policy
-    K = policy.K
-    k = policy.k
+    Ku = policy.Ku
+    ku = policy.ku
 
     Ks = policy.Ks
     ks = policy.ks
@@ -108,7 +108,7 @@ function rollout_feasible!(policy::PolicyData, problem::ProblemData; perturbatio
 
     for (t, d) in enumerate(dynamics)
         # u[t] .= ū[t] + K[t] * (x[t] - x̄[t]) + step_size * k[t]
-        update!(actions[t], nominal_actions[t], K[t], k[t], states[t], nominal_states[t], step_size)
+        update!(actions[t], nominal_actions[t], Ku[t], ku[t], states[t], nominal_states[t], step_size)
 
         # s[t] .= s̄[t] + Ks[t] * (x[t] -x̄[t]) + step_size * ks[t]
         update!(ineq_duals[t], nominal_ineq_duals[t], Ks[t], ks[t], states[t], nominal_states[t], step_size)
@@ -125,7 +125,7 @@ function rollout_feasible!(policy::PolicyData, problem::ProblemData; perturbatio
             return false
         end
 
-        states[t+1] .= dynamics!(d, states[t], actions[t], w[t])
+        states[t+1] .= dynamics!(d, states[t], actions[t], params[t])
     end
     return true
 end
