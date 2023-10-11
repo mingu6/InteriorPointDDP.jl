@@ -6,13 +6,15 @@
 
 struct ConstraintsData{T,C,CX,CU,S}
     constraints::Constraints{T}
-    violations::Vector{C}
-    jacobian_state::Vector{CX}
+    violations::Vector{C} # the current value of each constraint
+    jacobian_state::Vector{CX} 
     jacobian_action::Vector{CU}
-    inequalities::Vector{Vector{T}}
+    inequalities::Vector{Vector{T}} # violations but only for inequality constraints
     duals::Vector{Vector{T}} # duals (both eq and ineq) for each timestep
     ineq_duals::Vector{Vector{T}} # only ineq duals for each timestep
-    nominal_ineq_duals:: Vector{T}
+    nominal_ineq_duals:: Vector{Vector{T}}
+    slacks::Vector{Vector{T}}
+    nominal_slacks::Vector{Vector{T}}
 end
 
 function constraint_data(model::Model, constraints::Constraints) 
@@ -21,13 +23,16 @@ function constraint_data(model::Model, constraints::Constraints)
     cx = [zeros(constraints[t].num_constraint, t < H ? model[t].num_state : model[H-1].num_next_state) for t = 1:H]
     cu = [zeros(constraints[t].num_constraint, model[t].num_action) for t = 1:H-1]
     
+    ineqs = [zeros(constraints[t].num_inequality) for t = 1:H]
     constraint_duals = [zeros(constraints[t].num_constraint) for t = 1:H]
     
-    ineqs = [zeros(constraints[t].num_inequality) for t = 1:H]
-    ineq_duals = [zeros(constraints[t].num_inequality) for t = 1:H]
+    ineq_duals = [zeros(constraints[t].num_inequality) for t = 1:H] ## set these to 0.1
     nominal_ineq_duals = [zeros(constraints[t].num_inequality) for t = 1:H]
 
-    return ConstraintsData(constraints, c, cx, cu, ineqs, constraint_duals, ineq_duals, nominal_ineq_duals)
+    slacks = [zeros(constraints[t].num_inequality) for t = 1:H]
+    nominal_slacks = [zeros(constraints[t].num_inequality) for t = 1:H]
+
+    return ConstraintsData(constraints, c, cx, cu, ineqs, constraint_duals, ineq_duals, nominal_ineq_duals, slacks, nominal_slacks)
 end
 
 function constraint!(constraint_data::ConstraintsData, x, u, w)

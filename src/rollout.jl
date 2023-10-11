@@ -1,6 +1,28 @@
-function rollout!(policy::PolicyData, problem::ProblemData, constraints::ConstraintsData; 
+function rollout!(policy::PolicyData, problem::ProblemData; feasible::Bool;
     step_size=1.0)
 
+    if feasible
+        return rollout_feasible!(policy, problem, step_size=1.0)
+    else # infeasible
+        return rollout_infeasible!(policy, problem, step_size=1.0)
+    end
+end
+
+    
+function rollout(dynamics::Vector{Dynamics{T}}, initial_state, actions, 
+    parameters=[zeros(d.num_parameter) for d in dynamics]) where T
+
+    x_history = [initial_state]
+    for (t, d) in enumerate(dynamics) 
+        push!(x_history, copy(dynamics!(d, x_history[end], actions[t], parameters[t])))
+    end
+    
+    return x_history
+end
+
+
+function rollout_infeasible!(policy::PolicyData, problem::ProblemData;
+    step_size=1.0)
     # model 
     dynamics = problem.model.dynamics
 
@@ -11,10 +33,11 @@ function rollout!(policy::PolicyData, problem::ProblemData, constraints::Constra
     x̄ = problem.nominal_states # old states
     ū = problem.nominal_actions # old actions
 
-    # TODO: need to grab s and s̄ somehow??!?
-    s = constraints.ineq
-    s̄ = constraints.nominal_ineq # old dual
-    
+    # initial state
+    x[1] .= x̄[1]
+
+    constraints = problem.objective.costs.constraint_data
+
     # policy
     K = policy.K
     k = policy.k
@@ -22,62 +45,122 @@ function rollout!(policy::PolicyData, problem::ProblemData, constraints::Constra
     Ks = policy.Ks
     ks = policy.ks
 
+    tau = max(0.99, 1 - constraints.μ)
+
+    ineq_duals = constraints.ineq_duals
+    nominal_ineq_duals = constraints.nominal_ineq_duals
+
+    slacks = constraints.slacks
+    nominal_slacks = constraints.nominal_slacks # current slack variables
+    
+    Ky = policy.Ky
+    ky = policy.ky
+
+    for (t, d) in enumerate(dynamics)
+        # s[t] .= s̄[t] + Ks[t] * (x[t] -x̄[t]) + step_size * ks[t]
+        update!(ineq_duals[t], nominal_ineq_duals[t], Ks[t], ks[t], x[t], x̄[t], step_size)
+
+
+        # y[t] .= ȳ[t] + Ky[t] * (x[t] -x̄[t]) + step_size * ky[t]
+        update!(slacks[t], nominal_slacks[t], Ky[t], ky[t], x[t], x̄[t], step_size)
+
+        # check slack and dual positivity
+        num_ineq = constraints.constraints.num_inequality 
+        if check_positivity(ineq_duals[t], nominal_ineq_duals[t], num_ineq, tau) == false
+            return false
+        else if check_positivity(slacks[t], nominal_slacks[t], num_ineq, tau) == false
+            return false
+        end
+        
+        # u[t] .= ū[t] + K[t] * (x[t] - x̄[t]) + step_size * k[t]
+        update!(u[t], ū[t], K[t], k[t], x[t], x̄[t], step_size)
+        
+        x[t+1] .= dynamics!(d, x[t], u[t], w[t])
+    end        
+    return true
+end
+
+function rollout_feasible!(policy::PolicyData, problem::ProblemData; 
+    step_size=1.0)
+    # model 
+    dynamics = problem.model.dynamics
+
+    # trajectories
+    x = problem.states
+    u = problem.actions
+    w = problem.parameters
+    x̄ = problem.nominal_states # old states
+    ū = problem.nominal_actions # old actions
+
     # initial state
     x[1] .= x̄[1]
 
-    τ = max(0.99, 1 - constraints.μ)
-    is_satisfied = true
+    constraints = problem.objective.costs.constraint_data
 
-    # rollout
+    # policy
+    K = policy.K
+    k = policy.k
+
+    Ks = policy.Ks
+    ks = policy.ks
+
+    tau = max(0.99, 1 - constraints.μ)
+
     for (t, d) in enumerate(dynamics)
         # u[t] .= ū[t] + K[t] * (x[t] - x̄[t]) + step_size * k[t]
-        u[t] .= k[t] 
-        u[t] .*= step_size 
-        u[t] .+= ū[t] 
-        mul!(u[t], K[t], x[t], 1.0, 1.0) 
-        mul!(u[t], K[t], x̄[t], -1.0, 1.0)
+        update!(u[t], ū[t], K[t], k[t], x[t], x̄[t], step_size)
 
         # s[t] .= s̄[t] + Ks[t] * (x[t] -x̄[t]) + step_size * ks[t]
-        # s_temp = s[t]
-        s[t] .*= step_size
-        s[t] .+= s̄[t]
-        mul!(s[t], K[t], x[t], 1.0, 1.0)  # s[t] = s[t] + step_size * ks[t] + Ks[t] * x[t] 
-        mul!(s[t], K[t], x̄[t], -1.0, 1.0) # s[t] = s[t] + step_size * ks[t] + Ks[t] * x[t] - Ks[t] * x̄[t]
-
-
-        # TODO: check this is correct
-        # check strict constraint satisfaction
-        for (i, dual_value) in enumerate(s[t])
-            if dual_value <  (1 - τ) * s̄[t][i]
-                is_satisfied = false
-                return is_satisfied
-            end
+        update!(ineq_duals[t], nominal_ineq_duals[t], Ks[t], ks[t], x[t], x̄[t], step_size)
+        
+        num_ineq = constraints.constraints.num_inequality 
+        # check dual variable positivity
+        if check_positivity(ineq_duals[t], nominal_ineqs[t], num_ineq, tau) == false
+            return false
         end
 
-        # check dual variable positivity
-        con = constraints.constraints[t]
-        con_temp = constraints.constraints[t]
-        con.num_constraint == 0 && continue
-        con.evaluate(con.evaluate_cache, states[t], actions[t], parameters[t])
-        for index in con.indices_inequality
-            if con.evaluate_cache[index] > (1 - τ) * con_temp.violations[index] # calculations are stored in violations
-                is_satisfied = false
-                return is_satisfied
-            end
+        # check strict constraint satisfaction
+        if check_constr_sat(constraints.constraints[t], tau, states[t], actions[t], parameters[t]) == false
+            return false
         end
 
         x[t+1] .= dynamics!(d, x[t], u[t], w[t])
-        return is_satisfied
     end
+    return true
 end
 
-function rollout(dynamics::Vector{Dynamics{T}}, initial_state, actions, 
-    parameters=[zeros(d.num_parameter) for d in dynamics]) where T
 
-    x_history = [initial_state]
-    for (t, d) in enumerate(dynamics) 
-        push!(x_history, copy(dynamics!(d, x_history[end], actions[t], parameters[t])))
+function update!(vt, nominal_vt, Kt, kt, xt, nominal_xt, step_size)
+    vt .= kt
+    vt .*= step_size
+    vt .+= nominal_vt
+    mul!(vt, Kt, xt, 1.0, 1.0)
+    mul!(vt, Kt, nominal_xt, -1.0 , 1.0)
+end
+
+function check_positivity(new; old, num_ineq, tau)
+"""
+    Assumes that the old vector already has positive values.
+"""
+    for i = 1:num_ineq
+        if new[i] <  (1 - tau) * old[i]
+            return false
+        end
     end
-    
-    return x_history
+    return true
+end
+
+function check_constr_sat(constr::Constraint, tau, state, action, parameters)
+    con_temp = constr
+    if constr.num_constraint == 0
+        return true
+    end
+    # otherwise, more than 1 constraint
+    constr.evaluate(constr.evaluate_cache, state, action, parameters) # compute new constraint values
+    for index in constr.indices_inequality
+        if constr.evaluate_cache[index] > (1 - tau) * con_temp.violations[index] # calculations are stored in violations
+            return false
+        end
+    end
+    return true
 end

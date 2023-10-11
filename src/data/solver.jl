@@ -15,9 +15,14 @@ struct SolverData{T}
     iterations::Vector{Int}
 
     cache::Dict{Symbol,Vector{T}}       # solver stats
+
+    perturbation::Float64 = 0           # μ, the perturbation
+    logcost::Vector{T}                  # log of cost for i-th iteration
+    err::Vector{T}                      # ??
+    filter::Vector{Vector{T}}           # filter
 end
 
-function solver_data(dynamics::Vector{Dynamics{T}}; 
+function solver_data(dynamics::Vector{Dynamics{T}};
     max_cache=1000) where T
 
     # indices x and u
@@ -43,7 +48,12 @@ function solver_data(dynamics::Vector{Dynamics{T}};
                  :max_violation => zeros(max_cache), 
                  :step_size     => zeros(max_cache))
 
-    SolverData(objective, gradient, max_violation, indices_state, indices_action, step_size, [false], [0], cache)
+    perturbation = 0
+    logcost = [0.0]
+    err = [0]
+    filter = [zeros(2)]
+
+    SolverData(objective, gradient, max_violation, indices_state, indices_action, step_size, [false], [0], cache, perturbation, logcost, err, filter)
 end
 
 function reset!(data::SolverData) 
@@ -56,6 +66,10 @@ function reset!(data::SolverData)
     fill!(data.cache[:step_size], 0.0) 
     data.status[1] = false
     data.iterations[1] = 0
+    data.perturbation = 0.0
+    data.logcost = [0.0]
+    data.err = [0]
+    data.filter = [zeros(2)]
 end
 
 # TODO: fix iter
@@ -64,7 +78,10 @@ function cache!(data::SolverData)
     # (iter > length(data[:objective])) && (@warn "solver data cache exceeded")
     data.cache[:objective][iter] = data.objective[1]
     data.cache[:gradient][iter] = data.gradient
-    data.cache[:max_violation][iter] = data.max_violation
     data.cache[:step_size][iter] = data.step_size
+    data.cache[:perturbation][iter] = data.perturbation
+    data.cache[:logcost][iter] = data.logcost
+    data.cache[:err][iter] = data.err
+    data.cache[:filter][iter] = data.filter
     return nothing
 end

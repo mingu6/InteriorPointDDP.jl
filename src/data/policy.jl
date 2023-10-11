@@ -31,6 +31,9 @@ struct PolicyData{N,M,NN,MM,MN,NNN,MNN,S,SN} # TODO: add S and SN
     Ks::Vector{SN} # θ
     ks::Vector{S} # η
 
+    Ky::Vector{SN} # χ
+    ky::Vector{S} # ζ
+
     # TODO: NOT IMPORTANT AND FLAG
     # What is the K_candidate for?
     K_candidate::Vector{MN} 
@@ -60,6 +63,9 @@ function policy_data(dynamics::Vector{Dynamics{T}}, constraints::ConstraintsData
 	Ks = [zeros(constraints[t].num_inequality, dynamics[t].num_state) for t = 1:H] # S by N
     ks = [zeros(c.num_inequality) for c in constraints] # S-length vector
 
+	Ky = [zeros(constraints[t].num_inequality, dynamics[t].num_state) for t = 1:H] # S by N
+    ky = [zeros(c.num_inequality) for c in constraints] # S-length vector
+
     K_candidate = [zeros(d.num_action, d.num_state) for d in dynamics]
     k_candidate = [zeros(d.num_action) for d in dynamics]
 
@@ -87,7 +93,7 @@ function policy_data(dynamics::Vector{Dynamics{T}}, constraints::ConstraintsData
 	uu_tmp = [zeros(d.num_action, d.num_action) for d in dynamics]
 	ux_tmp = [zeros(d.num_action, d.num_state) for d in dynamics]
 
-    PolicyData(K, k, Ks, ks, K_candidate, k_candidate, 
+    PolicyData(K, k, Ks, ks, Ky, ky, K_candidate, k_candidate, 
         value,
         action_value,
         x_tmp, u_tmp, xx̂_tmp, ux̂_tmp, uu_tmp, ux_tmp)

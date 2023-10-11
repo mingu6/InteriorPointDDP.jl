@@ -12,17 +12,15 @@ Base.@kwdef mutable struct Options{T}
     max_penalty::T=1.0e8
     reset_cache::Bool=false
     verbose=true
-end
-
-Base.@kwdef mutable struct BackwardPassParams{T}
+    # Backward Pass Params
     reg::Int8 = 0
-    failed::Bool = false
+    bp_failed::Bool = false
     feasible::Bool = false
     opterr::Float64 = 0.0
     recovery::Float64 = 0.0 
-end 
-
-Base.@kwdef mutable struct ForwardPassParams{T}
+    # Forward Pass Params
     step::Int8 = 0
-    failed::Bool = false 
+    fp_failed::Bool = false 
+    # IPDDP Params
+    method::Symbol=:ip # can be :al for augmented lagrangian
 end 

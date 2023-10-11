@@ -3,8 +3,7 @@ using LinearAlgebra
 function backward_pass!(policy::PolicyData, 
     problem::ProblemData,
     constraint_data::ConstraintData,
-    bp::BackwardPassParams,
-    fp::ForwardPassParams,
+    options::Options{T},
     mode=:nominal, 
     )
 
@@ -203,8 +202,8 @@ function backward_pass!(policy::PolicyData,
         end
     end
 
-    bp.failed=0;
-    bp.opterr=max([Qu_err, c_err, mu_err]);
+    options.bp_failed=0;
+    options.opterr=max([Qu_err, c_err, mu_err]);
     
 end
 

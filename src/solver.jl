@@ -8,7 +8,7 @@ mutable struct Solver{T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX}
     options::Options{T}
 end
 
-function Solver(dynamics::Vector{Dynamics{T}}, objective::Objective{T}, constraints::ConstraintsData; 
+function Solver(dynamics::Vector{Dynamics{T}}, objective::Objective{T}; 
     parameters=[[zeros(d.num_parameter) for d in dynamics]..., zeros(0)],
     options=Options{T}()) where T
 
@@ -20,7 +20,7 @@ function Solver(dynamics::Vector{Dynamics{T}}, objective::Objective{T}, constrai
         parameters=parameters)
 
     # allocate solver data
-    data = solver_data(dynamics, constraints)
+    data = solver_data(dynamics)
 
 	Solver(problem, policy, data, options)
 end
@@ -29,14 +29,21 @@ function Solver(dynamics::Vector{Dynamics{T}}, costs::Vector{Cost{T}}, constrain
     parameters=[[zeros(d.num_parameter) for d in dynamics]..., zeros(0)],
     options=Options{T}()) where T
 
-	# augmented Lagrangian
-	objective_al = augmented_lagrangian(dynamics, costs, constraints)
+    options.horizon = length(dynamics) # should be number of timesteps
+
+    if options.method == :ip
+        # interior point
+        objective = interior_point(dynamics, costs, constraints)
+    else
+    	# augmented Lagrangian
+	    objective = augmented_lagrangian(dynamics, costs, constraints)
+    end
 
     # allocate policy data  
     policy = policy_data(dynamics, constraints)
 
     # allocate model data
-    problem = problem_data(dynamics, objective_al, 
+    problem = problem_data(dynamics, objective, 
         parameters=parameters)
 
     # allocate solver data

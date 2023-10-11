@@ -1,5 +1,3 @@
-
-
 mutable struct ProblemData{T,X,U,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX}
     # current trajectory
     states::Vector{X}
@@ -21,6 +19,8 @@ mutable struct ProblemData{T,X,U,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX}
 
     # trajectory: z = (x1,..., xT, u1,..., uT-1) | Δz = (Δx1..., ΔxT, Δu1,..., ΔuT-1)
     trajectory::Vector{T}
+
+    horizon::Int
 end
 
 function problem_data(dynamics, costs; 
@@ -42,6 +42,8 @@ function problem_data(dynamics, costs;
     objective = objective_data(dynamics, costs)
 
     trajectory = zeros(num_trajectory(dynamics))
-
-    ProblemData(states, actions, parameters, nominal_states, nominal_actions, model, objective, trajectory)
+    
+    horizon = length(costs)
+    
+    ProblemData(states, actions, parameters, nominal_states, nominal_actions, model, objective, trajectory, horizon)
 end

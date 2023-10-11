@@ -1,4 +1,4 @@
-function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverData, constraints::ConstraintsData;
+function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverData, options::Options;
     line_search=:armijo,
     min_step_size=1.0e-5,
     c1=1.0e-4,
@@ -7,7 +7,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     verbose=false)
 
     # reset solver status
-    data.status[1] = false
+    data.status[1] = false # this is the same as failed in MATLAB
 
     # previous cost
     J_prev = data.objective[1]
@@ -25,34 +25,54 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     # line search with rollout
     data.step_size[1] = 1.0
     iteration = 1
+
+    feasible = options.feasible
+
     while data.step_size[1] >= min_step_size
         iteration > max_iterations && (verbose && (@warn "forward pass failure"), break)
 
         J = Inf
-
-        # try
-        is_satisfied = rollout!(policy, problem, constraints,
-            step_size=data.step_size[1])
-        J = cost!(data, problem, 
-            mode=:current)[1]
-        # catch
-        #     if verbose
-        #         @warn "rollout failure"
-        #         @show norm(data.gradient)
-        #     end
-        # end
         
-        # check Armijo and strict constraint satisfaction and that s dual are all positive
-        if (J <= J_prev + c1 * data.step_size[1] * delta_grad_product && is_satisfied)
-            # update nominal
-                update_nominal_trajectory!(problem, constraints)
-                data.objective[1] = J
-                data.status[1] = true
-                break
+
+        succ = rollout!(policy, problem, feasible, step_size=data.step_size[1])
+
+        data.status[1] = succ
+
+        if succ
+            J = cost!(data, probem, mode=:current)[1] # dunno what current does
+            if options.feasible
+                logcost = J - data.perturbation * sum(log(reshape(- cnew, 1, :))) # do cnew
+
         else
-            data.step_size[1] *= 0.5
-            iteration += 1
+            continue
         end
+        # if succ # if rollout is successful
+        #     J = cost!(data, problem, 
+        #     mode=:current)[1]
+        
+        #     # check Armijo and strict constraint satisfaction and that s dual are all positive
+        #     if (J <= J_prev + c1 * data.step_size[1] * delta_grad_product)
+        #     # update nominal
+        #         update_nominal_trajectory!(problem)
+        #         data.objective[1] = J
+        #         data.status[1] = true
+        #         break
+        #     else
+        #         data.step_size[1] *= 0.5
+        #         iteration += 1
+        #     end
+        # else
+        #     data.step_size[1] *= 0.5
+        #     iteration += 1
+        #     continue
+        #     continue
+        # end
+
+        # if data.status[1] == false
+        #     continue
+        # else
+        #     for t = 1:options.horizon
+
     end
     data.step_size[1] < min_step_size && (verbose && (@warn "line search failure"))
 end

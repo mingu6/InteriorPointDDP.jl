@@ -29,8 +29,9 @@ function cost!(data::SolverData, problem::ProblemData;
 	return data.objective
 end
 
-function update_nominal_trajectory!(data::ProblemData, constraints::ConstraintsData) 
-    H = length(data.states) 
+function update_nominal_trajectory!(data::ProblemData) 
+    H = data.horizon
+    constraints = data.objective.costs.constraint_data
     for t = 1:H 
         data.nominal_states[t] .= data.states[t] 
         t == H && continue 

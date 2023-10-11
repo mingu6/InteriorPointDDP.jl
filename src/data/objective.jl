@@ -1,7 +1,7 @@
 
 
 struct ObjectiveData{C,X,U,XX,UU,UX}
-    costs::C
+    costs::C # this is where the interior point object is stored
     gradient_state::Vector{X}
     gradient_action::Vector{U}
     hessian_state_state::Vector{XX}
