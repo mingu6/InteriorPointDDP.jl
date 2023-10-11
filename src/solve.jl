@@ -148,8 +148,7 @@ function ipddp_solve!(solver::Solver;
     iteration=true)
 
     # START TIMER
-    # time = @elapsed begin
-    costs = [] # what do I do with these???
+    costs = []
     steps = []
     (solver.options.verbose && iteration==1) && solver_info()
 
@@ -178,41 +177,26 @@ function ipddp_solve!(solver::Solver;
     reset_regularisation!(options)
 
     for i = 1:solver.options.max_iterations
-        gradients!(problem,
+        iter_time = @elapsed begin   
+            gradients!(problem,
         mode=:nominal)
         backward_pass!(policy, problem, constraints, options)
         forward_pass!(policy, problem, data, constraints,
             min_step_size=solver.options.min_step_size,
             line_search=solver.options.line_search,
             verbose=solver.options.verbose)
-    end
-
-        
-    # end # for timer
-
-        # info
-        data.iterations[1] += 1
-
-        if solver.options.verbose
-            println(
-            "iter:                  $i
-             perturbation:          $(data.perturbation)
-             cost:                  $(data.objective[1])
-             opterr:                $(options.opterr)
-             reg:                   $(options.reg)
-			 step_size:             $(data.step_size[1])")
-        else if mod(i, 10) == 1 
-            println(
-            "iter:                  $i
-             perturbation:          $(data.perturbation)
-             cost:                  $(data.objective[1])
-             opterr:                $(options.opterr)
-             reg:                   $(options.reg)
-			 step_size:             $(data.step_size[1])")
         end
+    
+        # info
+        pad_width = 12
+        data.iterations[1] += 1
+        if iter % 10 == 1
+            println(rpad("Iteration", 5), rpad("Time", 10), rpad("mu", 10), rpad("Cost", 10), rpad("Opt.error", 10), rpad("Reg.power", 5), rpad("Stepsize", 12))
+        if solver.options.verbose
+            println(rpad(string(i), 5), rpad(string(iter_time), 10), rpad(string(data.pertubation), 10), rpad(string(data.objective[1]), 10), rpad(string(options.opterr), 10), rpad(string(options.reg), 5), rpad(string(data.step_size[1]), 12))
 
-        costs = [costs; data.objective[1]]
-        steps = [steps; data.step_size[1]]
+        push!(costs, data.objective[1])
+        push!(steps, data.step_size[1])
 
         # check convergence
         if max(options.opterr, data.pertubation) <= options.objective_tolerance
@@ -229,27 +213,26 @@ end
 
 
 function reset_filter!(problem::ProblemData{T}, data::SolverData{T}) 
-    constraint_vals = problem.objective.costs.constraint_data.violations # check that fp.c is violations
+    constraint_vals = problem.objective.costs.constraint_data.violations
     cost = data.objective[1]
     perturbation = data.perturbation
     if !options.feasible
         slacks = problem.objective.costs.constraint_data.slacks
-        data.logcost[1] = cost - perturbation * sum(log.(reshape(slacks, 1, :)))
-        data.err[1] = norm(reshape(constraint_vals + slacks, 1, :), 1)
-        if data.err[1] < options.objective_tolerance
-            data.err[1] = 0
+        data.logcost = cost - perturbation * sum(log.(reshape(slacks, 1, :)))
+        data.err = norm(reshape(constraint_vals + slacks, 1, :), 1)
+        if data.err < options.objective_tolerance
+            data.err = 0
         end
     else
-        data.logcost[1] = cost - perturbation * sum(log.(reshape(-constraint_vals, 1, :)))
-        data.err[1] = 0
+        data.logcost = cost - perturbation * sum(log.(reshape(-1 .* constraint_vals, 1, :)))
+        data.err = 0
     end
-    data.filter[1] = [data.logcost, data.err]
-    options.step = 0
+    data.filter = [data.logcost, data.err]
     data.status[1] = true
 end
 
 function reset_regularisation!(options::Options{T})
     options.reg = 0
-    options.bp_failed = false
+    data.status[1] = true
     options.recovery = 0.0
 end

@@ -14,13 +14,9 @@ Base.@kwdef mutable struct Options{T}
     verbose=true
     # Backward Pass Params
     reg::Int8 = 0
-    bp_failed::Bool = false
-    # feasible::Bool = false
+    feasible::Bool = false
     opterr::Float64 = 0.0
     recovery::Float64 = 0.0 
-    # Forward Pass Params
-    step::Int8 = 0
-    # fp_failed::Bool = false 
     # IPDDP Params
     method::Symbol=:ip # can be :al for augmented lagrangian
 end 

@@ -19,7 +19,7 @@ struct SolverData{T}
     perturbation::Float64 = 0           # μ, the perturbation
     logcost::Float64                    # log of cost for i-th iteration
     err::Float64                        # ??
-    filter::Vector{T}          # filter
+    filter::Vector{T}                   # filter
 end
 
 function solver_data(dynamics::Vector{Dynamics{T}};
