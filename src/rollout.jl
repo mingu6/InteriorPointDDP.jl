@@ -138,6 +138,7 @@ function update!(vt, nominal_vt, Kt, kt, xt, nominal_xt, step_size)
     mul!(vt, Kt, nominal_xt, -1.0 , 1.0)
 end
 
+
 function check_positivity(new; old, num_ineq, tau)
 """
     Assumes that the old vector already has positive values.
@@ -149,6 +150,7 @@ function check_positivity(new; old, num_ineq, tau)
     end
     return true
 end
+
 
 function check_constr_sat(constr::Constraint, tau, state, action, parameters)
     con_temp = constr
