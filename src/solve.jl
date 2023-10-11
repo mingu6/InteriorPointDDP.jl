@@ -245,7 +245,7 @@ function reset_filter!(problem::ProblemData{T}, data::SolverData{T})
     end
     data.filter[1] = [data.logcost, data.err]
     options.step = 0
-    options.fp_failed = false
+    data.status[1] = true
 end
 
 function reset_regularisation!(options::Options{T})

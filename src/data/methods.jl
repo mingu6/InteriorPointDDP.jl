@@ -19,25 +19,21 @@ function cost!(data::SolverData, problem::ProblemData;
 		data.objective[1] = cost(problem.objective.costs, problem.states, problem.actions, problem.parameters)
 	end
 
-	if problem.objective.costs isa AugmentedLagrangianCosts
-		data.max_violation[1] = constraint_violation(
-            problem.objective.costs.constraint_data,
-			problem.states, problem.actions, problem.parameters,
-			norm_type = Inf)
-	end
-
 	return data.objective
 end
 
-function update_nominal_trajectory!(data::ProblemData) 
+function update_nominal_trajectory!(data::ProblemData, feasible::Bool) 
     H = data.horizon
     constraints = data.objective.costs.constraint_data
-    for t = 1:H 
-        data.nominal_states[t] .= data.states[t] 
-        t == H && continue 
-        data.nominal_actions[t] .= data.actions[t]
-        constraints.nominal_ineq[t] .= constraints.ineq[t]
-    end 
+
+    data.nominal_states[1:H] .= data.states[1:H]
+    if H > 1
+        data.nominal_actions[1:H-1] .= data.actions[1:H-1]
+        constraints.nominal_ineq[1:H-1] .= constraints.ineq[1:H-1]
+        if !feasible # if infeasible, update slack variables
+            constraints.nominal_slacks[1:H-1] .= constraints.slacks[1:H-1]
+        end
+    end
 end
 
 #TODO: clean up

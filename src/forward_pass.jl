@@ -7,13 +7,13 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     verbose=false)
 
     # reset solver status
-    data.status[1] = false # this is the same as failed in MATLAB
+    data.status[1] = true # this is the same as (not) failed in MATLAB
 
-    # previous cost
-    J_prev = data.objective[1]
+    # # previous cost
+    # J_prev = data.objective[1]
 
     # gradient of Lagrangian
-    lagrangian_gradient!(data, policy, problem) ## TODO: explore what this changes
+    lagrangian_gradient!(data, policy, problem)
 
     if line_search == :armijo
         trajectory_sensitivities(problem, policy, data) ## used to calculate problem.trajectory
@@ -27,25 +27,74 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     iteration = 1
 
     feasible = options.feasible
+    perturbation = data.pertubation
+    constr_data = problem.objective.costs.constraint_data
+    dynamics = problem.model.dynamics
+    violations = constr_data.violations
 
-    while data.step_size[1] >= min_step_size
+    while data.step_size[1] >= min_step_size # check whether we still want it to be this
         iteration > max_iterations && (verbose && (@warn "forward pass failure"), break)
 
         J = Inf
         
+        data.status[1] = rollout!(policy, problem, feasible, perturbation, step_size=data.step_size[1])
 
-        succ = rollout!(policy, problem, feasible, step_size=data.step_size[1])
+        if data.status[1] # not failed
+            cost!(data, probem, mode=:current)[1] # calls cost in methods.jl, which calls cost in interior_point.jl, saves result in data.objective[1]
+            J = data.objective[1]
 
-        data.status[1] = succ
-
-        if succ
-            J = cost!(data, probem, mode=:current)[1] # dunno what current does
             if options.feasible
-                logcost = J - data.perturbation * sum(log(reshape(- cnew, 1, :))) # do cnew
+                # update constraints with computed values in the cache (from rollout_feasible!)
+                for t = 1:length(dynamics)
+                    @views violations[t] .= constr_data[t].evaluate_cache
+                    # take inequalities and package them together
+                    for (i, index) in enumerate(constr_data[t].indices_inequality)
+                        constr_data.inequalities[t][i] = constr_data[t].evaluate_cache[index]
+                    end
+                end
+                logcost = J - perturbation * sum(log(-1.0 .* reshape(violations[t], 1, :))) 
+                err = 0
+            else
+                # infeasible
+                logcost = J - perturbation * sum(log(reshape(constr_data.slacks, 1, :)))
+                # update constraint values with new states and actions
+                constraint!(constr_data.violations, constr_data.inequalities, constr_data.constraints, problem.states, problem.actions, problem.parameters)
+                err = max(options.objective_tolerance, norm(reshape(constr_data.violations .+ constr_data.slacks ,1,:), 1))
+            end
 
+            candidate = [logcost, err]
+            if any(all(candidate .>= data.filter, dims=1))
+                data.status[1] = false
+                data.step_size[1] *= 0.5
+                iteration += 1
+                continue
+            else
+                # logcost and err are both lower than filter
+                # update variables
+                update_nominal_trajectory!(problem) # updates states, actions, duals, and slack vars
+                data.objective[1] = J # update cost
+                data.status[1] = true # update status
+                data.logcost = logcost
+                data.err = err
+                # constraints are updated above
+                break
+            end
         else
+            data.step_size[1] *= 0.5
+            iteration += 1
             continue
         end
+    end
+
+    if data.step_size[1] < min_step_size 
+        data.status[1] = false
+        data.step_size[1] = 0
+        verbose && (@warn "line search failure")
+    end
+end
+
+
+
         # if succ # if rollout is successful
         #     J = cost!(data, problem, 
         #     mode=:current)[1]
@@ -72,44 +121,3 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         #     continue
         # else
         #     for t = 1:options.horizon
-
-    end
-    data.step_size[1] < min_step_size && (verbose && (@warn "line search failure"))
-end
-
-# function strict_constraint_satisfaction(constraints::ConstraintsData)
-#     is_satisfied = true
-    
-#     # set tau
-#     τ = max(0.99, 1 - constraints.μ)
-
-#     # Approach 1: checks if any violation is greater than or equal to 0
-#     H = len(constraints.constraints)
-#     for t = 1:H-1
-#         for violation in constraints.violations[t]
-#             if violation >= 0
-#                 is_satisfied = false
-#                     break
-#             end
-#         end
-#     end
-
-#     # TODO: Approach 2: manually check constraints using indices_inequality
-#     return is_satisfied
-# end
-
-
-# function inequality_dual_positivity(constraints:: ConstraintsData)
-#     is_satisfied = true
-#     H = len(constraints.constraints)
-#     for t = 1:H-1
-#         for dual_var in constraints.ineq[t]
-#             # check if s_t > 0
-#             if !(dual_var > 0) 
-#                 is_satisfied = false
-#                     break
-#             end
-#         end
-#     end
-#     return is_satisfied
-# end

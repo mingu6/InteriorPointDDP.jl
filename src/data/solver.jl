@@ -17,9 +17,9 @@ struct SolverData{T}
     cache::Dict{Symbol,Vector{T}}       # solver stats
 
     perturbation::Float64 = 0           # μ, the perturbation
-    logcost::Vector{T}                  # log of cost for i-th iteration
-    err::Vector{T}                      # ??
-    filter::Vector{Vector{T}}           # filter
+    logcost::Float64                    # log of cost for i-th iteration
+    err::Float64                        # ??
+    filter::Vector{T}          # filter
 end
 
 function solver_data(dynamics::Vector{Dynamics{T}};
@@ -48,10 +48,10 @@ function solver_data(dynamics::Vector{Dynamics{T}};
                  :max_violation => zeros(max_cache), 
                  :step_size     => zeros(max_cache))
 
-    perturbation = 0
-    logcost = [0.0]
-    err = [0]
-    filter = [zeros(2)]
+    perturbation = 0.0
+    logcost = 0.0
+    err = 0.0
+    filter = [Inf , 0.0]
 
     SolverData(objective, gradient, max_violation, indices_state, indices_action, step_size, [false], [0], cache, perturbation, logcost, err, filter)
 end
