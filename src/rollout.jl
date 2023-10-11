@@ -121,7 +121,7 @@ function rollout_feasible!(policy::PolicyData, problem::ProblemData; perturbatio
 
         constraints = constr_data.constraints
         # check strict constraint satisfaction
-        if check_constr_sat(constraints[t], tau, states[t], actions[t], parameters[t]) == false
+        if check_constr_sat!(constraints[t], tau, states[t], actions[t], parameters[t]) == false
             return false
         end
 
@@ -153,16 +153,15 @@ function check_positivity(new; old, num_ineq, tau)
 end
 
 
-function check_constr_sat(constr::Constraint, tau, state, action, parameters)
+function check_constr_sat!(constr::Constraint, tau, state, action, parameters)
     if constr.num_constraint == 0
         return true
     end
     # otherwise, more than 1 constraint
     constr.evaluate(constr.evaluate_cache, state, action, parameters) # compute new constraint values, not stored to violations yet
-    for index in constr.indices_inequality
-        if constr.evaluate_cache[index] > (1 - tau) * constr.violations[index]
+    indices_inequality = constr.indices_inequality
+    if any(constr.evaluate_cache[indices_inequality] > (1 - tau) .*  constr.violations[indices_inequality])
             return false
-        end
     end
     return true
 end

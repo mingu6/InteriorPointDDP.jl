@@ -48,9 +48,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
                 for t = 1:length(dynamics)
                     @views violations[t] .= constr_data[t].evaluate_cache
                     # take inequalities and package them together
-                    for (i, index) in enumerate(constr_data[t].indices_inequality)
-                        constr_data.inequalities[t][i] = constr_data[t].evaluate_cache[index]
-                    end
+                    @views constr_data.inequalities[t] .= constr_data[t].evaluate_cache[constr_data[t].indices_inequality] # cool indexing trick
                 end
                 logcost = J - perturbation * sum(log(-1.0 .* reshape(violations[t], 1, :))) 
                 err = 0

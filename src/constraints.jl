@@ -70,12 +70,8 @@ function constraint!(violations, inequalities, constraints::Constraints{T}, stat
         con.num_constraint == 0 && continue
         con.evaluate(con.evaluate_cache, states[t], actions[t], parameters[t])
         @views violations[t] .= con.evaluate_cache
-
         # take inequalities and package them together
-        for (i, index) in enumerate(con.indices_inequality)
-            inequalities[t][i] = con.evaluate_cache[index]
-        end
-
+        @views inequalities[t] .= con.evaluate_cache[con.indices_inequality] # cool indexing trick
         fill!(con.evaluate_cache, 0.0) # TODO: confirm this is necessary
     end
 end
