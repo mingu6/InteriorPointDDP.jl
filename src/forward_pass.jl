@@ -44,12 +44,15 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
             J = data.objective[1]
 
             if options.feasible
+                # TODO: don't need to update violations because there's a view from violations to evaluate_cache
+
                 # update constraints with computed values in the cache (from rollout_feasible!)
-                for t = 1:length(dynamics)
-                    @views violations[t] .= constr_data[t].evaluate_cache
-                    # take inequalities and package them together
-                    @views constr_data.inequalities[t] .= constr_data[t].evaluate_cache[constr_data[t].indices_inequality] # cool indexing trick
-                end
+                # for t = 1:length(dynamics)
+                #     @views violations[t] .= constr_data[t].evaluate_cache
+                #     # take inequalities and package them together
+                #     @views constr_data.inequalities[t] .= constr_data[t].evaluate_cache[constr_data[t].indices_inequality] # cool indexing trick
+                # end
+
                 logcost = J - perturbation * sum(log(-1.0 .* reshape(violations[t], 1, :))) 
                 err = 0
             else

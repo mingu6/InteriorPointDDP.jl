@@ -20,10 +20,16 @@ end
 function constraint_data(model::Model, constraints::Constraints) 
     H = length(constraints)
     c = [zeros(constraints[t].num_constraint) for t = 1:H]
+    ineqs = [zeros(constraints[t].num_inequality) for t = 1:H]
+
+    # take inequalities and package them together
+    for t = 1:H
+        @views c[t] .= constraints[t].evaluate_cache
+        @views ineqs[t] .= constraints[t].evaluate_cache[con.indices_inequality] # cool indexing trick
+
     cx = [zeros(constraints[t].num_constraint, t < H ? model[t].num_state : model[H-1].num_next_state) for t = 1:H]
     cu = [zeros(constraints[t].num_constraint, model[t].num_action) for t = 1:H-1]
     
-    ineqs = [zeros(constraints[t].num_inequality) for t = 1:H]
     constraint_duals = [zeros(constraints[t].num_constraint) for t = 1:H]
     
     ineq_duals = [0.1 .* ones(constraints[t].num_inequality) for t = 1:H]
