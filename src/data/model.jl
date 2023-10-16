@@ -2,14 +2,14 @@
     Model Data
 """
 
-struct ModelData{T,X,U,W,XX,XU,UU}
+struct ModelData{T,X,U,W} # TODO: XX,XU,UU include later 
     dynamics::Vector{Dynamics{T}}
     jacobian_state::Vector{X}
     jacobian_action::Vector{U}
 	jacobian_parameter::Vector{W} # TODO: Remove
-    hessian_state_state::Vector{XX}
-    hessian_state_action::Vector{XU}
-    hessian_action_action::Vector{UU}
+    # hessian_state_state::Vector{XX}
+    # hessian_state_action::Vector{XU}
+    # hessian_action_action::Vector{UU}
 end
 
 function model_data(dynamics::Vector{Dynamics{T}}) where T

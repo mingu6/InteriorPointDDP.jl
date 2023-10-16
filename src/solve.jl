@@ -15,8 +15,10 @@ function ilqr_solve!(solver::Solver;
         mode=:nominal)
     gradients!(problem,
         mode=:nominal)
-    backward_pass!(policy, problem,
-        mode=:nominal)
+    backward_pass!(policy, 
+        problem,
+        solver.data,
+        solver.options)
 
     obj_prev = data.objective[1]
     for i = 1:solver.options.max_iterations
