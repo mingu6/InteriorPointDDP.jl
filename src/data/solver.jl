@@ -1,7 +1,7 @@
 """
     Solver Data
 """
-struct SolverData{T}
+mutable struct SolverData{T}
     objective::Vector{T}                # objective value
     gradient::Vector{T}                 # Lagrangian gradient
     max_violation::Vector{T}            # maximum constraint violation

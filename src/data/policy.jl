@@ -49,7 +49,7 @@ struct PolicyData{N,M,NN,MM,MN,NNN,MNN,S,SN} # TODO: add S and SN
 	ux_tmp::Vector{MN}
 end
 
-function policy_data(dynamics::Vector{Dynamics{T}}, constraints::ConstraintsData) where T
+function policy_data(dynamics::Vector{Dynamics{T}}, constraints::Constraints{T}) where T
     # policy
 	Ku = [zeros(d.num_action, d.num_state) for d in dynamics]
     ku = [zeros(d.num_action) for d in dynamics]

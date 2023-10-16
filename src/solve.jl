@@ -145,6 +145,9 @@ function solve!(solver::Solver{T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O}, args...; kwargs.
     constrained_ilqr_solve!(solver, args...; kwargs...)
 end
 
+function solve!(solver::Solver{T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O}, args...; kwargs...) where {T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O<:InteriorPoint{T}}
+    ipddp_solve!(solver, args...; kwargs...)
+end
 
 function ipddp_solve!(solver::Solver; 
     iteration=true)
@@ -168,15 +171,15 @@ function ipddp_solve!(solver::Solver;
 	initial_cost = cost!(data, problem,
         mode=:nominal)
 
-    if data.pertubation == 0
+    if data.perturbation == 0
         initial_cost = initial_cost[1] # = data.objective[1] which is the obj func/cost for first iteration
         horizon = problem.horizon
         num_inequals = constraints.constraints[1].num_inequality
-        data.pertubation = initial_cost/horizon/num_inequals
+        data.perturbation = initial_cost/horizon/num_inequals
     end
 
     reset_filter!(problem, data, options)
-    reset_regularisation!(options)
+    reset_regularisation!(data, options)
 
     for i = 1:solver.options.max_iterations
         iter_time = @elapsed begin   
@@ -196,19 +199,19 @@ function ipddp_solve!(solver::Solver;
             println(rpad("Iteration", 5), rpad("Time", 10), rpad("mu", 10), rpad("Cost", 10), rpad("Opt.error", 10), rpad("Reg.power", 5), rpad("Stepsize", 12))
         end
         if solver.options.verbose
-            println(rpad(string(i), 5), rpad(string(iter_time), 10), rpad(string(data.pertubation), 10), rpad(string(data.objective[1]), 10), rpad(string(options.opterr), 10), rpad(string(options.reg), 5), rpad(string(data.step_size[1]), 12))
+            println(rpad(string(i), 5), rpad(string(iter_time), 10), rpad(string(data.perturbation), 10), rpad(string(data.objective[1]), 10), rpad(string(options.opterr), 10), rpad(string(options.reg), 5), rpad(string(data.step_size[1]), 12))
         end 
 
         push!(costs, data.objective[1])
         push!(steps, data.step_size[1])
 
         # check convergence
-        if max(options.opterr, data.pertubation) <= options.objective_tolerance
+        if max(options.opterr, data.perturbation) <= options.objective_tolerance
             print("Optimality reached")
         end
 
-        if options.opterr <= 0.2 * data.pertubation
-            data.pertubation = max(options.objective_tolerance/10.0, min(0.2 * data.pertubation, data.pertubation^1.2))
+        if options.opterr <= 0.2 * data.perturbation
+            data.perturbation = max(options.objective_tolerance/10.0, min(0.2 * data.perturbation, data.perturbation^1.2))
         end
     end
 
@@ -216,26 +219,31 @@ function ipddp_solve!(solver::Solver;
 end
 
 
-function reset_filter!(problem::ProblemData, data::SolverData) 
+function reset_filter!(problem::ProblemData, data::SolverData, options::Options) 
     constraint_vals = problem.objective.costs.constraint_data.violations
     cost = data.objective[1]
     perturbation = data.perturbation
     if !options.feasible
         slacks = problem.objective.costs.constraint_data.slacks
-        data.logcost = cost - perturbation * sum(log.(reshape(slacks, 1, :)))
-        data.err = norm(reshape(constraint_vals + slacks, 1, :), 1)
+        data.logcost = cost - perturbation * sum(log.(vcat(slacks...)))
+        # Add padding
+        flattened_sum = vcat([(length(s) > length(c) ? vcat(c, zeros(length(s) - length(c))) : c) + 
+                      (length(s) < length(c) ? vcat(s, zeros(length(c) - length(s))) : s) 
+                      for (s, c) in zip(slacks, constraint_vals)]...)
+        data.err = norm(flattened_sum, 1)
+        # TODO: Less than or not less than?
         if data.err < options.objective_tolerance
             data.err = 0
         end
     else
-        data.logcost = cost - perturbation * sum(log.(reshape(-1 .* constraint_vals, 1, :)))
+        data.logcost = cost - perturbation * sum(log.(vcat((-1 .* constraint_vals)...)))
         data.err = 0
     end
     data.filter = [data.logcost, data.err]
     data.status[1] = true
 end
 
-function reset_regularisation!(options::Options)
+function reset_regularisation!(data::SolverData, options::Options)
     options.reg = 0
     data.status[1] = true
     options.recovery = 0.0

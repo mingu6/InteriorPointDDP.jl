@@ -93,6 +93,6 @@ function gradients!(problem::ProblemData;
     mode=:nominal)
     gradients!(problem.model.dynamics, problem, 
         mode=mode)
-    gradients!(problem.objective.costs, problem, 
+    gradients!(problem.objective.costs.objective, problem, 
         mode=mode)
 end

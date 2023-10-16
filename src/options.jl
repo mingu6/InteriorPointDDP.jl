@@ -13,6 +13,7 @@ Base.@kwdef mutable struct Options{T}
     reset_cache::Bool=false
     verbose=true
     # Backward Pass Params
+    horizon::Int = 0
     reg::Int8 = 0
     feasible::Bool = false
     opterr::Float64 = 0.0

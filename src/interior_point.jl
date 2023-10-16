@@ -46,4 +46,4 @@ function cost(interior_point::InteriorPoint, states, actions, parameters)
     return J
 end
 
-Base.length(objective::AugmentedLagrangianobjective) = length(objective.objective)
+Base.length(objective::InteriorPoint) = length(objective.objective)
