@@ -1,4 +1,4 @@
-function rollout!(policy::PolicyData, problem::ProblemData; feasible::Bool; perturbation::Float64;
+function rollout!(policy::PolicyData, problem::ProblemData, feasible::Bool, perturbation::Float64;
     step_size=1.0)
 
     if feasible
@@ -21,7 +21,7 @@ function rollout(dynamics::Vector{Dynamics{T}}, initial_state, actions,
 end
 
 
-function rollout_infeasible!(policy::PolicyData, problem::ProblemData; perturbation;
+function rollout_infeasible!(policy::PolicyData, problem::ProblemData, perturbation;
     step_size=1.0)
     # model 
     dynamics = problem.model.dynamics
@@ -68,7 +68,7 @@ function rollout_infeasible!(policy::PolicyData, problem::ProblemData; perturbat
         num_ineq = constr_data.constraints.num_inequality 
         if check_positivity(ineq_duals[t], nominal_ineq_duals[t], num_ineq, tau) == false
             return false
-        else if check_positivity(slacks[t], nominal_slacks[t], num_ineq, tau) == false
+        elseif check_positivity(slacks[t], nominal_slacks[t], num_ineq, tau) == false
             return false
         end
         
@@ -80,7 +80,7 @@ function rollout_infeasible!(policy::PolicyData, problem::ProblemData; perturbat
     return true
 end
 
-function rollout_feasible!(policy::PolicyData, problem::ProblemData; perturbation;
+function rollout_feasible!(policy::PolicyData, problem::ProblemData, perturbation;
     step_size=1.0)
     # model 
     dynamics = problem.model.dynamics

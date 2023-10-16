@@ -3,7 +3,6 @@
 """
 # TODO: consider splitting eq and inequality constraints apart rather than using indices_inequality to determine inequalities
 
-
 struct ConstraintsData{T,C,CX,CU,S}
     constraints::Constraints{T}
     violations::Vector{C} # the current value of each constraint
@@ -26,7 +25,8 @@ function constraint_data(model::Model, constraints::Constraints)
     for t = 1:H
         @views c[t] .= constraints[t].evaluate_cache
         @views ineqs[t] .= constraints[t].evaluate_cache[con.indices_inequality] # cool indexing trick
-
+    end
+    
     cx = [zeros(constraints[t].num_constraint, t < H ? model[t].num_state : model[H-1].num_next_state) for t = 1:H]
     cu = [zeros(constraints[t].num_constraint, model[t].num_action) for t = 1:H-1]
     

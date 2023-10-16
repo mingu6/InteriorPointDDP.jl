@@ -194,8 +194,10 @@ function ipddp_solve!(solver::Solver;
         data.iterations[1] += 1
         if iter % 10 == 1
             println(rpad("Iteration", 5), rpad("Time", 10), rpad("mu", 10), rpad("Cost", 10), rpad("Opt.error", 10), rpad("Reg.power", 5), rpad("Stepsize", 12))
+        end
         if solver.options.verbose
             println(rpad(string(i), 5), rpad(string(iter_time), 10), rpad(string(data.pertubation), 10), rpad(string(data.objective[1]), 10), rpad(string(options.opterr), 10), rpad(string(options.reg), 5), rpad(string(data.step_size[1]), 12))
+        end 
 
         push!(costs, data.objective[1])
         push!(steps, data.step_size[1])
@@ -214,7 +216,7 @@ function ipddp_solve!(solver::Solver;
 end
 
 
-function reset_filter!(problem::ProblemData{T}, data::SolverData{T}) 
+function reset_filter!(problem::ProblemData, data::SolverData) 
     constraint_vals = problem.objective.costs.constraint_data.violations
     cost = data.objective[1]
     perturbation = data.perturbation
@@ -233,7 +235,7 @@ function reset_filter!(problem::ProblemData{T}, data::SolverData{T})
     data.status[1] = true
 end
 
-function reset_regularisation!(options::Options{T})
+function reset_regularisation!(options::Options)
     options.reg = 0
     data.status[1] = true
     options.recovery = 0.0

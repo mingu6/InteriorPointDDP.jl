@@ -16,7 +16,7 @@ struct SolverData{T}
 
     cache::Dict{Symbol,Vector{T}}       # solver stats
 
-    perturbation::Float64 = 0           # μ, the perturbation
+    perturbation::Float64               # μ, the perturbation
     logcost::Float64                    # log of cost for i-th iteration
     err::Float64                        # ??
     filter::Vector{T}                   # filter
