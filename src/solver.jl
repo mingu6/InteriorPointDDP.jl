@@ -29,8 +29,6 @@ function Solver(dynamics::Vector{Dynamics{T}}, costs::Vector{Cost{T}}, constrain
     parameters=[[zeros(d.num_parameter) for d in dynamics]..., zeros(0)],
     options=Options{T}()) where T
 
-    options.horizon = length(dynamics) # should be number of timesteps
-
     if options.method == :ip
         # interior point
         objective = interior_point(dynamics, costs, constraints)

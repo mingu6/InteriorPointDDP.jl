@@ -185,8 +185,8 @@ function ipddp_solve!(solver::Solver;
         iter_time = @elapsed begin   
             gradients!(problem,
         mode=:nominal)
-        backward_pass!(policy, problem, constraints, options)
-        forward_pass!(policy, problem, data, constraints,
+        backward_pass!(policy, problem, options)
+        forward_pass!(policy, problem, data, options,
             min_step_size=solver.options.min_step_size,
             line_search=solver.options.line_search,
             verbose=solver.options.verbose)

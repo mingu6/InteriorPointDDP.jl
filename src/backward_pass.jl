@@ -3,7 +3,7 @@ using LinearAlgebra
 function backward_pass!(policy::PolicyData, 
     problem::ProblemData,
     # constraint_data::ConstraintsData,
-    solver_data::SolverData,
+    # solver_data::SolverData,
     options::Options,
     mode=:nominal, 
     )
