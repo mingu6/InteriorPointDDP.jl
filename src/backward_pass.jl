@@ -1,52 +1,50 @@
 using LinearAlgebra
 
 function backward_pass!(policy::PolicyData, 
+    solver_data::SolverData,
     problem::ProblemData,
-    # constraint_data::ConstraintsData,
-    # solver_data::SolverData,
     options::Options,
-    mode=:nominal, 
+    mode=:nominal
     )
 
+    # Constraint Data 
+    constraint_data = problem.objective.costs.constraint_data
     # Horizon 
     H = length(problem.states)
-
-    # Dimensions 
-    dim_x = length(problem.states)
-    dim_u = length(problem.actions)
-    # dim_c = length(constraint_data.constraints)
-
     # Errors
     dV = [0.0, 0.0]
     c_err::Float64 = 0
     mu_err::Float64 = 0
     Qu_err::Float64 = 0
 
+    # Dimensions 
+    dim_x = length(problem.states)
+    dim_u = length(problem.actions)
+    dim_c = length(constraint_data.constraints)
+
     # Current trajectory
     x = problem.states
     u = problem.actions
 
     # Constraints 
-    # c = constraint_data.constraints
+    c = constraint_data.constraints
 
     # Dual variables 
-    # TODO: Double check that these are correct 
-    s = problem.dual.ineq
-    λ = problem.dual.ineq
+    s = constraint_data.ineq_duals
     
     # Jacobians of system dynamics
     fx = problem.model.jacobian_state
     fu = problem.model.jacobian_action
     # Hessians of system dynamics 
-    fxx = problem.model.hessian_state_state
-    fxu = problem.model.hessian_state_action
-    fuu = problem.model.hessian_action_action
+    # fxx = problem.model.hessian_state_state
+    # fxu = problem.model.hessian_state_action
+    # fuu = problem.model.hessian_action_action
     # Jacobian constraints 
-    # Qsx = constraint_data.jacobian_state
-    # Qsu = constraint_data.jacobian_action
+    Qsx = constraint_data.jacobian_state
+    Qsu = constraint_data.jacobian_action
 
     # Cost 
-    q = problem.objective.costs
+    q = problem.objective.costs # objective.evaluate_cache is the cost (V in MATLAB)
     # Cost gradients
     qx = problem.objective.gradient_state
     qu = problem.objective.gradient_action
@@ -62,15 +60,9 @@ function backward_pass!(policy::PolicyData,
     Quu = policy.action_value.hessian_action_action
     Qux = policy.action_value.hessian_action_state
 
-    # Gains/Policy
-    # TODO: Need one for slack for infeasible ipddp
-    # Action-gains (K = Ku) and (k = ku)
-    K = policy.K
-    k = policy.k
-
-    # Gains for ineq dual variable 
-    Ks = policy.Ks
-    ks = policy.ks
+    # Value function
+    Vx = policy.value.gradient
+    Vxx = policy.value.hessian
 
     # terminal value function
     # TODO: Extension: Implement terminal constraints 
@@ -78,15 +70,15 @@ function backward_pass!(policy::PolicyData,
     Vx[H] .= qx[H]
 
     for t = H-1:-1:1
-        # Qx[t] .= qx[t] + (Qsx[t]' * s) + (fx[t]' * Vx[t+1])
-        mul!(policy.x_tmp, transpose(Qsx[t]), s)
-        mul!(Qu[t], transpose(fx[t]), Vx[t+1])
-        Qu[t] .+= qx[t] + policy.x_tmp
+        # Qx[t] .= qx[t] + (Qsx[t]' * s[t]) + (fx[t]' * Vx[t+1])
+        mul!(policy.x_tmp[t], transpose(Qsx[t]), s[t])
+        mul!(Qx[t], transpose(fx[t]), Vx[t+1])
+        Qx[t] .+= qx[t] + policy.x_tmp[t]
 
-        # Qu[t] .= qu[t] + (Qsu[t]' * s) + (fu[t]' * Vx[t+1])
-        mul!(policy.u_tmp, transpose(Qsu[t]), s)
+        # Qu[t] .= qu[t] + (Qsu[t]' * s[t]) + (fu[t]' * Vx[t+1])
+        mul!(policy.u_tmp[t], transpose(Qsu[t]), s[t])
         mul!(Qu[t], transpose(fu[t]), Vx[t+1])
-        Qu[t] .+= qu[t] + policy.u_tmp
+        Qu[t] .+= qu[t] + policy.u_tmp[t]
 
         # Qxx[t] .= qxx[t] + ((fx[t]' * Vxx[t+1]) * fx[t])
         mul!(policy.xx̂_tmp[t], transpose(fx[t]), Vxx[t+1])
@@ -99,15 +91,16 @@ function backward_pass!(policy::PolicyData,
         Quu[t] .+= quu[t]
 
         # Qux[t] .= qux[t] + ((fu[t]' * Vxx[t+1]) * fx[t])
-        # TODO: Is this symmetric to Qxu in the matlab code?
         mul!(policy.ux̂_tmp[t], transpose(fu[t]), Vxx[t+1])
         mul!(Qux[t], policy.ux̂_tmp[t], fx[t])
         Qux[t] .+= qux[t]
 
-        S = Diagonal(s)
+        ## TODO: Hacky way since it's symmetric
+        Qxu = transpose(Qux[t])
+        S = Diagonal(s[t])
 
+        mu = solver_data.perturbation
         Quu_reg = Quu[t] + quu[t] * (1.6^options.reg - 1) 
-        # mu = constraint_data.pertubation
 
         # Here is a bunch of future TODO 
         # 1) Factor out ku and Ku 
@@ -115,19 +108,15 @@ function backward_pass!(policy::PolicyData,
         if options.feasible
             # TODO: Can be recomputed
             # TODO: Call a direct factorisation solver
-            r = S * c + mu
-            cinv = 1.0 ./ c
-            SCinv = Diagonal(s .* cinv)
+            r = S * c[t].evaluate_cache .+ mu
+            cinv = 1.0 ./ c[t].evaluate_cache
+            SCinv = Diagonal(s[t] .* cinv)
 
             # Compute gains
-            # res = compute_gains!(policy, constraint_data, options, SCinv, SYinv, cinv, r, S, t)
-            # if !res
-            #     solver_data.status[1] = true    
-            #     break 
-            # end
+            compute_gains!(policy, constraint_data, SCinv, cinv, r, S, t, Qxu, Quu_reg)
 
             # Update action value function 
-            # update_action_value_function!(policy, constraint_data, SCinv, cinv, r)
+            update_action_value_function!(policy, constraint_data, SCinv, cinv, r, t)
 
             # TODO: Move error out once infeasible is complete
             # Error mapping 
@@ -142,17 +131,15 @@ function backward_pass!(policy::PolicyData,
         end
     end
 
-    data.status[1] =false;
-    otpions.opterr=max([Qu_err, c_err, mu_err]);
-    
+    options.opterr=max([Qu_err, c_err, mu_err]);
 end
 
 
-function compute_gains!(policy, constraint_data, options, SCinv, SYinv, cinv, r, S, t)
+function compute_gains!(policy, constraint_data, SCinv, cinv, r, S, t, Qxu, Quu_reg)
 
     # Gains 
-    K = policy.K
-    k = policy.k
+    Ku = policy.Ku
+    ku = policy.ku
     Ks = policy.Ks
     ks = policy.ks
     # Action value gradient w.r.t to action
@@ -161,29 +148,28 @@ function compute_gains!(policy, constraint_data, options, SCinv, SYinv, cinv, r,
     Qsx = constraint_data.jacobian_state
     Qsu = constraint_data.jacobian_action
 
-    Quu_reg = Quu[t] + quu[t] * (1.6^options.reg - 1) 
-
-    cholesky_decomp = cholesky(Quu_reg .- Qsu' * SYinv * Qsu, check=false)
+    cholesky_decomp = cholesky(Quu_reg .- Qsu[t]' * SCinv * Qsu[t], check=false)
     
-    # TODO: Update it here
+    # TODO: Fix regularisation 
     if !issuccess(cholesky_decomp)
         return false 
     end 
 
     R = cholesky_decomp.U
-    kK = -R \ (R' \ [Qu - Qsu' * (cinv .* r), Qxu' - Qsu' * SCinv * Qsx])
-    
+    b = hcat(Qu[t] - Qsu[t]' * (cinv .* r), Qxu' - Qsu[t]' * SCinv * Qsx[t])
+    kK = -R \ (R' \ b)
+
     # Update gains for K (Ku) and k (ku)
-    k[t] = kK[:, 1]
-    K[t] = kK[:, 2:end]
+    ku[t] = kK[:, 1]
+    Ku[t] = kK[:, 2:end]
     
     # Update gains for ineq dual variable ks and Ks
-    ks[t] = -cinv .* (r .+ S * Qsu * k[t])
-    Ks[t] = -SCinv * (Qsx .+ Qsu * K[t])
+    ks[t] = -cinv .* (r .+ S * Qsu[t] * ku[t])
+    Ks[t] = -SCinv * (Qsx[t] .+ Qsu[t] * Ku[t])
 end
 
 
-function update_action_value_function!(policy, constraint_data, SCinv, cinv, r)
+function update_action_value_function!(policy, constraint_data, SCinv, cinv, r, t)
     # Jacobian constraints 
     Qsx = constraint_data.jacobian_state
     Qsu = constraint_data.jacobian_action
@@ -195,11 +181,11 @@ function update_action_value_function!(policy, constraint_data, SCinv, cinv, r)
     Quu = policy.action_value.hessian_action_action
     Qux = policy.action_value.hessian_action_state
 
-    Quu .-= Qsu' * SCinv * Qsu
-    Qux .-= Qsx' * SCinv * Qsu
-    Qxx .-= Qsx' * SCinv * Qsx
-    Qu .-= Qsu' * (cinv .* r)
-    Qx .-= Qsx' * (cinv .* r)
+    Quu[t] .-= Qsu[t]' * SCinv * Qsu[t]
+    Qux[t] .-= transpose(Qsx[t]' * SCinv * Qsu[t])
+    Qxx[t] .-= Qsx[t]' * SCinv * Qsx[t]
+    Qu[t] .-= Qsu[t]' * (cinv .* r)
+    Qx[t] .-= Qsx[t]' * (cinv .* r)
 end
 
 function update_value_function!(policy, t)
@@ -214,21 +200,21 @@ function update_value_function!(policy, t)
     Quu = policy.action_value.hessian_action_action
     Qux = policy.action_value.hessian_action_state
     # Gains values
-    K = policy.K
-    k = policy.k
+    Ku = policy.Ku
+    ku = policy.ku
 
     # Vxx[t] .=  Qxx[t] + (K[t]' * (Quu[t] * K[t])) + (K[t]' * Qux[t]) + (Qux[t]' * K[t])
-    mul!(policy.ux_tmp[t], Quu[t], K[t])
-    mul!(Vxx[t], transpose(K[t]), policy.ux_tmp[t])
-    mul!(Vxx[t], transpose(K[t]), Qux[t], 1.0, 1.0) # apply appropriate scaling 
-    mul!(Vxx[t], transpose(Qux[t]), K[t], 1.0, 1.0) # apply appropriate scaling
+    mul!(policy.ux_tmp[t], Quu[t], Ku[t])
+    mul!(Vxx[t], transpose(Ku[t]), policy.ux_tmp[t])
+    mul!(Vxx[t], transpose(Ku[t]), Qux[t], 1.0, 1.0) # apply appropriate scaling 
+    mul!(Vxx[t], transpose(Qux[t]), Ku[t], 1.0, 1.0) # apply appropriate scaling
     Vxx[t] .+= Qxx[t]
 
     # Vx[t] .=  Qx[t] + (K[t]' * Quu[t] * k[t]) + (K[t]' * Qu[t]) + (Qux[t]' * k[t])
-    mul!(policy.u_tmp, Quu[t], k[t])
-    mul!(Vx[t], transpose(K[t]), policy.u_tmp)
-    mul!(Vx[t], transpose(K[t]), Qu[t], 1.0, 1.0) # apply appropriate scaling 
-    mul!(Vx[t], transpose(Qux[t]), k[t], 1.0, 1.0) # apply appropriate scaling 
+    mul!(policy.u_tmp[t], Quu[t], ku[t])
+    mul!(Vx[t], transpose(Ku[t]), policy.u_tmp[t])
+    mul!(Vx[t], transpose(Ku[t]), Qu[t], 1.0, 1.0) # apply appropriate scaling 
+    mul!(Vx[t], transpose(Qux[t]), ku[t], 1.0, 1.0) # apply appropriate scaling 
     Vx[t] .+= Qx[t]
 
 end

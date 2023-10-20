@@ -20,11 +20,10 @@ end
 """
     Policy Data
 """
-struct PolicyData{N,M,NN,MM,MN,NNN,MNN,S,SN} # TODO: add S and SN
+struct PolicyData{N,M,NN,MM,MN,NNN,MNN,S,SN} 
     # policy u = ū + K * (x - x̄) + k
     Ku::Vector{MN} # β
     ku::Vector{M}  # α
-    ## TODO: refactor to Ku and ku
 
     # S = # of inequality dual variables
     # N = # of states

@@ -28,7 +28,7 @@ function constraint_data(model::Model, constraints::Constraints)
     end
     
     cx = [zeros(constraints[t].num_constraint, t < H ? model[t].num_state : model[H-1].num_next_state) for t = 1:H]
-    cu = [zeros(constraints[t].num_constraint, model[t].num_action) for t = 1:H-1]
+    cu = [zeros(constraints[t].num_constraint, model[t].num_action) for t = 1:H]
     
     constraint_duals = [zeros(constraints[t].num_constraint) for t = 1:H]
     

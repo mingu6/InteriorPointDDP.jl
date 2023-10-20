@@ -9,20 +9,27 @@ using LinearAlgebra
 using Plots
 
 # ## horizon 
-T = 51 
+T = 51
 
 # ## car 
-num_state = 3
+num_state = 4
 num_action = 2
 num_parameter = 0 
 
 function car_continuous(x, u)
-    [u[1] * cos(x[3]); u[1] * sin(x[3]); u[2]]
+    d = 2.0  
+    h = 0.03 
+
+    return [
+        (d + h*x[4]*cos(u[1]) - sqrt(d^2 - (h*x[4]*sin(u[1]))^2))*cos(x[3]);
+        (d + h*x[4]*cos(u[1]) - sqrt(d^2 - (h*x[4]*sin(u[1]))^2))*sin(x[3]);
+        asin(sin(u[1])*h*x[4]/d);
+        h*u[2]
+    ]
 end
 
 function car_discrete(x, u)
-    h = 0.1 # timestep 
-    x + h * car_continuous(x + 0.5 * h * car_continuous(x, u), u)
+    x + car_continuous(x, u)
 end
 
 # ## model
@@ -30,44 +37,48 @@ car = Dynamics(car_discrete, num_state, num_action)
 dynamics = [car for t = 1:T-1] 
 
 # ## initialization
-x1 = [0.0; 0.0; 0.0] 
-xT = [1.0; 1.0; 0.0] 
+x1 = [1.0; 1.0; 3*pi/2; 0.0]
 
 # ## rollout
-ū = [1.0e-2 * [1.0; 0.1] for t = 1:T-1]
+ū = [0.01 * [1.0; 1.0] .- 0.01 for t = 1:T-1]
 x̄ = rollout(dynamics, x1, ū)
 
 # ## objective 
+
+# ## Define aux functions for stage cost and final cost
+function stage_cost(x, u)
+    R = 1.0e-2 * Diagonal([1, 0.01])
+    Q = 1.0e-3 * [1; 1]
+
+    c1 = u' * R * u
+    c2 = 1.0e-3 * (sqrt(x[1]^2+Q[1])-Q[1]) + 1.0e-3 * (sqrt(x[2]^2+Q[2])-Q[2])
+    return c1 + c2
+end
+
+function final_cost(x)
+    P = [0.01; 0.01; 0.01; 1]
+    p = 0.1 * (sqrt(x[1]^2+P[1])-P[1])+
+        0.1 * (sqrt(x[2]^2+P[2])-P[2])+
+        1 * (sqrt(x[3]^2+P[3])-P[3])+
+        0.3 * (sqrt(x[4]^2+P[4])-P[4])
+    return p
+end
+
 objective = [
-    [Cost((x, u) -> 1.0 * dot(x - xT, x - xT) + 1.0e-2 * dot(u, u), num_state, num_action) for t = 1:T-1]...,
-    Cost((x, u) -> 1000.0 * dot(x - xT, x - xT), num_state, 0)
+    [Cost((x, u) -> stage_cost(x,u), num_state, num_action) for t = 1:T-1]...,
+    Cost((x, u) -> final_cost(x), num_state, 0)
 ]
 
 # ## constraints
-ul = -5.0 * ones(num_action) 
-uu = 5.0 * ones(num_action)
-
-p_obs = [0.5; 0.5] 
-r_obs = 0.1
-
 constraints = [
-    [Constraint((x, u) -> begin
-        e = x[1:2] - p_obs
-        [
-            ul - u; ## control limit (lower)
-            u - uu; ## control limit (upper)
-            r_obs^2.0 - dot(e, e); ## obstacle 
-        ]
-    end, 
-    num_state, num_action, indices_inequality=collect(1:5)) for t = 1:T-1]..., 
-    Constraint((x, u) -> begin
-        e = x[1:2] - p_obs
-        [
-            x - xT; # goal 
-            r_obs^2.0 - dot(e, e); # obstacle
-        ]
-    end, num_state, num_action, indices_inequality=collect(3 .+ (1:1)))
-] 
+    [Constraint((x, u) -> [
+            u[1] - 0.5; 
+            -u[1] - 0.5; 
+            u[2] - 2; 
+            -u[2] - 2
+        ], 
+        num_state, num_action, indices_inequality=collect(1:4)) for t = 1:T-1]..., 
+]
 
 # ## solver
 solver = Solver(dynamics, objective, constraints)
