@@ -49,7 +49,7 @@ function solver_data(dynamics::Vector{Dynamics{T}};
                  :step_size     => zeros(max_cache))
 
     perturbation = 0.0
-    logcost = 0.0
+    logcost = Inf
     err = 0.0
     filter = [Inf , 0.0]
 

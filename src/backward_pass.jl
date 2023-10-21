@@ -1,8 +1,8 @@
 using LinearAlgebra
 
 function backward_pass!(policy::PolicyData, 
-    solver_data::SolverData,
     problem::ProblemData,
+    solver_data::SolverData,
     options::Options,
     mode=:nominal
     )

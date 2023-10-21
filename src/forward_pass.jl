@@ -44,16 +44,14 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
             J = data.objective[1]
 
             if options.feasible
-                # TODO: don't need to update violations because there's a view from violations to evaluate_cache
-
                 # update constraints with computed values in the cache (from rollout_feasible!)
-                # for t = 1:length(dynamics)
-                #     @views violations[t] .= constr_data[t].evaluate_cache
-                #     # take inequalities and package them together
-                #     @views constr_data.inequalities[t] .= constr_data[t].evaluate_cache[constr_data[t].indices_inequality] # cool indexing trick
-                # end
+                for t = 1:length(dynamics)
+                    @views violations[t] .= constr_data[t].evaluate_cache
+                    # take inequalities and package them together
+                    @views constr_data.inequalities[t] .= constr_data[t].evaluate_cache[constr_data[t].indices_inequality] # cool indexing trick
+                end
 
-                logcost = J - perturbation * sum(log(-1.0 .* reshape(violations[t], 1, :))) 
+                logcost = J - perturbation * sum(log(-1.0 .* reshape(violations, 1, :))) 
                 err = 0
             else
                 # infeasible
@@ -93,32 +91,3 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         verbose && (@warn "line search failure")
     end
 end
-
-
-
-        # if succ # if rollout is successful
-        #     J = cost!(data, problem, 
-        #     mode=:current)[1]
-        
-        #     # check Armijo and strict constraint satisfaction and that s dual are all positive
-        #     if (J <= J_prev + c1 * data.step_size[1] * delta_grad_product)
-        #     # update nominal
-        #         update_nominal_trajectory!(problem)
-        #         data.objective[1] = J
-        #         data.status[1] = true
-        #         break
-        #     else
-        #         data.step_size[1] *= 0.5
-        #         iteration += 1
-        #     end
-        # else
-        #     data.step_size[1] *= 0.5
-        #     iteration += 1
-        #     continue
-        #     continue
-        # end
-
-        # if data.status[1] == false
-        #     continue
-        # else
-        #     for t = 1:options.horizon
