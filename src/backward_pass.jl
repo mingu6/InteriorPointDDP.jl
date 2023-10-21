@@ -22,12 +22,8 @@ function backward_pass!(policy::PolicyData,
     dim_u = length(problem.actions)
     dim_c = length(constraint_data.constraints)
 
-    # Current trajectory
-    x = problem.states
-    u = problem.actions
-
     # Constraints 
-    c = constraint_data.constraints
+    ineq_eval = constraint_data.inequalities
 
     # Dual variables 
     s = constraint_data.ineq_duals
@@ -108,8 +104,8 @@ function backward_pass!(policy::PolicyData,
         if options.feasible
             # TODO: Can be recomputed
             # TODO: Call a direct factorisation solver
-            r = S * c[t].evaluate_cache .+ mu
-            cinv = 1.0 ./ c[t].evaluate_cache
+            r = S * ineq_eval[t] .+ mu
+            cinv = 1.0 ./ ineq_eval[t]
             SCinv = Diagonal(s[t] .* cinv)
 
             # Compute gains
@@ -131,7 +127,7 @@ function backward_pass!(policy::PolicyData,
         end
     end
 
-    options.opterr=max([Qu_err, c_err, mu_err]);
+    options.opterr=max(Qu_err, c_err, mu_err);
 end
 
 

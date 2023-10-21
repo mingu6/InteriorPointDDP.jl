@@ -35,4 +35,6 @@ function gradients!(problem::ProblemData;
         mode=mode)
     gradients!(problem.objective.costs.objective, problem, 
         mode=mode)
+    gradients!(problem.objective.costs.constraint_data, problem, 
+        mode=mode)
 end
