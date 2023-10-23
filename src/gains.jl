@@ -38,7 +38,8 @@ function compute_gains_and_update_feasible!(policy, problem, solver_data, option
             error("Regularisation failed for all values")
         end
         Quu_reg = Quu[t] + quu[t] * (1.6^reg - 1) 
-        chol = cholesky(Quu_reg .- Qsu[t]' * SCinv * Qsu[t], check=false)
+        res = Quu_reg .- Qsu[t]' * SCinv * Qsu[t]
+        chol = cholesky(res, check=false)
         if issuccess(chol)
             R = chol.U
             break
@@ -98,8 +99,7 @@ function compute_gains_and_update_infeasible!(policy, problem, solver_data, opti
     y = con_data.slacks
 
     # Infeasible computation
-    # mu = solver_data.perturbation
-    mu = 0.986960440108936
+    mu = solver_data.perturbation
     S = Diagonal(s[t])
     r = s[t] .* y[t] .- mu
     rhat = s[t] .* (constraint_evaluations[t] .+ y[t]) .- r
