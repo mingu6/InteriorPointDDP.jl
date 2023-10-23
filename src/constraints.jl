@@ -83,7 +83,7 @@ function jacobian!(jacobian_states, jacobian_actions, constraints::Constraints{T
         con.jacobian_state(con.jacobian_state_cache, states[t], actions[t], parameters[t])
         @views jacobian_states[t] .= con.jacobian_state_cache
         fill!(con.jacobian_state_cache, 0.0) # TODO: confirm this is necessary
-        # t == H && continue # TODO: This is only necessary if we have terminal constraints not assosciated with the action
+        t == H && continue
         con.jacobian_action(con.jacobian_action_cache, states[t], actions[t], parameters[t])
         @views jacobian_actions[t] .= con.jacobian_action_cache
         fill!(con.jacobian_action_cache, 0.0) # TODO: confirm this is necessary

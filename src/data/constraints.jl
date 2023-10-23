@@ -28,15 +28,15 @@ function constraint_data(model::Model, constraints::Constraints)
     end
     
     cx = [zeros(constraints[t].num_constraint, t < H ? model[t].num_state : model[H-1].num_next_state) for t = 1:H]
-    cu = [zeros(constraints[t].num_constraint, model[t].num_action) for t = 1:H]
+    cu = [zeros(constraints[t].num_constraint, model[t].num_action) for t = 1:H-1]
     
     constraint_duals = [zeros(constraints[t].num_constraint) for t = 1:H]
     
     ineq_duals = [0.1 .* ones(constraints[t].num_inequality) for t = 1:H]
     nominal_ineq_duals = [0.1 .* ones(constraints[t].num_inequality) for t = 1:H]
 
-    slacks = [0.1 .* ones(constraints[t].num_inequality) for t = 1:H]
-    nominal_slacks = [0.1 .* ones(constraints[t].num_inequality) for t = 1:H]
+    slacks = [0.01 .* ones(constraints[t].num_inequality) for t = 1:H]
+    nominal_slacks = [0.01 .* ones(constraints[t].num_inequality) for t = 1:H]
 
     return ConstraintsData(constraints, c, cx, cu, ineqs, constraint_duals, ineq_duals, nominal_ineq_duals, slacks, nominal_slacks)
 end
