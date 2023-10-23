@@ -7,27 +7,15 @@ function backward_pass!(policy::PolicyData,
     mode=:nominal
     )
 
-    # Constraint Data 
-    constraint_data = problem.objective.costs.constraint_data
     # Horizon 
     H = length(problem.states)
+    # Constraint Data 
+    con_data = problem.objective.costs.constraint_data
     # Errors
-    dV = [0.0, 0.0]
     c_err::Float64 = 0
     mu_err::Float64 = 0
     Qu_err::Float64 = 0
 
-    # Dimensions 
-    dim_x = length(problem.states)
-    dim_u = length(problem.actions)
-    dim_c = length(constraint_data.constraints)
-
-    # Constraints 
-    ineq_eval = constraint_data.inequalities
-
-    # Dual variables 
-    s = constraint_data.ineq_duals
-    
     # Jacobians of system dynamics
     fx = problem.model.jacobian_state
     fu = problem.model.jacobian_action
@@ -36,11 +24,8 @@ function backward_pass!(policy::PolicyData,
     # fxu = problem.model.hessian_state_action
     # fuu = problem.model.hessian_action_action
     # Jacobian constraints 
-    Qsx = constraint_data.jacobian_state
-    Qsu = constraint_data.jacobian_action
-
-    # Cost 
-    q = problem.objective.costs # objective.evaluate_cache is the cost (V in MATLAB)
+    Qsx = con_data.jacobian_state
+    Qsu = con_data.jacobian_action
     # Cost gradients
     qx = problem.objective.gradient_state
     qu = problem.objective.gradient_action
@@ -48,17 +33,17 @@ function backward_pass!(policy::PolicyData,
     qxx = problem.objective.hessian_state_state
     quu = problem.objective.hessian_action_action
     qux = problem.objective.hessian_action_state
-
     # Action-Value function approximation
     Qx = policy.action_value.gradient_state
     Qu = policy.action_value.gradient_action
     Qxx = policy.action_value.hessian_state_state
     Quu = policy.action_value.hessian_action_action
     Qux = policy.action_value.hessian_action_state
-
     # Value function
     Vx = policy.value.gradient
     Vxx = policy.value.hessian
+    # Inequality dual variable 
+    s = con_data.ineq_duals
 
     # terminal value function
     # TODO: Extension: Implement terminal constraints 
@@ -91,126 +76,29 @@ function backward_pass!(policy::PolicyData,
         mul!(Qux[t], policy.ux̂_tmp[t], fx[t])
         Qux[t] .+= qux[t]
 
-        ## TODO: Hacky way since it's symmetric
-        Qxu = transpose(Qux[t])
-        S = Diagonal(s[t])
-
-        mu = solver_data.perturbation
-        Quu_reg = Quu[t] + quu[t] * (1.6^options.reg - 1) 
-
-        # Here is a bunch of future TODO 
-        # 1) Factor out ku and Ku 
-        # 2) Optimise cholesky decomp
+        # Future TODO 
+        # 1) Call direct factorisation instead of cholesky
         if options.feasible
-            # TODO: Can be recomputed
-            # TODO: Call a direct factorisation solver
-            r = S * ineq_eval[t] .+ mu
-            cinv = 1.0 ./ ineq_eval[t]
-            SCinv = Diagonal(s[t] .* cinv)
-
             # Compute gains
-            compute_gains!(policy, constraint_data, SCinv, cinv, r, S, t, Qxu, Quu_reg)
-
-            # Update action value function 
-            update_action_value_function!(policy, constraint_data, SCinv, cinv, r, t)
-
-            # TODO: Move error out once infeasible is complete
-            # Error mapping 
-            Qu_err = max(Qu_err, norm(Qu, Inf))
-            mu_err = max(mu_err, norm(r, Inf))
+            r = compute_gains_and_update_feasible!(policy, 
+            problem, solver_data, options, t)
+        else
+            # Compute gains 
+            r = compute_gains_and_update_infeasible!(policy,
+            problem, solver_data, options, t)
         end
 
         update_value_function!(policy, t)
 
+        # Optimality Error 
+        Qu_err = max(Qu_err, norm(Qu, Inf))
+        mu_err = max(mu_err, norm(r, Inf))
         if !options.feasible
-            c_err = max(c_err, norm(fp.c[:,i] + fp.y[:,i], Inf)) # needs changed
+            constraint_evaluation = con_data.inequalities
+            slacks = con_data.slacks
+            c_err = max(c_err, norm(constraint_evaluation[t] + slacks[t], Inf))
         end
     end
 
     options.opterr=max(Qu_err, c_err, mu_err);
-end
-
-
-function compute_gains!(policy, constraint_data, SCinv, cinv, r, S, t, Qxu, Quu_reg)
-
-    # Gains 
-    Ku = policy.Ku
-    ku = policy.ku
-    Ks = policy.Ks
-    ks = policy.ks
-    # Action value gradient w.r.t to action
-    Qu = policy.action_value.gradient_action
-    # Jacobian constraints 
-    Qsx = constraint_data.jacobian_state
-    Qsu = constraint_data.jacobian_action
-
-    cholesky_decomp = cholesky(Quu_reg .- Qsu[t]' * SCinv * Qsu[t], check=false)
-    
-    # TODO: Fix regularisation 
-    if !issuccess(cholesky_decomp)
-        return false 
-    end 
-
-    R = cholesky_decomp.U
-    b = hcat(Qu[t] - Qsu[t]' * (cinv .* r), Qxu' - Qsu[t]' * SCinv * Qsx[t])
-    kK = -R \ (R' \ b)
-
-    # Update gains for K (Ku) and k (ku)
-    ku[t] = kK[:, 1]
-    Ku[t] = kK[:, 2:end]
-    
-    # Update gains for ineq dual variable ks and Ks
-    ks[t] = -cinv .* (r .+ S * Qsu[t] * ku[t])
-    Ks[t] = -SCinv * (Qsx[t] .+ Qsu[t] * Ku[t])
-end
-
-
-function update_action_value_function!(policy, constraint_data, SCinv, cinv, r, t)
-    # Jacobian constraints 
-    Qsx = constraint_data.jacobian_state
-    Qsu = constraint_data.jacobian_action
-
-    # Action-Value function approximation
-    Qx = policy.action_value.gradient_state
-    Qu = policy.action_value.gradient_action
-    Qxx = policy.action_value.hessian_state_state
-    Quu = policy.action_value.hessian_action_action
-    Qux = policy.action_value.hessian_action_state
-
-    Quu[t] .-= Qsu[t]' * SCinv * Qsu[t]
-    Qux[t] .-= transpose(Qsx[t]' * SCinv * Qsu[t])
-    Qxx[t] .-= Qsx[t]' * SCinv * Qsx[t]
-    Qu[t] .-= Qsu[t]' * (cinv .* r)
-    Qx[t] .-= Qsx[t]' * (cinv .* r)
-end
-
-function update_value_function!(policy, t)
-
-    # Value function approximations
-    Vx = policy.value.gradient
-    Vxx = policy.value.hessian
-    # Action-Value function approximation
-    Qx = policy.action_value.gradient_state
-    Qu = policy.action_value.gradient_action
-    Qxx = policy.action_value.hessian_state_state
-    Quu = policy.action_value.hessian_action_action
-    Qux = policy.action_value.hessian_action_state
-    # Gains values
-    Ku = policy.Ku
-    ku = policy.ku
-
-    # Vxx[t] .=  Qxx[t] + (K[t]' * (Quu[t] * K[t])) + (K[t]' * Qux[t]) + (Qux[t]' * K[t])
-    mul!(policy.ux_tmp[t], Quu[t], Ku[t])
-    mul!(Vxx[t], transpose(Ku[t]), policy.ux_tmp[t])
-    mul!(Vxx[t], transpose(Ku[t]), Qux[t], 1.0, 1.0) # apply appropriate scaling 
-    mul!(Vxx[t], transpose(Qux[t]), Ku[t], 1.0, 1.0) # apply appropriate scaling
-    Vxx[t] .+= Qxx[t]
-
-    # Vx[t] .=  Qx[t] + (K[t]' * Quu[t] * k[t]) + (K[t]' * Qu[t]) + (Qux[t]' * k[t])
-    mul!(policy.u_tmp[t], Quu[t], ku[t])
-    mul!(Vx[t], transpose(Ku[t]), policy.u_tmp[t])
-    mul!(Vx[t], transpose(Ku[t]), Qu[t], 1.0, 1.0) # apply appropriate scaling 
-    mul!(Vx[t], transpose(Qux[t]), ku[t], 1.0, 1.0) # apply appropriate scaling 
-    Vx[t] .+= Qx[t]
-
 end

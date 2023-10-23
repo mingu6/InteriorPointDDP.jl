@@ -244,7 +244,10 @@ function reset_filter!(problem::ProblemData, data::SolverData, options::Options)
 end
 
 function reset_regularisation!(data::SolverData, options::Options)
-    options.reg = 0
+    # TODO: Is this needed or not?
+    options.start_reg = 0
+    options.end_reg = 24 
+    options.reg_step = 1
     data.status[1] = true
     options.recovery = 0.0
 end

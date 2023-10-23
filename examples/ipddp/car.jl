@@ -9,6 +9,7 @@ using LinearAlgebra
 using Plots
 
 # ## horizon 
+# NOTE: This should be one more than the matlab horizon
 T = 51
 
 # ## car 
@@ -16,7 +17,7 @@ num_state = 4
 num_action = 2
 num_parameter = 0 
 
-function car_continuous(x, u)
+function car_aux(x, u)
     d = 2.0  
     h = 0.03 
 
@@ -28,19 +29,19 @@ function car_continuous(x, u)
     ]
 end
 
-function car_discrete(x, u)
-    x + car_continuous(x, u)
+function car_dynamics(x, u)
+    x + car_aux(x, u)
 end
 
 # ## model
-car = Dynamics(car_discrete, num_state, num_action)
+car = Dynamics(car_dynamics, num_state, num_action)
 dynamics = [car for t = 1:T-1] 
 
 # ## initialization
-x1 = [1.0; 1.0; 3*pi/2; 0.0]
+x1 = [1.0; 1.0; pi*3/2; 0.0]
 
 # ## rollout
-ū = [0.01 * [1.0; 1.0] .- 0.01 for t = 1:T-1]
+ū = [0.01 * ones(num_action) .- 0.01 for t = 1:T-1]
 x̄ = rollout(dynamics, x1, ū)
 
 # ## objective 
@@ -78,6 +79,7 @@ constraints = [
             -u[2] - 2
         ], 
         num_state, num_action, indices_inequality=collect(1:4)) for t = 1:T-1]..., 
+        Constraint() # no terminal constraint 
 ]
 
 # ## solver

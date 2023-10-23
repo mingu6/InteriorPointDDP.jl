@@ -12,11 +12,14 @@ Base.@kwdef mutable struct Options{T}
     max_penalty::T=1.0e8
     reset_cache::Bool=false
     verbose=true
-    # Backward Pass Params
-    reg::Int8 = 0
-    feasible::Bool = true
+    # Regularisation Params
+    start_reg::Int8 = 0
+    end_reg::Int8 = 24
+    reg_step::Int8 = 1
+    # Error Params 
     opterr::Float64 = 0.0
     recovery::Float64 = 0.0 
     # IPDDP Params
+    feasible::Bool = false
     method::Symbol=:ip # can be :al for augmented lagrangian
 end 
