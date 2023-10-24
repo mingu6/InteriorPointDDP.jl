@@ -88,7 +88,7 @@ function rollout_feasible!(policy::PolicyData, problem::ProblemData, perturbatio
     # trajectories
     states = problem.states
     actions = problem.actions
-    # params = problem.parameters
+    params = problem.parameters
     nominal_states = problem.nominal_states # best states so far
     nominal_actions = problem.nominal_actions # best actions so far
 
@@ -104,7 +104,13 @@ function rollout_feasible!(policy::PolicyData, problem::ProblemData, perturbatio
     Ks = policy.Ks
     ks = policy.ks
 
+    ineq_duals = constr_data.ineq_duals
+    nominal_ineq_duals = constr_data.nominal_ineq_duals
+
     tau = max(0.99, 1 - perturbation)
+
+    constraints = constr_data.constraints
+    violations = constr_data.violations
 
     for (t, d) in enumerate(dynamics)
         # u[t] .= ū[t] + K[t] * (x[t] - x̄[t]) + step_size * k[t]
@@ -113,15 +119,14 @@ function rollout_feasible!(policy::PolicyData, problem::ProblemData, perturbatio
         # s[t] .= s̄[t] + Ks[t] * (x[t] -x̄[t]) + step_size * ks[t]
         update!(ineq_duals[t], nominal_ineq_duals[t], Ks[t], ks[t], states[t], nominal_states[t], step_size)
         
-        num_ineq = constr_data.constraints.num_inequality 
+        num_ineq = constr_data.constraints[t].num_inequality 
         # check dual variable positivity
-        if check_positivity(ineq_duals[t], nominal_ineqs[t], num_ineq, tau) == false
+        if check_positivity(ineq_duals[t], nominal_ineq_duals[t], num_ineq, tau) == false
             return false
         end
 
-        constraints = constr_data.constraints
         # check strict constraint satisfaction
-        if check_constr_sat!(constraints[t], violations[t], tau, states[t], actions[t], parameters[t]) == false
+        if check_constr_sat!(constraints[t], violations[t], tau, states[t], actions[t], params[t]) == false
             return false
         end
 
@@ -140,11 +145,11 @@ function update!(vt, nominal_vt, Kt, kt, xt, nominal_xt, step_size)
 end
 
 
-function check_positivity(new; old, num_ineq, tau)
+function check_positivity(new, old, n, tau)
 """
     Assumes that the old vector already has positive values.
 """
-    for i = 1:num_ineq
+    for i = 1:n
         if new[i] <  (1 - tau) * old[i]
             return false
         end

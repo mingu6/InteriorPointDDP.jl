@@ -9,7 +9,7 @@ struct ConstraintsData{T,C,CX,CU}
     jacobian_state::Vector{CX} 
     jacobian_action::Vector{CU}
     inequalities::Vector{Vector{T}} # violations but only for inequality constraints
-    duals::Vector{Vector{T}} # duals (both eq and ineq) for each timestep
+    duals::Vector{Vector{T}} # duals (both eq and ineq) for each timestep # consider removing
     ineq_duals::Vector{Vector{T}} # only ineq duals for each timestep
     nominal_ineq_duals:: Vector{Vector{T}}
     slacks::Vector{Vector{T}}

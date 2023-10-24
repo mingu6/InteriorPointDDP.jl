@@ -60,7 +60,7 @@ function ipddp_solve!(solver::Solver;
     reset_filter!(problem, data, options)
     reset_regularisation!(data, options)
 
-    for i = 1:solver.options.max_iterations
+    for iter = 1:solver.options.max_iterations
         iter_time = @elapsed begin   
             gradients!(problem,
         mode=:nominal)
@@ -75,10 +75,10 @@ function ipddp_solve!(solver::Solver;
         pad_width = 12
         data.iterations[1] += 1
         if iter % 10 == 1
-            println(rpad("Iteration", 5), rpad("Time", 10), rpad("mu", 10), rpad("Cost", 10), rpad("Opt.error", 10), rpad("Reg.power", 5), rpad("Stepsize", 12))
+            println(rpad("Iteration", 5), rpad("Time", 10), rpad("mu", 10), rpad("Cost", 10), rpad("Opt.error", 10), rpad("Reg.power", 5), rpad("Stepsize", 10))
         end
         if solver.options.verbose
-            println(rpad(string(i), 5), rpad(string(iter_time), 10), rpad(string(data.perturbation), 10), rpad(string(data.objective[1]), 10), rpad(string(options.opterr), 10), rpad(string(options.reg), 5), rpad(string(data.step_size[1]), 12))
+            println(rpad(string(iter), 5), rpad(string(iter_time), 10), rpad(string(data.perturbation), 10), rpad(string(data.objective[1]), 10), rpad(string(options.opterr), 10), rpad(string(options.reg), 5), rpad(string(data.step_size[1]), 10))
         end 
 
         push!(costs, data.objective[1])

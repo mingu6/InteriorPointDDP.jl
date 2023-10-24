@@ -47,6 +47,7 @@ function compute_gains_and_update_feasible!(policy, problem, solver_data, option
             reg = reg + options.reg_step
         end 
     end
+    options.reg = reg
 
     Qxu = transpose(Qux[t])
     b = hcat(Qu[t] - Qsu[t]' * (cinv .* r), Qxu' - Qsu[t]' * SCinv * Qsx[t])

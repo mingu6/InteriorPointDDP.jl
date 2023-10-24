@@ -29,7 +29,7 @@ function update_nominal_trajectory!(data::ProblemData, feasible::Bool)
     data.nominal_states[1:H] .= data.states[1:H]
     if H > 1
         data.nominal_actions[1:H-1] .= data.actions[1:H-1]
-        constraints.nominal_ineq[1:H-1] .= constraints.ineq[1:H-1]
+        constraints.nominal_ineq_duals[1:H-1] .= constraints.ineq_duals[1:H-1]
         if !feasible # if infeasible, update slack variables
             constraints.nominal_slacks[1:H-1] .= constraints.slacks[1:H-1]
         end

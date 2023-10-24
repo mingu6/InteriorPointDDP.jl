@@ -13,6 +13,7 @@ Base.@kwdef mutable struct Options{T}
     reset_cache::Bool=false
     verbose=true
     # Regularisation Params
+    reg::Int8 = 0
     start_reg::Int8 = 0
     end_reg::Int8 = 24
     reg_step::Int8 = 1

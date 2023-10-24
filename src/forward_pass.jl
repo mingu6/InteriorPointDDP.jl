@@ -28,8 +28,9 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     iteration = 1
 
     feasible = options.feasible
-    perturbation = data.pertubation
+    perturbation = data.perturbation
     constr_data = problem.objective.costs.constraint_data
+    constraints = constr_data.constraints
     dynamics = problem.model.dynamics
     violations = constr_data.violations
 
@@ -41,25 +42,28 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         data.status[1] = rollout!(policy, problem, feasible, perturbation, step_size=data.step_size[1])
 
         if data.status[1] # not failed
-            cost!(data, probem, mode=:current)[1] # calls cost in methods.jl, which calls cost in interior_point.jl, saves result in data.objective[1]
+            cost!(data, problem, mode=:current)[1] # calls cost in methods.jl, which calls cost in interior_point.jl, saves result in data.objective[1]
             J = data.objective[1]
 
             if options.feasible
                 # update constraints with computed values in the cache (from rollout_feasible!)
                 for t = 1:length(dynamics)
-                    @views violations[t] .= constr_data[t].evaluate_cache
+                    @views violations[t] .= constraints[t].evaluate_cache
                     # take inequalities and package them together
-                    @views constr_data.inequalities[t] .= constr_data[t].evaluate_cache[constr_data[t].indices_inequality] # cool indexing trick
+                    @views constr_data.inequalities[t] .= constraints[t].evaluate_cache[constraints[t].indices_inequality] # cool indexing trick
                 end
 
-                logcost = J - perturbation * sum(log(-1.0 .* reshape(violations, 1, :))) 
+                logcost = J - perturbation * sum(log.(vcat((-1 .* violations)...)))
                 err = 0
             else
                 # infeasible
-                logcost = J - perturbation * sum(log(reshape(constr_data.slacks, 1, :)))
+                logcost = J - perturbation * sum(log.(vcat(slacks...)))
                 # update constraint values with new states and actions
-                constraint!(constr_data.violations, constr_data.inequalities, constr_data.constraints, problem.states, problem.actions, problem.parameters)
-                err = max(options.objective_tolerance, norm(reshape(constr_data.violations .+ constr_data.slacks ,1,:), 1))
+                constraint!(constr_data.violations, constr_data.inequalities, constraints, problem.states, problem.actions, problem.parameters)
+                flattened_sum = vcat([(length(s) > length(c) ? vcat(c, zeros(length(s) - length(c))) : c) + 
+                                (length(s) < length(c) ? vcat(s, zeros(length(c) - length(s))) : s) 
+                                for (s, c) in zip(slacks, violations)]...)
+                err = max(options.objective_tolerance, norm(flattened_sum, 1))
             end
 
             candidate = [logcost, err]
@@ -71,7 +75,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
             else
                 # logcost and err are both lower than filter
                 # update variables
-                update_nominal_trajectory!(problem) # updates states, actions, duals, and slack vars
+                update_nominal_trajectory!(problem, options.feasible) # updates states, actions, duals, and slack vars
                 data.objective[1] = J # update cost
                 data.status[1] = true # update status
                 data.logcost = logcost
