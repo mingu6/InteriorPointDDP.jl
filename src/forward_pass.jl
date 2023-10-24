@@ -33,6 +33,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     constraints = constr_data.constraints
     dynamics = problem.model.dynamics
     violations = constr_data.violations
+    slacks = constr_data.slacks
 
     while data.step_size[1] >= min_step_size # check whether we still want it to be this
         iteration > max_iterations && (verbose && (@warn "forward pass failure"), break)

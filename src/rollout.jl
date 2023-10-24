@@ -2,9 +2,9 @@ function rollout!(policy::PolicyData, problem::ProblemData, feasible::Bool, pert
     step_size=1.0)
 
     if feasible
-        return rollout_feasible!(policy, problem, perturbation, step_size=1.0)
+        return rollout_feasible!(policy, problem, perturbation; step_size)
     else # infeasible
-        return rollout_infeasible!(policy, problem, perturbation, step_size=1.0)
+        return rollout_infeasible!(policy, problem, perturbation; step_size)
     end
 end
 
@@ -65,7 +65,7 @@ function rollout_infeasible!(policy::PolicyData, problem::ProblemData, perturbat
         update!(slacks[t], nominal_slacks[t], Ky[t], ky[t], states[t], nominal_states[t], step_size)
 
         # check slack and dual positivity
-        num_ineq = constr_data.constraints.num_inequality 
+        num_ineq = constr_data.constraints[t].num_inequality 
         if check_positivity(ineq_duals[t], nominal_ineq_duals[t], num_ineq, tau) == false
             return false
         elseif check_positivity(slacks[t], nominal_slacks[t], num_ineq, tau) == false
