@@ -12,15 +12,16 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     # # previous cost
     # J_prev = data.objective[1]
 
-    # gradient of Lagrangian
-    lagrangian_gradient!(data, policy, problem)
+    # TODO: ARMIJO LINE SEARCH
+    # # gradient of Lagrangian
+    # lagrangian_gradient!(data, policy, problem)
 
-    if line_search == :armijo
-        trajectory_sensitivities(problem, policy, data) ## used to calculate problem.trajectory
-        delta_grad_product = data.gradient' * problem.trajectory
-    else
-        delta_grad_product = 0.0
-    end
+    # if line_search == :armijo
+    #     trajectory_sensitivities(problem, policy, data) ## used to calculate problem.trajectory
+    #     delta_grad_product = data.gradient' * problem.trajectory
+    # else
+    #     delta_grad_product = 0.0
+    # end
 
     # line search with rollout
     data.step_size[1] = 1.0

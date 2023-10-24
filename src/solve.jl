@@ -52,7 +52,7 @@ function ipddp_solve!(solver::Solver;
     constraint!(constraints, problem.states, problem.actions, problem.parameters)
     if data.perturbation == 0
         initial_cost = initial_cost[1] # = data.objective[1] which is the obj func/cost for first iteration
-        n_minus_1 = problem.horizon
+        n_minus_1 = problem.horizon - 1
         num_inequals = constraints.constraints[1].num_inequality
         data.perturbation = initial_cost/n_minus_1/num_inequals
     end

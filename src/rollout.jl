@@ -158,10 +158,10 @@ function check_constr_sat!(constr::Constraint, violations, tau, state, action, p
         return true
     end
     # otherwise, more than 1 constraint
-    old_vals = copy(violations)
+    # old_vals = copy(violations) # TODO: check if this is needed
     constr.evaluate(constr.evaluate_cache, state, action, parameters) # compute new constraint values, not stored to violations yet
     indices_inequality = constr.indices_inequality
-    if any(constr.evaluate_cache[indices_inequality] > (1 - tau) .*  old_vals[indices_inequality])
+    if any(constr.evaluate_cache[indices_inequality] > (1 - tau) .*  violations[indices_inequality])
             return false
     end
     return true
