@@ -8,7 +8,7 @@
     {
         "type": "julia",
         "request": "launch",
-        "name": "Launch Program",
+        "name": "Launch car.jl",
         "program": "${workspaceFolder}/examples/ipddp/car.jl",
         "stopOnEntry": false
     },
