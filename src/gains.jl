@@ -39,7 +39,8 @@ function compute_gains_and_update_feasible!(policy, problem, solver_data, option
         end
         Quu_reg = Quu[t] + quu[t] * (1.6^reg - 1) 
         res = Quu_reg .- Qsu[t]' * SCinv * Qsu[t]
-        chol = cholesky(res, check=false)
+        symmetric = (res + transpose(res)) ./ 2
+        chol = cholesky(symmetric, check=false)
         if issuccess(chol)
             R = chol.U
             break
@@ -116,7 +117,8 @@ function compute_gains_and_update_infeasible!(policy, problem, solver_data, opti
         end
         Quu_reg = Quu[t] + quu[t] * (1.6^reg - 1) 
         res = Quu_reg .+ Qsu[t]' * SYinv * Qsu[t]
-        chol = cholesky(res, check=false)
+        symmetric = (res + transpose(res)) ./ 2
+        chol = cholesky(symmetric, check=false)
         if issuccess(chol)
             R = chol.U
             break

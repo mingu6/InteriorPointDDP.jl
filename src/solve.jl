@@ -75,10 +75,18 @@ function ipddp_solve!(solver::Solver;
         pad_width = 12
         data.iterations[1] += 1
         if iter % 10 == 1
-            println(rpad("Iteration", 5), rpad("Time", 10), rpad("mu", 10), rpad("Cost", 10), rpad("Opt.error", 10), rpad("Reg.power", 5), rpad("Stepsize", 10))
+            println(rpad("i", 5), rpad("Time", 15), rpad("mu", 15), rpad("Cost", 15), rpad("Opt.error", 15), rpad("Reg.power", 15), rpad("Stepsize", 15))
         end
         if solver.options.verbose
-            println(rpad(string(iter), 5), rpad(string(iter_time), 10), rpad(string(data.perturbation), 10), rpad(string(data.objective[1]), 10), rpad(string(options.opterr), 10), rpad(string(options.reg), 5), rpad(string(data.step_size[1]), 10))
+            println(
+                rpad(string(iter), 5), 
+                rpad(@sprintf("%.5e", iter_time), 15), 
+                rpad(@sprintf("%.5e", data.perturbation), 15), 
+                rpad(@sprintf("%.5e", data.objective[1]), 15), 
+                rpad(@sprintf("%.5e", options.opterr), 15), 
+                rpad(@sprintf("%.5e", options.reg), 15), 
+                rpad(@sprintf("%.5e", data.step_size[1]), 15)
+            )            
         end 
 
         push!(costs, data.objective[1])
@@ -86,7 +94,8 @@ function ipddp_solve!(solver::Solver;
 
         # check convergence
         if max(options.opterr, data.perturbation) <= options.objective_tolerance
-            print("Optimality reached")
+            println("Optimality reached")
+            return nothing
         end
 
         if options.opterr <= 0.2 * data.perturbation

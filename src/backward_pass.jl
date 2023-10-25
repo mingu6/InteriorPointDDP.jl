@@ -91,7 +91,7 @@ function backward_pass!(policy::PolicyData,
         update_value_function!(policy, t)
 
         # Optimality Error 
-        Qu_err = max(Qu_err, norm(Qu, Inf))
+        Qu_err = max(Qu_err, norm(Qu[t], Inf))
         mu_err = max(mu_err, norm(r, Inf))
         if !options.feasible
             constraint_evaluation = con_data.inequalities

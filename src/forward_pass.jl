@@ -91,6 +91,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         end
     end
 
+    break_ = 1
     if data.step_size[1] < min_step_size 
         data.status[1] = false
         data.step_size[1] = 0

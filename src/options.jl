@@ -1,9 +1,9 @@
 Base.@kwdef mutable struct Options{T} 
     line_search::Symbol=:armijo
-    max_iterations::Int=100
+    max_iterations::Int=100 # changed from 100
     max_dual_updates::Int=10
     min_step_size::T=1.0e-5
-    objective_tolerance::T=1.0e-3
+    objective_tolerance::T=1.0e-7 # changed from 1e-3
     lagrangian_gradient_tolerance::T=1.0e-3
     constraint_tolerance::T=5.0e-3
     constraint_norm::T=Inf

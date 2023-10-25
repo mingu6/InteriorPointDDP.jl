@@ -30,13 +30,18 @@ function rollout_infeasible!(policy::PolicyData, problem::ProblemData, perturbat
     states = problem.states
     actions = problem.actions
     params = problem.parameters
-    nominal_states = problem.nominal_states # old states
-    nominal_actions = problem.nominal_actions # old actions
+
+    constr_data = problem.objective.costs.constraint_data
+    ineq_duals = constr_data.ineq_duals
+    slacks = constr_data.slacks
+
+    nominal_states = deepcopy(problem.nominal_states) # best states so far
+    nominal_actions = deepcopy(problem.nominal_actions) # best actions so far
+    nominal_ineq_duals = deepcopy(constr_data.nominal_ineq_duals)
+    nominal_slacks = deepcopy(constr_data.nominal_slacks) # current slack variables
 
     # initial state
     states[1] .= nominal_states[1]
-
-    constr_data = problem.objective.costs.constraint_data
 
     # policy
     Ku = policy.Ku
@@ -50,16 +55,9 @@ function rollout_infeasible!(policy::PolicyData, problem::ProblemData, perturbat
 
     tau = max(0.99, 1 - perturbation)
 
-    ineq_duals = constr_data.ineq_duals
-    nominal_ineq_duals = constr_data.nominal_ineq_duals
-
-    slacks = constr_data.slacks
-    nominal_slacks = constr_data.nominal_slacks # current slack variables
-
     for (t, d) in enumerate(dynamics)
         # s[t] .= s̄[t] + Ks[t] * (x[t] -x̄[t]) + step_size * ks[t]
         update!(ineq_duals[t], nominal_ineq_duals[t], Ks[t], ks[t], states[t], nominal_states[t], step_size)
-
 
         # y[t] .= ȳ[t] + Ky[t] * (x[t] -x̄[t]) + step_size * ky[t]
         update!(slacks[t], nominal_slacks[t], Ky[t], ky[t], states[t], nominal_states[t], step_size)
@@ -67,8 +65,16 @@ function rollout_infeasible!(policy::PolicyData, problem::ProblemData, perturbat
         # check slack and dual positivity
         num_ineq = constr_data.constraints[t].num_inequality 
         if check_positivity(ineq_duals[t], nominal_ineq_duals[t], num_ineq, tau) == false
+            constr_data.ineq_duals .= nominal_ineq_duals
+            constr_data.nominal_ineq_duals .= nominal_ineq_duals
+            constr_data.slacks .= nominal_slacks
+            constr_data.nominal_slacks .= nominal_slacks
             return false
         elseif check_positivity(slacks[t], nominal_slacks[t], num_ineq, tau) == false
+            constr_data.ineq_duals .= nominal_ineq_duals
+            constr_data.nominal_ineq_duals .= nominal_ineq_duals
+            constr_data.slacks .= nominal_slacks
+            constr_data.nominal_slacks .= nominal_slacks
             return false
         end
         
@@ -89,13 +95,16 @@ function rollout_feasible!(policy::PolicyData, problem::ProblemData, perturbatio
     states = problem.states
     actions = problem.actions
     params = problem.parameters
-    nominal_states = problem.nominal_states # best states so far
-    nominal_actions = problem.nominal_actions # best actions so far
+
+    constr_data = problem.objective.costs.constraint_data
+    ineq_duals = constr_data.ineq_duals
+
+    nominal_states = deepcopy(problem.nominal_states) # best states so far
+    nominal_actions = deepcopy(problem.nominal_actions) # best actions so far
+    nominal_ineq_duals = deepcopy(constr_data.nominal_ineq_duals)
 
     # initial state
     states[1] .= nominal_states[1]
-
-    constr_data = problem.objective.costs.constraint_data
 
     # policy
     Ku = policy.Ku
@@ -103,9 +112,6 @@ function rollout_feasible!(policy::PolicyData, problem::ProblemData, perturbatio
 
     Ks = policy.Ks
     ks = policy.ks
-
-    ineq_duals = constr_data.ineq_duals
-    nominal_ineq_duals = constr_data.nominal_ineq_duals
 
     tau = max(0.99, 1 - perturbation)
 
@@ -122,11 +128,19 @@ function rollout_feasible!(policy::PolicyData, problem::ProblemData, perturbatio
         num_ineq = constr_data.constraints[t].num_inequality 
         # check dual variable positivity
         if check_positivity(ineq_duals[t], nominal_ineq_duals[t], num_ineq, tau) == false
+            constr_data.ineq_duals .= nominal_ineq_duals
+            constr_data.nominal_ineq_duals .= nominal_ineq_duals
+            problem.actions .= nominal_actions
+            problem.nominal_actions .= nominal_actions 
             return false
         end
 
         # check strict constraint satisfaction
         if check_constr_sat!(constraints[t], violations[t], tau, states[t], actions[t], params[t]) == false
+            constr_data.ineq_duals .= nominal_ineq_duals
+            constr_data.nominal_ineq_duals .= nominal_ineq_duals
+            problem.actions .= nominal_actions
+            problem.nominal_actions .= nominal_actions 
             return false
         end
 

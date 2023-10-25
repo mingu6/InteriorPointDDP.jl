@@ -71,13 +71,13 @@ function cost_hessian!(hessian_state_state, hessian_action_action, hessian_actio
     H = length(costs)
     for (t, cost) in enumerate(costs)
         cost.hessian_state_state(cost.hessian_state_state_cache, states[t], actions[t], parameters[t])
-        @views hessian_state_state[t] .+= cost.hessian_state_state_cache
+        @views hessian_state_state[t] .= cost.hessian_state_state_cache
         fill!(cost.hessian_state_state_cache, 0.0) # TODO: confirm this is necessary
         t == H && continue
         cost.hessian_action_action(cost.hessian_action_action_cache, states[t], actions[t], parameters[t])
         cost.hessian_action_state(cost.hessian_action_state_cache, states[t], actions[t], parameters[t])
-        @views hessian_action_action[t] .+= cost.hessian_action_action_cache
-        @views hessian_action_state[t]  .+= cost.hessian_action_state_cache
+        @views hessian_action_action[t] .= cost.hessian_action_action_cache
+        @views hessian_action_state[t]  .= cost.hessian_action_state_cache
         fill!(cost.hessian_action_action_cache, 0.0) # TODO: confirm this is necessary
         fill!(cost.hessian_action_state_cache, 0.0) # TODO: confirm this is necessary
     end
