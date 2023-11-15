@@ -32,9 +32,6 @@ function Solver(dynamics::Vector{Dynamics{T}}, costs::Vector{Cost{T}}, constrain
     if options.method == :ip
         # interior point
         objective = interior_point(dynamics, costs, constraints)
-    else
-    	# augmented Lagrangian
-	    objective = augmented_lagrangian(dynamics, costs, constraints)
     end
 
     # allocate policy data  

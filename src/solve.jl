@@ -20,13 +20,20 @@ function lagrangian_gradient!(data::SolverData, policy::PolicyData, problem::Pro
     # NOTE: gradient wrt x1 is satisfied implicitly
 end
 
-function solve!(solver::Solver{T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O}, args...; kwargs...) where {T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O<:Objective{T}}
-    ilqr_solve!(solver, args...; kwargs...)
-end
+# function solve!(solver::Solver{T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O}, args...; kwargs...) where {T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O<:Objective{T}}
+#     ilqr_solve!(solver, args...; kwargs...)
+# end
 
 function solve!(solver::Solver{T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O}, args...; kwargs...) where {T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O<:InteriorPoint{T}}
     ipddp_solve!(solver, args...; kwargs...)
 end
+
+function ipddp_solve!(solver::Solver, states, actions; kwargs...)
+    initialize_controls!(solver, actions)
+    initialize_states!(solver, states)
+    ipddp_solve!(solver; kwargs...)
+end
+
 
 function ipddp_solve!(solver::Solver; 
     iteration=true)
@@ -60,6 +67,7 @@ function ipddp_solve!(solver::Solver;
     reset_filter!(problem, data, options)
     reset_regularisation!(data, options)
 
+    time = 0
     for iter = 1:solver.options.max_iterations
         iter_time = @elapsed begin   
             gradients!(problem,
@@ -72,19 +80,19 @@ function ipddp_solve!(solver::Solver;
         end
     
         # info
-        pad_width = 12
         data.iterations[1] += 1
         if iter % 10 == 1
-            println(rpad("i", 5), rpad("Time", 15), rpad("mu", 15), rpad("Cost", 15), rpad("Opt.error", 15), rpad("Reg.power", 15), rpad("Stepsize", 15))
+            println("")
+            println(rpad("Iteration", 15), rpad("Elapsed time", 15), rpad("mu", 15), rpad("Cost", 15), rpad("Opt.error", 15), rpad("Reg.power", 13), rpad("Stepsize", 15))
         end
         if solver.options.verbose
             println(
-                rpad(string(iter), 5), 
-                rpad(@sprintf("%.5e", iter_time), 15), 
+                rpad(string(iter), 15), 
+                rpad(@sprintf("%.5e", time+=iter_time), 15), 
                 rpad(@sprintf("%.5e", data.perturbation), 15), 
                 rpad(@sprintf("%.5e", data.objective[1]), 15), 
                 rpad(@sprintf("%.5e", options.opterr), 15), 
-                rpad(@sprintf("%.5e", options.reg), 15), 
+                rpad(@sprintf("%.3e", options.reg), 13), 
                 rpad(@sprintf("%.5e", data.step_size[1]), 15)
             )            
         end 
@@ -94,7 +102,8 @@ function ipddp_solve!(solver::Solver;
 
         # check convergence
         if max(options.opterr, data.perturbation) <= options.objective_tolerance
-            println("Optimality reached")
+            println("~~~~~~~~~~~~~~~~~~~")
+            println("Optimality reached!")
             return nothing
         end
 

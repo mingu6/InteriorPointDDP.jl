@@ -3,10 +3,12 @@
 # PKG_SETUP
 
 # ## Setup
-
+# include("/Users/jeffreyliang/Documents/SCNC3101/IPDDP.jl/src/IterativeLQR.jl")
 using IterativeLQR 
 using LinearAlgebra
 using Plots
+using BenchmarkTools
+# using TickTock
 
 # ## horizon 
 # NOTE: This should be one more than the matlab horizon
@@ -32,6 +34,11 @@ end
 function car_dynamics(x, u)
     x + car_aux(x, u)
 end
+
+function reset_solver!(solver)
+    solve!(solver)
+end
+
 
 # ## model
 car = Dynamics(car_dynamics, num_state, num_action)
@@ -87,7 +94,7 @@ solver = Solver(dynamics, objective, constraints)
 initialize_controls!(solver, ū) 
 initialize_states!(solver, x̄)
 
-# ## solve
+# solve
 solve!(solver)
 
 # ## solution
@@ -99,4 +106,5 @@ plot(hcat(u_sol[1:end-1]...)', linetype=:steppost)
 
 # ## benchmark allocations + timing
 # using BenchmarkTools
-# info = @benchmark solve!($solver, x̄, ū) setup=(x̄=deepcopy(x̄), ū=deepcopy(ū))
+# info = @benchmark solve!(deepcopy(solver))
+

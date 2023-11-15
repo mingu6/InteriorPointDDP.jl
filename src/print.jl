@@ -1,15 +1,17 @@
 function solver_info()
-    println(crayon"bold red",
-    "
- ___ _                _   _         _    ___  ___
-|_ _| |_ ___ _ _ __ _| |_(_)_ _____| |  / _ \\| _ \\
- | ||  _/ -_) '_/ _` |  _| \\ V / -_) |_| (_) |   /
-|___|\\__\\___|_| \\__,_|\\__|_|\\_/\\___|____\\__\\_\\_|_\\
+    println(crayon"bold red","   
+    ██╗██████╗░█████╗░░░█████╗░░░██████╗░
+    ██║██╔══██╗██╔══██╗░██╔══██╗░██╔══██╗
+    ██║██████╔╝██║░░░██║██║░░░██║██████╔╝
+    ██║██╔═══╝░██║░░██║░██║░░██║░██╔═══╝░
+    ██║██║░░░░░█████╔╝░░█████╔╝░░██║░░░░░
+    ╚═╝╚═╝░░░░░╚════╝░░░╚════╝░░░╚═╝░░░░░    
     ")
     println(crayon"reset bold black",
-    "Taylor Howell and Simon Le Cleac'h")
-    println("Robotic Exploration Lab")
-    println("Stanford University\n")
+    "Andrei Pavlov, Iman Shames, and Chris Manzie")
+    println("Implemented by Mingda Xu, Pranav Pativada and Jeffrey Liang")
+    println("School of Computing")
+    println("The Australian National University\n")
     print(crayon"reset")
 end
 
