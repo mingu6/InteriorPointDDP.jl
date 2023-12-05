@@ -4,15 +4,20 @@
 
 # ## Setup
 # include("/Users/jeffreyliang/Documents/SCNC3101/IPDDP.jl/src/IterativeLQR.jl")
-using IterativeLQR 
+using IPDDP
 using LinearAlgebra
 using Plots
 using BenchmarkTools
 # using TickTock
 
+
+using Profile
+using ProfileView
+
+
 # ## horizon 
 # NOTE: This should be one more than the matlab horizon
-T = 51
+T = 501
 
 # ## car 
 num_state = 4
@@ -94,10 +99,10 @@ solver = Solver(dynamics, objective, constraints)
 initialize_controls!(solver, ū) 
 initialize_states!(solver, x̄)
 
-# solve
+# # solve
 solve!(solver)
 
-# ## solution
+# # solution
 x_sol, u_sol = get_trajectory(solver)
 
 # ## visualize
@@ -107,4 +112,4 @@ plot(hcat(u_sol[1:end-1]...)', linetype=:steppost)
 # ## benchmark allocations + timing
 # using BenchmarkTools
 # info = @benchmark solve!(deepcopy(solver))
-
+# display(info)

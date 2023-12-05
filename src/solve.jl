@@ -34,9 +34,7 @@ function ipddp_solve!(solver::Solver, states, actions; kwargs...)
     ipddp_solve!(solver; kwargs...)
 end
 
-
-function ipddp_solve!(solver::Solver; 
-    iteration=true)
+function ipddp_solve!(solver::Solver; iteration=true)
 
     # START TIMER
     costs = []
@@ -56,7 +54,7 @@ function ipddp_solve!(solver::Solver;
     # initial rollout is performed in caller file
 	initial_cost = cost!(data, problem,
         mode=:nominal)
-    constraint!(constraints, problem.states, problem.actions, problem.parameters)
+    constraint!(constraints, problem.nominal_states, problem.nominal_actions, problem.parameters)
     if data.perturbation == 0
         initial_cost = initial_cost[1] # = data.objective[1] which is the obj func/cost for first iteration
         n_minus_1 = problem.horizon - 1
@@ -77,7 +75,7 @@ function ipddp_solve!(solver::Solver;
             min_step_size=solver.options.min_step_size,
             line_search=solver.options.line_search,
             verbose=solver.options.verbose)
-        end
+        end 
     
         # info
         data.iterations[1] += 1
@@ -104,14 +102,17 @@ function ipddp_solve!(solver::Solver;
         if max(options.opterr, data.perturbation) <= options.objective_tolerance
             println("~~~~~~~~~~~~~~~~~~~")
             println("Optimality reached!")
+            data.perturbation = 0.  # allows profiling, TODO: fix hack
             return nothing
         end
 
         if options.opterr <= 0.2 * data.perturbation
             data.perturbation = max(options.objective_tolerance/10.0, min(0.2 * data.perturbation, data.perturbation^1.2))
+            reset_filter!(problem, data, options)
         end
     end
-
+    
+    data.perturbation = 0.  # allows profiling, TODO: fix hack
     return nothing
 end
 
@@ -129,7 +130,8 @@ function reset_filter!(problem::ProblemData, data::SolverData, options::Options)
                       for (s, c) in zip(slacks, constraint_vals)]...)
         data.err = norm(flattened_sum, 1)
         if data.err < options.objective_tolerance
-            data.err = 0
+            # data.err = 0
+            data.err = options.objective_tolerance
         end
     else
         data.logcost = cost - perturbation * sum(log.(vcat((-1 .* constraint_vals)...)))

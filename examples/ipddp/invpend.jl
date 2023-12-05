@@ -4,24 +4,25 @@
 
 # ## Setup
 
-using IterativeLQR 
+using IPDDP
 using LinearAlgebra
 using Plots
 
 # ## horizon 
 # NOTE: This should be one more than the matlab horizon
-T = 51
+T = 501
 
 # ## inverse pendulum 
 num_state = 2
 num_action = 1
-num_parameter = 0 
+num_parameter = 0
+h = 0.05
 
 function invpend_dynamics(x, u)
     h = 0.05
     return [
-        x[1] .+ h*x[2];
-        x[2] .+ h*sin(x[1]) .+ h*u;
+        x[1] .+ h * x[2];
+        x[2] .+ h * sin(x[1]) .+ h * u;
     ]
 end
 
@@ -33,7 +34,7 @@ dynamics = [invpend for t = 1:T-1]
 x1 = [-pi; 0.0]
 
 # ## rollout
-ū = [0.01 * ones(num_action) .- 0.01 for t = 1:T-1]
+ū = [0.01 * ones(num_action) for t = 1:T-1]
 x̄ = rollout(dynamics, x1, ū)
 
 # ## objective 
@@ -42,13 +43,12 @@ x̄ = rollout(dynamics, x1, ū)
 function stage_cost(x, u)
     Q = I(num_state)
     R = I(num_action)
-    h = 0.05
     return 0.5 * h * (transpose(x) * Q * x + + transpose(u) * R * u)
 end
 
 function final_cost(x)
     P = 10 * I(num_state)
-    return 0.5 * transpose(x) * P * x 
+    return 0.5 * transpose(x) * P * x
 end
 
 objective = [
@@ -68,19 +68,20 @@ constraints = [
 
 # ## solver
 solver = Solver(dynamics, objective, constraints)
-initialize_controls!(solver, ū) 
+initialize_controls!(solver, ū)
 initialize_states!(solver, x̄)
 
-# ## solve
+## solve
 solve!(solver)
 
-# ## solution
+## solution
 x_sol, u_sol = get_trajectory(solver)
 
-# ## visualize
+## visualize
 plot(hcat(x_sol...)')
 plot(hcat(u_sol[1:end-1]...)', linetype=:steppost)
 
-# ## benchmark allocations + timing
+## benchmark allocations + timing
 # using BenchmarkTools
 # info = @benchmark solve!($solver, x̄, ū) setup=(x̄=deepcopy(x̄), ū=deepcopy(ū))
+# display(info)

@@ -7,6 +7,7 @@ function compute_gains_and_update_feasible!(policy, problem, solver_data, option
     ku = policy.ku
     Ks = policy.Ks
     ks = policy.ks
+    kK = policy.kK_tmp
     # Action-Value function approximation
     Qx = policy.action_value.gradient_state
     Qu = policy.action_value.gradient_action
@@ -31,32 +32,30 @@ function compute_gains_and_update_feasible!(policy, problem, solver_data, option
     SCinv = Diagonal(s[t] .* cinv)
 
     # Iteratively bump regularisation
-    R = nothing
+    code = 0
     reg = options.start_reg
-    while reg <= options.end_reg
-        if reg >= options.end_reg && isnothing(R)
-            error("Regularisation failed for all values")
+    
+    # for reg=options.start_reg:options.reg_step:options.end_reg
+    while reg < options.end_reg
+        policy.uu_tmp[t] .= Quu[t] + quu[t] * (1.6^reg - 1) .- Qsu[t]' * SCinv * Qsu[t]
+        (_, code) = LAPACK.potrf!('U', policy.uu_tmp[t])
+        if code > 0
+            reg += options.reg_step
+            continue
         end
-        Quu_reg = Quu[t] + quu[t] * (1.6^reg - 1) 
-        res = Quu_reg .- Qsu[t]' * SCinv * Qsu[t]
-        symmetric = (res + transpose(res)) ./ 2
-        chol = cholesky(symmetric, check=false)
-        if issuccess(chol)
-            R = chol.U
-            break
-        else
-            reg = reg + options.reg_step
-        end 
+        kK[t] .= -hcat(Qu[t] - Qsu[t]' * (cinv .* r), Qux[t] - Qsu[t]' * SCinv * Qsx[t])
+        LAPACK.potrs!('U', policy.uu_tmp[t], kK[t])
+        break
     end
+    if code > 0  # cycled through all regularization values and still not PD
+        error("Regularisation failed for all values")
+    end
+    
     options.reg = reg
 
-    Qxu = transpose(Qux[t])
-    b = hcat(Qu[t] - Qsu[t]' * (cinv .* r), Qxu' - Qsu[t]' * SCinv * Qsx[t])
-    kK = -R \ (R' \ b)
-
     # Update gains
-    ku[t] = kK[:, 1]
-    Ku[t] = kK[:, 2:end]
+    ku[t] = kK[t][:, 1]
+    Ku[t] = kK[t][:, 2:end]
     ks[t] = -cinv .* (r .+ S * Qsu[t] * ku[t])
     Ks[t] = -SCinv * (Qsx[t] .+ Qsu[t] * Ku[t])
     
@@ -82,6 +81,7 @@ function compute_gains_and_update_infeasible!(policy, problem, solver_data, opti
     ks = policy.ks
     Ky = policy.Ky
     ky = policy.ky
+    kK = policy.kK_tmp
     # Action-Value function approximation
     Qx = policy.action_value.gradient_state
     Qu = policy.action_value.gradient_action
@@ -109,31 +109,31 @@ function compute_gains_and_update_infeasible!(policy, problem, solver_data, opti
     SYinv = Diagonal(s[t] .* yinv)
 
     # Iteratively bump regularisation
-    R = nothing
+    code = 0
     reg = options.start_reg
-    while reg <= options.end_reg + 1
-        if reg >= options.end_reg + 1 && isnothing(R)
-            error("Regularisation failed for all values")
+    
+    # for reg=options.start_reg:options.reg_step:options.end_reg
+    while reg < options.end_reg
+        policy.uu_tmp[t] .= Quu[t] + quu[t] * (1.6^reg - 1) .+ Qsu[t]' * SYinv * Qsu[t]
+        policy.uu_tmp[t] .+= Quu[t]
+        (_, code) = LAPACK.potrf!('U', policy.uu_tmp[t])
+        if code > 0
+            reg += options.reg_step
+            continue
         end
-        Quu_reg = Quu[t] + quu[t] * (1.6^reg - 1) 
-        res = Quu_reg .+ Qsu[t]' * SYinv * Qsu[t]
-        symmetric = (res + transpose(res)) ./ 2
-        chol = cholesky(symmetric, check=false)
-        if issuccess(chol)
-            R = chol.U
-            break
-        else
-            reg = reg + options.reg_step
-        end 
+        kK[t] .= -hcat(Qu[t] + Qsu[t]' * (yinv .* rhat), Qux[t] + Qsu[t]' * SYinv * Qsx[t])
+        LAPACK.potrs!('U', policy.uu_tmp[t], kK[t])
+        break
     end
-
-    Qxu = transpose(Qux[t])
-    b = hcat(Qu[t] + Qsu[t]' * (yinv .* rhat), Qxu' + Qsu[t]' * SYinv * Qsx[t])
-    kK = -R \ (R' \ b)
-
+    if code > 0  # cycled through all regularization values and still not PD
+        error("Regularisation failed for all values")
+    end
+    
+    options.reg = reg
+    
     # Update gains
-    ku[t] = kK[:, 1]
-    Ku[t] = kK[:, 2:end]
+    ku[t] = kK[t][:, 1]
+    Ku[t] = kK[t][:, 2:end]
     ks[t] = yinv .* (rhat .+ S * Qsu[t] * ku[t])
     Ks[t] = SYinv * (Qsx[t] + Qsu[t] * Ku[t])
     ky[t] = -(constraint_evaluations[t] .+ y[t]) - Qsu[t] * ku[t]
@@ -170,6 +170,7 @@ function update_value_function!(policy, t)
     mul!(Vxx[t], transpose(Ku[t]), Qux[t], 1.0, 1.0) # apply appropriate scaling 
     mul!(Vxx[t], transpose(Qux[t]), Ku[t], 1.0, 1.0) # apply appropriate scaling
     Vxx[t] .+= Qxx[t]
+    # Vxx[t] .=  Qxx[t] + (Ku[t]' * (Quu[t] * Ku[t])) + (Ku[t]' * Qux[t]) + (Qux[t]' * Ku[t])
 
     # Vx[t] .=  Qx[t] + (K[t]' * Quu[t] * k[t]) + (K[t]' * Qu[t]) + (Qux[t]' * k[t])
     mul!(policy.u_tmp[t], Quu[t], ku[t])
@@ -177,4 +178,5 @@ function update_value_function!(policy, t)
     mul!(Vx[t], transpose(Ku[t]), Qu[t], 1.0, 1.0) # apply appropriate scaling 
     mul!(Vx[t], transpose(Qux[t]), ku[t], 1.0, 1.0) # apply appropriate scaling 
     Vx[t] .+= Qx[t]
+    # Vx[t] .=  Qx[t] + (Ku[t]' * Quu[t] * ku[t]) + (Ku[t]' * Qu[t]) + (Qux[t]' * ku[t])
 end

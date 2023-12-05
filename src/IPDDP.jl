@@ -1,4 +1,4 @@
-module IterativeLQR
+module IPDDP
 
 using LinearAlgebra 
 using Symbolics 

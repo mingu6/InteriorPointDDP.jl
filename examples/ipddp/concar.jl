@@ -4,13 +4,13 @@
 
 # ## Setup
 
-using IterativeLQR 
+using IPDDP
 using LinearAlgebra
 using Plots
 
 # ## horizon 
 # NOTE: This should be one more than the matlab horizon
-T = 51
+T = 501
 
 # ## car 
 num_state = 4

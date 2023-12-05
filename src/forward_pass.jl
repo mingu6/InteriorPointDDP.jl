@@ -3,7 +3,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     min_step_size=1.0e-5,
     c1=1.0e-4,
     c2=0.9,
-    max_iterations=25,
+    max_iterations=100,
     verbose=false)
 
     # reset solver status
@@ -48,27 +48,27 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
 
             if options.feasible
                 # update constraints with computed values in the cache (from rollout_feasible!)
-                for t = 1:length(dynamics)
-                    @views violations[t] .= constraints[t].evaluate_cache
-                    # take inequalities and package them together
-                    @views constr_data.inequalities[t] .= constraints[t].evaluate_cache[constraints[t].indices_inequality] # cool indexing trick
+                constraint!(constr_data.violations, constr_data.inequalities, constraints, problem.states, problem.actions, problem.parameters)
+                if any(vcat(constr_data.inequalities...) .> 0.)
+                    for (i, el) = enumerate(constr_data.inequalities)
+                        if any(el .> 0.)
+                            display(i)
+                            display(el)
+                        end
+                    end
                 end
-
-                logcost = J - perturbation * sum(log.(vcat((-1 .* violations)...)))
+                logcost = J - perturbation * sum(log.(vcat((-1 .* constr_data.inequalities)...)))
                 err = 0
             else
                 # infeasible
                 logcost = J - perturbation * sum(log.(vcat(slacks...)))
                 # update constraint values with new states and actions
                 constraint!(constr_data.violations, constr_data.inequalities, constraints, problem.states, problem.actions, problem.parameters)
-                flattened_sum = vcat([(length(s) > length(c) ? vcat(c, zeros(length(s) - length(c))) : c) + 
-                                (length(s) < length(c) ? vcat(s, zeros(length(c) - length(s))) : s) 
-                                for (s, c) in zip(slacks, violations)]...)
-                err = max(options.objective_tolerance, norm(flattened_sum, 1))
+                err = max(options.objective_tolerance, norm(vcat(constr_data.violations...) + vcat(slacks...), 1))
             end
 
             candidate = [logcost, err]
-            if any(all(candidate .>= data.filter, dims=1))
+            if all(candidate .>= data.filter)
                 data.status[1] = false
                 data.step_size[1] *= 0.5
                 iteration += 1
@@ -82,6 +82,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
                 data.logcost = logcost
                 data.err = err
                 # constraints are updated above
+                data.filter = [data.logcost, data.err]  # update filter
                 break
             end
         else
