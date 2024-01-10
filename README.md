@@ -1,14 +1,16 @@
-# IterativeLQR.jl
-[![CI](https://github.com/thowell/IterativeLQR.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/thowell/IterativeLQR.jl/actions/workflows/CI.yml)
-[![codecov](https://codecov.io/gh/thowell/IterativeLQR.jl/branch/main/graph/badge.svg?token=FGM33O1K1E)](https://codecov.io/gh/thowell/IterativeLQR.jl)
+# InteriorPointDDP.jl (Work in progress!!!)
 
-A Julia package for solving constrained trajectory optimization problems with iterative LQR (iLQR). 
+Implemented by Ming Xu, Pranav Pativada, Jeffrey Liang and Iman Shames.
+
+A Julia package for solving constrained trajectory optimization problems with interior point DDP (IPDDP) [[Paper](https://arxiv.org/pdf/2004.12710), [Original Code](https://github.com/Xapavlov/ipddp)]. We leverage the nice solver API and code structure from [IterativeLQR.jl](https://github.com/thowell/IterativeLQR.jl) for InteriorPointDDP.jl.
+
+Problems that we can solve using IPDDP must be formulated as
 
 $$ 
 \begin{align*}
 		\underset{x_{1:T}, \phantom{\,} u_{1:T-1}}{\text{minimize }} & \phantom{,} g_T(x_T; \theta_T) + \sum \limits_{t = 1}^{T-1} g_t(x_t, u_t; \theta_t)\\
 		\text{subject to } & \phantom{,} f_t(x_t, u_t; \theta_t) = x_{t+1}, \phantom{,} \quad t = 1,\dots,T-1,\\
-		& \phantom{,} c_t(x_t, u_t; \theta_t) \phantom{,}[\leq, =] \phantom{,} 0, \quad t = 1, \dots, T,\\
+		& \phantom{,} c_t(x_t, u_t; \theta_t) \phantom{,}\leq \phantom{,} 0, \quad t = 1, \dots, T-1,\\
 \end{align*}
 $$
 
@@ -19,76 +21,60 @@ with
 - $\theta_{1:T}$: problem-data trajectory 
 
 
-- Fast and allocation-free gradients and Jacobians are automatically generated using [Symbolics.jl](https://github.com/JuliaSymbolics/Symbolics.jl) for user-provided costs, constraints, and dynamics. 
+- Jacobians are automatically generated using [Symbolics.jl](https://github.com/JuliaSymbolics/Symbolics.jl) for user-provided costs, constraints, and dynamics. 
 
-- Constraints are handled using an [augmented Lagrangian framework](https://en.wikipedia.org/wiki/Augmented_Lagrangian_method). 
+- Constraints are handled using an interior point framework.
 
 - Cost, dynamics, and constraints can have varying dimensions at each time step.
 
-- Parameters are exposed (and gradients wrt these values coming soon!)
+- TODO: Allocation-free jacobians. Currently, these are causing gnarly bugs so we have removed them. 
 
-For more details, see our related paper: [ALTRO: A Fast Solver for Constrained Trajectory Optimization](http://roboticexplorationlab.org/papers/altro-iros.pdf)
+- TODO: Implement equality constraints and terminal constraints (including inequality).
+
+## Objectives of this project/repo
+
+### Cleaner API (vs the MATLAB implementation)
+
+We are closely following the code structure of IterativeLQR.jl. Benefits include
+- More user friendly (tidier API)
+- Easier to directly (and fairly) compare IPDDP and penalty-based methods for handling constraints (e.g., [Altro.jl](https://github.com/RoboticExplorationLab/Altro.jl), [IterativeLQR.jl](https://github.com/thowell/IterativeLQR.jl)). 
+- Ease of integration into awesome contact dynamics work from the robot exploration lab (e.g., [optimization_dynamics](https://github.com/thowell/optimization_dynamics), [Dojo](https://github.com/dojo-sim/Dojo.jl)).
+
+### Improved computation times
+
+Implementing IPDDP in Julia will dramatically speed up computation time compared to the original MATLAB code (after compilation).
+
+### Solver enhancements (à la IPOPT)
+
+The original implementation in the MATLAB code uses a very basic line search filter. We believe this line search filter may not be sufficiently robust for problems which are significantly more difficult than the examples presented in the original paper (e.g., non-linear constraints). 
+
+We propose to implement enhancements similar to state-of-the-art, general, interior point method IPOPT (see [paper](https://link.springer.com/article/10.1007/s10107-004-0559-y) for details) to improve solver robustness and convergence speed. Key enhancements include
+
+- Second-order corrections for descent directions
+- Improved regularization of descent directions
+- Feasibility restoration phase
+- and more....
+
+So far, **none have been implemented**. The current implementation is similar (though not identical) to the original MATLAB implementation.
+
+**If you have a tricky constrained trajectory optimisation problem you would like us to try, please raise an issue with the mathematical formulation/code!**
 
 ## Installation
 From the Julia REPL, type `]` to enter the Pkg REPL mode and run:
 ```julia
-pkg> add https://github.com/thowell/IterativeLQR.jl
+pkg> add https://github.com/mingu6/InteriorPointDDP.jl
 ```
 
-## Quick Start 
-```julia
-using IterativeLQR 
-using LinearAlgebra
+## Quick Start
 
-# horizon 
-T = 11 
+Load the Julia REPL and this project.
 
-# particle 
-num_state = 2
-num_action = 1 
+`julia --project=/path/to/InteriorPointDDP.jl`
 
-function particle_discrete(x, u)
-   A = [1.0 1.0; 0.0 1.0]
-   B = [0.0; 1.0] 
-   return A * x + B * u[1]
-end
+Switch to package mode using `]` and type `instantiate` if you are loading this project for the first time to download and install dependencies.
 
-# model
-particle = Dynamics(particle_discrete, num_state, num_action)
-model = [particle for t = 1:T-1] 
+Run example from the Julia REPL, e.g.,
 
-# initialization
-x1 = [0.0; 0.0] 
-xT = [1.0; 0.0]
-ū = [1.0e-1 * randn(num_action) for t = 1:T-1] 
-x̄ = rollout(model, x1, ū)
+`include("examples/ipddp/car.jl")`
 
-# objective  
-objective = [
-   [Cost((x, u) -> 0.1 * dot(x, x) + 0.1 * dot(u, u), num_state, num_action) for t = 1:T-1]..., 
-   Cost((x, u) -> 0.1 * dot(x, x), num_state, 0)
-]
-
-# constraints
-constraints = [
-   [Constraint() for t = 1:T-1]..., 
-   Constraint((x, u) -> x - xT, num_state, 0)
-] 
-
-# solver
-solver = Solver(model, objective, constraints)
-initialize_controls!(solver, ū)
-initialize_states!(solver, x̄)
-
-# solve
-solve!(solver)
-
-# solution
-x_sol, u_sol = get_trajectory(solver)
-```
-## Examples 
-
-Please see the following for examples using this package: 
-
-- [Trajectory Optimization with Optimization-Based Dynamics](https://github.com/thowell/optimization_dynamics) 
-- [Dojo: A Differentiable Simulator for Robotics](https://github.com/dojo-sim/Dojo.jl)
+Change solver options in `src/options.jl` (e.g., feasible/infeasible start, number of iterations etc.). Note you will need to recompile the project after changing this (TODO: fix this).
