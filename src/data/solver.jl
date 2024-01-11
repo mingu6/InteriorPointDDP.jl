@@ -16,7 +16,8 @@ mutable struct SolverData{T}
 
     cache::Dict{Symbol,Vector{T}}       # solver stats
 
-    perturbation::Float64               # μ, the perturbation
+    μⱼ::Float64                         # perturbation value
+    # τⱼ::Float64                         # fraction to the boundary value
     logcost::Float64                    # log of cost for i-th iteration
     err::Float64                        # ??
     
@@ -49,12 +50,12 @@ function solver_data(dynamics::Vector{Dynamics{T}};
                  :θ_max => zeros(max_cache), 
                  :step_size     => zeros(max_cache))
 
-    perturbation = 0.0
+    μⱼ = 0.0
     logcost = Inf
     err = 0.0
     filter = [Inf , 0.0]
 
-    SolverData(objective, gradient, θ_max, indices_state, indices_action, step_size, [false], [0], cache, perturbation, logcost, err, filter)
+    SolverData(objective, gradient, θ_max, indices_state, indices_action, step_size, [false], [0], cache, μⱼ, logcost, err, filter)
 end
 
 function reset!(data::SolverData) 
@@ -67,7 +68,7 @@ function reset!(data::SolverData)
     data.θ_max = Inf
     data.status[1] = false
     data.iterations[1] = 0
-    data.perturbation = 0.0
+    data.μⱼ = 0.0
     data.logcost = [0.0]
     data.err = [0]
     data.filter = [zeros(2)]
@@ -80,7 +81,7 @@ function cache!(data::SolverData)
     data.cache[:objective][iter] = data.objective[1]
     data.cache[:gradient][iter] = data.gradient
     data.cache[:step_size][iter] = data.step_size
-    data.cache[:perturbation][iter] = data.perturbation
+    data.cache[:μⱼ][iter] = data.μⱼ
     data.cache[:logcost][iter] = data.logcost
     data.cache[:err][iter] = data.err
     data.cache[:filter][iter] = data.filter

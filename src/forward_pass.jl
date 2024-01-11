@@ -28,7 +28,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     iteration = 1
 
     feasible = options.feasible
-    perturbation = data.perturbation
+    μⱼ = data.μⱼ
     constr_data = problem.objective.costs.constraint_data
     constraints = constr_data.constraints
     dynamics = problem.model.dynamics
@@ -40,7 +40,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
 
         J = Inf
         
-        data.status[1] = rollout!(policy, problem, feasible, perturbation, step_size=data.step_size[1])
+        data.status[1] = rollout!(policy, problem, feasible, μⱼ, step_size=data.step_size[1])
 
         if data.status[1] # not failed
             cost!(data, problem, mode=:current)[1] # calls cost in methods.jl, which calls cost in interior_point.jl, saves result in data.objective[1]
@@ -57,11 +57,11 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
                         end
                     end
                 end
-                logcost = J - perturbation * sum(log.(vcat((-1 .* constr_data.inequalities)...)))
+                logcost = J - μⱼ * sum(log.(vcat((-1 .* constr_data.inequalities)...)))
                 err = Inf
             else
                 # infeasible
-                logcost = J - perturbation * sum(log.(vcat(slacks...)))
+                logcost = J - μⱼ * sum(log.(vcat(slacks...)))
                 # update constraint values with new states and actions
                 constraint!(constr_data.violations, constr_data.inequalities, constraints, problem.states, problem.actions, problem.parameters)
                 err = max(options.objective_tolerance, norm(vcat(constr_data.violations...) + vcat(slacks...), 1))

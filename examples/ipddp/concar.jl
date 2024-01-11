@@ -4,7 +4,7 @@
 
 # ## Setup
 
-using IPDDP
+using InteriorPointDDP
 using LinearAlgebra
 using Plots
 

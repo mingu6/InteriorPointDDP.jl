@@ -1,4 +1,4 @@
-module IPDDP
+module InteriorPointDDP
 
 using LinearAlgebra 
 using Symbolics 

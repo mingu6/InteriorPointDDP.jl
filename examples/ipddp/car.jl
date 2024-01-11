@@ -3,7 +3,7 @@
 # PKG_SETUP
 
 # ## Setup
-using IPDDP
+using InteriorPointDDP
 using LinearAlgebra
 using Plots
 using BenchmarkTools
