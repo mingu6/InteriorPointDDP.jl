@@ -1,29 +1,3 @@
-"""
-    gradient of Lagrangian
-        https://web.stanford.edu/class/ee363/lectures/lqr-lagrange.pdf
-"""
-function lagrangian_gradient!(data::SolverData, policy::PolicyData, problem::ProblemData)
-	p = policy.value.gradient
-    Qx = policy.action_value.gradient_state
-    Qu = policy.action_value.gradient_action
-    H = length(problem.states)
-
-    for t = 1:H-1
-        Lx = @views data.gradient[data.indices_state[t]]
-        Lx .= Qx[t]
-        Lx .-= p[t]
-        Lu = @views data.gradient[data.indices_action[t]]
-        Lu .= Qu[t]
-        # data.gradient[data.indices_state[t]] = Qx[t] - p[t] # should always be zero by construction
-        # data.gradient[data.indices_action[t]] = Qu[t]
-    end
-    # NOTE: gradient wrt x1 is satisfied implicitly
-end
-
-# function solve!(solver::Solver{T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O}, args...; kwargs...) where {T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O<:Objective{T}}
-#     ilqr_solve!(solver, args...; kwargs...)
-# end
-
 function solve!(solver::Solver{T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O}, args...; kwargs...) where {T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O<:InteriorPoint{T}}
     ipddp_solve!(solver, args...; kwargs...)
 end
@@ -52,9 +26,17 @@ function ipddp_solve!(solver::Solver; iteration=true)
     constraints = solver.problem.objective.costs.constraint_data
 
     # initial rollout is performed in caller file
-	initial_cost = cost!(data, problem,
-        mode=:nominal)
-    constraint!(constraints, problem.nominal_states, problem.nominal_actions, problem.parameters)
+	initial_cost = cost!(data, problem, mode=:nominal)
+	
+	# initialize θ_max to initialise filter
+	if !options.feasible
+        constraint!(constraints, problem.nominal_states, problem.nominal_actions, problem.parameters)
+        slacks = problem.objective.costs.constraint_data.slacks
+        data.θ_max = norm(constraints.violations + slacks, 1)
+    else
+        data.θ_max = Inf
+    end
+    
     if data.perturbation == 0
         initial_cost = initial_cost[1] # = data.objective[1] which is the obj func/cost for first iteration
         n_minus_1 = problem.horizon - 1
@@ -62,14 +44,13 @@ function ipddp_solve!(solver::Solver; iteration=true)
         data.perturbation = initial_cost/n_minus_1/num_inequals
     end
 
-    reset_filter!(problem, data, options)
+    reset_filter!(data, options)
     reset_regularisation!(data, options)
 
     time = 0
     for iter = 1:solver.options.max_iterations
         iter_time = @elapsed begin   
-            gradients!(problem,
-        mode=:nominal)
+            gradients!(problem, mode=:nominal)
         backward_pass!(policy, problem, data, options)
         forward_pass!(policy, problem, data, options,
             min_step_size=solver.options.min_step_size,
@@ -108,7 +89,7 @@ function ipddp_solve!(solver::Solver; iteration=true)
 
         if options.opterr <= 0.2 * data.perturbation
             data.perturbation = max(options.objective_tolerance/10.0, min(0.2 * data.perturbation, data.perturbation^1.2))
-            reset_filter!(problem, data, options)
+            reset_filter!(data, options)
         end
     end
     
@@ -116,28 +97,12 @@ function ipddp_solve!(solver::Solver; iteration=true)
     return nothing
 end
 
-
-function reset_filter!(problem::ProblemData, data::SolverData, options::Options) 
-    constraint_vals = problem.objective.costs.constraint_data.violations
-    cost = data.objective[1]
-    perturbation = data.perturbation
+function reset_filter!(data::SolverData, options::Options) 
     if !options.feasible
-        slacks = problem.objective.costs.constraint_data.slacks
-        data.logcost = cost - perturbation * sum(log.(vcat(slacks...)))
-        # Add padding
-        flattened_sum = vcat([(length(s) > length(c) ? vcat(c, zeros(length(s) - length(c))) : c) + 
-                      (length(s) < length(c) ? vcat(s, zeros(length(c) - length(s))) : s) 
-                      for (s, c) in zip(slacks, constraint_vals)]...)
-        data.err = norm(flattened_sum, 1)
-        if data.err < options.objective_tolerance
-            # data.err = 0
-            data.err = options.objective_tolerance
-        end
+        data.filter = [Inf, data.θ_max]
     else
-        data.logcost = cost - perturbation * sum(log.(vcat((-1 .* constraint_vals)...)))
-        data.err = 0
+        data.filter = [Inf, Inf]
     end
-    data.filter = [data.logcost, data.err]
     data.status[1] = true
 end
 

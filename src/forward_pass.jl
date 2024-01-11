@@ -58,7 +58,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
                     end
                 end
                 logcost = J - perturbation * sum(log.(vcat((-1 .* constr_data.inequalities)...)))
-                err = 0
+                err = Inf
             else
                 # infeasible
                 logcost = J - perturbation * sum(log.(vcat(slacks...)))

@@ -4,7 +4,7 @@
 mutable struct SolverData{T}
     objective::Vector{T}                # objective value
     gradient::Vector{T}                 # Lagrangian gradient
-    max_violation::Vector{T}            # maximum constraint violation
+    θ_max::T                    # filter initialization for maximum allowable constraint violation
 
     indices_state::Vector{Vector{Int}}  # indices for state trajectory
     indices_action::Vector{Vector{Int}} # indices for control trajectory
@@ -19,6 +19,7 @@ mutable struct SolverData{T}
     perturbation::Float64               # μ, the perturbation
     logcost::Float64                    # log of cost for i-th iteration
     err::Float64                        # ??
+    
     filter::Vector{T}                   # filter
 end
 
@@ -40,12 +41,12 @@ function solver_data(dynamics::Vector{Dynamics{T}};
     push!(indices_state, collect(n_sum .+ (1:dynamics[end].num_next_state)))
 
     objective = [Inf]
-    max_violation = [0.0]
+    θ_max = 0.0
     step_size = [1.0]
     gradient = zeros(num_trajectory(dynamics))
     cache = Dict(:objective     => zeros(max_cache), 
                  :gradient      => zeros(max_cache), 
-                 :max_violation => zeros(max_cache), 
+                 :θ_max => zeros(max_cache), 
                  :step_size     => zeros(max_cache))
 
     perturbation = 0.0
@@ -53,17 +54,17 @@ function solver_data(dynamics::Vector{Dynamics{T}};
     err = 0.0
     filter = [Inf , 0.0]
 
-    SolverData(objective, gradient, max_violation, indices_state, indices_action, step_size, [false], [0], cache, perturbation, logcost, err, filter)
+    SolverData(objective, gradient, θ_max, indices_state, indices_action, step_size, [false], [0], cache, perturbation, logcost, err, filter)
 end
 
 function reset!(data::SolverData) 
     fill!(data.objective, 0.0) 
     fill!(data.gradient, 0.0)
-    fill!(data.max_violation, 0.0) 
     fill!(data.cache[:objective], 0.0) 
     fill!(data.cache[:gradient], 0.0) 
-    fill!(data.cache[:max_violation], 0.0) 
+    fill!(data.cache[:θ_max], 0.0) 
     fill!(data.cache[:step_size], 0.0) 
+    data.θ_max = Inf
     data.status[1] = false
     data.iterations[1] = 0
     data.perturbation = 0.0

@@ -3,7 +3,6 @@
 # PKG_SETUP
 
 # ## Setup
-# include("/Users/jeffreyliang/Documents/SCNC3101/IPDDP.jl/src/IterativeLQR.jl")
 using IPDDP
 using LinearAlgebra
 using Plots
