@@ -64,7 +64,8 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
                 logcost = J - μⱼ * sum(log.(vcat(slacks...)))
                 # update constraint values with new states and actions
                 constraint!(constr_data.violations, constr_data.inequalities, constraints, problem.states, problem.actions, problem.parameters)
-                err = max(options.objective_tolerance, norm(vcat(constr_data.violations...) + vcat(slacks...), 1))
+                # err = max(options.objective_tolerance, norm(vcat(constr_data.violations...) + vcat(slacks...), 1))
+                err = data.optimality_error
             end
 
             candidate = [logcost, err]
@@ -92,7 +93,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         end
     end
 
-    if data.step_size[1] < min_step_size 
+    if data.step_size[1] < min_step_size
         data.status[1] = false
         data.step_size[1] = 0
         verbose && (@warn "line search failure")

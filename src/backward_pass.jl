@@ -8,16 +8,10 @@ function backward_pass!(policy::PolicyData,
     )
 
     # Horizon 
-    H = length(problem.states)
+    N = length(problem.states)
     
     # Constraint Data 
     con_data = problem.objective.costs.constraint_data
-    
-    # Optimality errors
-    stat_err::Float64 = 0   # stationarity of Lagrangian
-    viol_err::Float64 = 0   # constraint violation (equality and slacks + ineq)
-    cs_err::Float64 = 0     # complementary slackness
-    s_norm::Float64 = 0        # optimality error rescaling term
 
     # Jacobians of system dynamics
     fx = problem.model.jacobian_state
@@ -50,10 +44,10 @@ function backward_pass!(policy::PolicyData,
 
     # terminal value function
     # TODO: Extension: Implement terminal constraints 
-    Vxx[H] .= qxx[H]
-    Vx[H] .= qx[H]
+    Vxx[N] .= qxx[N]
+    Vx[N] .= qx[N]
 
-    for t = H-1:-1:1
+    for t = N-1:-1:1
         # Qx[t] .= qx[t] + (Qsx[t]' * s[t]) + (fx[t]' * Vx[t+1])
         mul!(policy.x_tmp[t], transpose(Qsx[t]), s[t])
         mul!(Qx[t], transpose(fx[t]), Vx[t+1])
@@ -95,20 +89,5 @@ function backward_pass!(policy::PolicyData,
         end
 
         update_value_function!(policy, t)
-
-        # Update optimality error
-        
-        stat_err = max(stat_err, norm(Qu[t], Inf))
-        cs_err = max(cs_err, norm(r, Inf))
-        if !options.feasible
-            inequalities = con_data.inequalities
-            slacks = con_data.slacks
-            viol_err = max(viol_err, norm(inequalities[t] + slacks[t], Inf))
-        end
-        s_norm += norm(s[t], 1)
     end
-    
-    s_max = options.s_max
-    s_d = max(s_max, s_norm / (H * length(s[1])))  / s_max
-    solver_data.optimality_error = options.feasible ? max(stat_err / s_d, cs_err / s_d) : max(stat_err / s_d, viol_err, cs_err / s_d)
 end

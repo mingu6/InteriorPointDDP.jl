@@ -50,10 +50,14 @@ function ipddp_solve!(solver::Solver; iteration=true)
     time = 0
     for iter = 1:solver.options.max_iterations
         iter_time = @elapsed begin
+            if iter > 1
+                constraint!(constraints, problem.nominal_states, problem.nominal_actions, problem.parameters)
+            end
             gradients!(problem, mode=:nominal)
             backward_pass!(policy, problem, data, options)
+            optimality_error!(policy, problem, data, options, data.μⱼ)
             forward_pass!(policy, problem, data, options, min_step_size=solver.options.min_step_size,
-                line_search=solver.options.line_search, verbose=solver.options.verbose)
+                    line_search=solver.options.line_search, verbose=solver.options.verbose)
         end 
     
         # info
@@ -111,4 +115,33 @@ function reset_regularisation!(data::SolverData, options::Options)
     options.reg_step = 1
     data.status[1] = true
     options.recovery = 0.0
+end
+
+function optimality_error!(policy::PolicyData, problem::ProblemData,solver_data::SolverData, options::Options, μ::Float64)
+    stat_err::Float64 = 0   # stationarity of Lagrangian
+    viol_err::Float64 = 0   # constraint violation (equality and slacks + ineq)
+    cs_err::Float64 = 0     # complementary slackness
+    s_norm::Float64 = 0     # optimality error rescaling term
+    
+    N = length(problem.states)
+    Qu = policy.action_value.gradient_action
+    constraints = problem.objective.costs.constraint_data
+    s = constraints.ineq_duals
+    y = constraints.slacks
+    c = constraints.inequalities
+    
+    for t = 1:N-1
+        stat_err = max(stat_err, norm(Qu[t], Inf))
+        if options.feasible
+            cs_err = max(cs_err, norm(s[t] .* c[t] .+ μ, Inf))
+        else
+            viol_err = max(viol_err, norm(c[t] + y[t], Inf))
+            cs_err = max(cs_err, norm(s[t] .* y[t] .- μ, Inf))
+        end
+        s_norm += norm(s[t], 1)
+    end
+    
+    s_max = options.s_max
+    s_d = max(s_max, s_norm / (N * length(s[1])))  / s_max
+    solver_data.optimality_error = options.feasible ? max(stat_err / s_d, cs_err / s_d) : max(stat_err / s_d, viol_err, cs_err / s_d)
 end
