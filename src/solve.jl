@@ -9,11 +9,14 @@ function ipddp_solve!(solver::Solver, states, actions; kwargs...)
 end
 
 function ipddp_solve!(solver::Solver; iteration=true)
-
-    # START TIMER
     costs = []
     steps = []
     (solver.options.verbose && iteration==1) && solver_info()
+    
+    # iteration counters
+    j::Int = 1  # outer loop iteration
+    k::Int = 1  # inner loop iteration (barrier sub-problem)
+    l::Int = 1  # line search iteration
 
 	# data
 	policy = solver.policy
@@ -21,8 +24,8 @@ function ipddp_solve!(solver::Solver; iteration=true)
     reset!(problem.model)
     reset!(problem.objective)
 	data = solver.data
-    solver.options.reset_cache && reset!(data)
     options = solver.options
+    options.reset_cache && reset!(data)
     constraints = solver.problem.objective.costs.constraint_data
 
     # initial rollout is performed in caller file
@@ -37,40 +40,57 @@ function ipddp_solve!(solver::Solver; iteration=true)
         data.θ_max = Inf
     end
     
-    if data.μⱼ == 0
+    if data.μ_j == 0
         initial_cost = initial_cost[1] # = data.objective[1] which is the obj func/cost for first iteration
         n_minus_1 = problem.horizon - 1
         num_inequals = constraints.constraints[1].num_inequality
-        data.μⱼ = initial_cost / n_minus_1 / num_inequals
+        data.μ_j = initial_cost / n_minus_1 / num_inequals
     end
 
     reset_filter!(data, options)
     reset_regularisation!(data, options)
 
     time = 0
-    for iter = 1:solver.options.max_iterations
+    while k <= options.max_iterations
         iter_time = @elapsed begin
-            if iter > 1
+            if k > 1
                 constraint!(constraints, problem.nominal_states, problem.nominal_actions, problem.parameters)
             end
             gradients!(problem, mode=:nominal)
             backward_pass!(policy, problem, data, options)
-            optimality_error!(policy, problem, data, options, data.μⱼ)
-            forward_pass!(policy, problem, data, options, min_step_size=solver.options.min_step_size,
-                    line_search=solver.options.line_search, verbose=solver.options.verbose)
-        end 
-    
+            opt_err = optimality_error(policy, problem, options, 0.0)
+            data.optimality_error = opt_err
+            if opt_err <= options.optimality_tolerance  # converged!!! woohoo
+                println("~~~~~~~~~~~~~~~~~~~")
+                println("Optimality reached!")
+                data.μ_j = 0.  # allows profiling, TODO: fix hack
+                return nothing
+            end
+            opt_err_barrier = optimality_error(policy, problem, options, data.μ_j)
+            if opt_err_barrier <= options.κ_ϵ * data.μ_j
+                data.μ_j = max(options.optimality_tolerance / 10.0, min(options.κ_μ * data.μ_j, data.μ_j^options.θ_μ))
+                reset_filter!(data, options)
+                j += 1
+                if k == 1
+                    continue
+                end
+            end
+            # when to update optimality error? when is filter updated?
+            forward_pass!(policy, problem, data, options, min_step_size=options.min_step_size,
+                    line_search=options.line_search, verbose=options.verbose)
+            k += 1
+        end
         # info
         data.iterations[1] += 1
-        if iter % 10 == 1
+        if k % 10 == 1
             println("")
             println(rpad("Iteration", 15), rpad("Elapsed time", 15), rpad("μ", 15), rpad("Cost", 15), rpad("Opt.error", 15), rpad("Reg.power", 13), rpad("Stepsize", 15))
         end
-        if solver.options.verbose
+        if options.verbose
             println(
-                rpad(string(iter), 15), 
+                rpad(string(k), 15), 
                 rpad(@sprintf("%.5e", time+=iter_time), 15), 
-                rpad(@sprintf("%.5e", data.μⱼ), 15), 
+                rpad(@sprintf("%.5e", data.μ_j), 15), 
                 rpad(@sprintf("%.5e", data.objective[1]), 15), 
                 rpad(@sprintf("%.5e", data.optimality_error), 15), 
                 rpad(@sprintf("%.3e", options.reg), 13), 
@@ -80,22 +100,9 @@ function ipddp_solve!(solver::Solver; iteration=true)
 
         push!(costs, data.objective[1])
         push!(steps, data.step_size[1])
-
-        # check convergence
-        if max(options.opterr, data.μⱼ) <= options.objective_tolerance
-            println("~~~~~~~~~~~~~~~~~~~")
-            println("Optimality reached!")
-            data.μⱼ = 0.  # allows profiling, TODO: fix hack
-            return nothing
-        end
-
-        if data.optimality_error <= 0.2 * data.μⱼ
-            data.μⱼ = max(options.objective_tolerance / 10.0, min(0.2 * data.μⱼ, data.μⱼ^1.2))
-            reset_filter!(data, options)
-        end
     end
     
-    data.μⱼ = 0.  # allows profiling, TODO: fix hack
+    data.μ_j = 0.  # allows profiling, TODO: fix hack
     return nothing
 end
 
@@ -117,7 +124,7 @@ function reset_regularisation!(data::SolverData, options::Options)
     options.recovery = 0.0
 end
 
-function optimality_error!(policy::PolicyData, problem::ProblemData,solver_data::SolverData, options::Options, μ::Float64)
+function optimality_error(policy::PolicyData, problem::ProblemData, options::Options, μ::Float64)
     stat_err::Float64 = 0   # stationarity of Lagrangian
     viol_err::Float64 = 0   # constraint violation (equality and slacks + ineq)
     cs_err::Float64 = 0     # complementary slackness
@@ -143,5 +150,6 @@ function optimality_error!(policy::PolicyData, problem::ProblemData,solver_data:
     
     s_max = options.s_max
     s_d = max(s_max, s_norm / (N * length(s[1])))  / s_max
-    solver_data.optimality_error = options.feasible ? max(stat_err / s_d, cs_err / s_d) : max(stat_err / s_d, viol_err, cs_err / s_d)
+    optimality_error = options.feasible ? max(stat_err / s_d, cs_err / s_d) : max(stat_err / s_d, viol_err, cs_err / s_d)
+    return optimality_error
 end

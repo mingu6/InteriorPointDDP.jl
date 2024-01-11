@@ -3,7 +3,7 @@ Base.@kwdef mutable struct Options{T}
     max_iterations::Int=1000 # changed from 100
     max_dual_updates::Int=10
     min_step_size::T=1.0e-8
-    objective_tolerance::T=1.0e-7 # changed from 1e-3
+    optimality_tolerance::T=1.0e-7 # 
     lagrangian_gradient_tolerance::T=1.0e-3
     constraint_tolerance::T=1.0e-7
     constraint_norm::T=Inf
@@ -21,10 +21,13 @@ Base.@kwdef mutable struct Options{T}
     opterr::Float64 = 0.0
     recovery::Float64 = 0.0 
     
+    κ_ϵ::Float64 = 10
+    κ_μ::Float64 = 0.2
+    θ_μ::Float64 = 1.5
     s_max::Float64 = 100
     τ_min::Float64 = 0.99
     
     # IPDDP Params
-    feasible::Bool = true
+    feasible::Bool = false
     method::Symbol=:ip # can be :al for augmented lagrangian
 end 

@@ -25,9 +25,9 @@ function compute_gains_and_update_feasible!(policy, problem, solver_data, option
     s = con_data.ineq_duals
 
     # Feasible computation
-    μⱼ = solver_data.μⱼ
+    μ_j = solver_data.μ_j
     S = Diagonal(s[t])
-    r = S * constraint_evaluations[t] .+ μⱼ
+    r = S * constraint_evaluations[t] .+ μ_j
     cinv = 1.0 ./ constraint_evaluations[t]
     SCinv = Diagonal(s[t] .* cinv)
 
@@ -66,7 +66,7 @@ function compute_gains_and_update_feasible!(policy, problem, solver_data, option
     Qu[t] .-= Qsu[t]' * (cinv .* r)
     Qx[t] .-= Qsx[t]' * (cinv .* r)
 
-    # Return r to calculate the μⱼ-err later 
+    # Return r to calculate the μ_j-err later 
     return r
 end
 
@@ -101,9 +101,9 @@ function compute_gains_and_update_infeasible!(policy, problem, solver_data, opti
     y = con_data.slacks
 
     # Infeasible computation
-    μⱼ = solver_data.μⱼ
+    μ_j = solver_data.μ_j
     S = Diagonal(s[t])
-    r = s[t] .* y[t] .- μⱼ
+    r = s[t] .* y[t] .- μ_j
     rhat = s[t] .* (constraint_evaluations[t] .+ y[t]) .- r
     yinv = 1.0 ./ y[t]
     SYinv = Diagonal(s[t] .* yinv)
