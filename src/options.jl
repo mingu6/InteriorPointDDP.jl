@@ -21,9 +21,10 @@ Base.@kwdef mutable struct Options{T}
     opterr::Float64 = 0.0
     recovery::Float64 = 0.0 
     
+    s_max::Float64 = 100
     τ_min::Float64 = 0.99
     
     # IPDDP Params
-    feasible::Bool = true
+    feasible::Bool = false
     method::Symbol=:ip # can be :al for augmented lagrangian
 end 

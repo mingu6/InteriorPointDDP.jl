@@ -9,12 +9,15 @@ function backward_pass!(policy::PolicyData,
 
     # Horizon 
     H = length(problem.states)
+    
     # Constraint Data 
     con_data = problem.objective.costs.constraint_data
-    # Errors
-    c_err::Float64 = 0
-    mu_err::Float64 = 0
-    Qu_err::Float64 = 0
+    
+    # Optimality errors
+    stat_err::Float64 = 0   # stationarity of Lagrangian
+    viol_err::Float64 = 0   # constraint violation (equality and slacks + ineq)
+    cs_err::Float64 = 0     # complementary slackness
+    s_norm::Float64 = 0        # optimality error rescaling term
 
     # Jacobians of system dynamics
     fx = problem.model.jacobian_state
@@ -85,25 +88,27 @@ function backward_pass!(policy::PolicyData,
         # 1) Call direct factorisation instead of cholesky
         if options.feasible
             # Compute gains
-            r = compute_gains_and_update_feasible!(policy, 
-            problem, solver_data, options, t)
+            r = compute_gains_and_update_feasible!(policy, problem, solver_data, options, t)
         else
             # Compute gains 
-            r = compute_gains_and_update_infeasible!(policy,
-            problem, solver_data, options, t)
+            r = compute_gains_and_update_infeasible!(policy, problem, solver_data, options, t)
         end
 
         update_value_function!(policy, t)
 
-        # Optimality Error 
-        Qu_err = max(Qu_err, norm(Qu[t], Inf))
-        mu_err = max(mu_err, norm(r, Inf))
+        # Update optimality error
+        
+        stat_err = max(stat_err, norm(Qu[t], Inf))
+        cs_err = max(cs_err, norm(r, Inf))
         if !options.feasible
-            constraint_evaluation = con_data.inequalities
+            inequalities = con_data.inequalities
             slacks = con_data.slacks
-            c_err = max(c_err, norm(constraint_evaluation[t] + slacks[t], Inf))
+            viol_err = max(viol_err, norm(inequalities[t] + slacks[t], Inf))
         end
+        s_norm += norm(s[t], 1)
     end
-
-    options.opterr=max(Qu_err, c_err, mu_err);
+    
+    s_max = options.s_max
+    s_d = max(s_max, s_norm / (H * length(s[1])))  / s_max
+    solver_data.optimality_error = options.feasible ? max(stat_err / s_d, cs_err / s_d) : max(stat_err / s_d, viol_err, cs_err / s_d)
 end

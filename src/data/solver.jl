@@ -2,9 +2,13 @@
     Solver Data
 """
 mutable struct SolverData{T}
+    j::Int                              # Outer loop iteration counter
+    k::Int                              # Barrier problem (inner) iteration counter
+    l::Int                              # Line search iteration counter
+
     objective::Vector{T}                # objective value
     gradient::Vector{T}                 # Lagrangian gradient
-    θ_max::T                    # filter initialization for maximum allowable constraint violation
+    θ_max::T                            # filter initialization for maximum allowable constraint violation
 
     indices_state::Vector{Vector{Int}}  # indices for state trajectory
     indices_action::Vector{Vector{Int}} # indices for control trajectory
@@ -17,15 +21,18 @@ mutable struct SolverData{T}
     cache::Dict{Symbol,Vector{T}}       # solver stats
 
     μⱼ::Float64                         # perturbation value
-    # τⱼ::Float64                         # fraction to the boundary value
+    # τⱼ::Float64                       # fraction to the boundary value
     logcost::Float64                    # log of cost for i-th iteration
-    err::Float64                        # ??
+    optimality_error::Float64           # optimality error for problem (not barrier)
     
     filter::Vector{T}                   # filter
 end
 
 function solver_data(dynamics::Vector{Dynamics{T}};
     max_cache=1000) where T
+    i = 0
+    j = 0
+    k = 0
 
     # indices x and u
     indices_state = Vector{Int}[]
@@ -52,10 +59,10 @@ function solver_data(dynamics::Vector{Dynamics{T}};
 
     μⱼ = 0.0
     logcost = Inf
-    err = 0.0
+    optimality_error = 0.0
     filter = [Inf , 0.0]
 
-    SolverData(objective, gradient, θ_max, indices_state, indices_action, step_size, [false], [0], cache, μⱼ, logcost, err, filter)
+    SolverData(i, j, k, objective, gradient, θ_max, indices_state, indices_action, step_size, [false], [0], cache, μⱼ, logcost, optimality_error, filter)
 end
 
 function reset!(data::SolverData) 
@@ -65,12 +72,15 @@ function reset!(data::SolverData)
     fill!(data.cache[:gradient], 0.0) 
     fill!(data.cache[:θ_max], 0.0) 
     fill!(data.cache[:step_size], 0.0) 
+    data.i = 0
+    data.j = 0
+    data.k = 0
     data.θ_max = Inf
     data.status[1] = false
     data.iterations[1] = 0
     data.μⱼ = 0.0
     data.logcost = [0.0]
-    data.err = [0]
+    data.optimality_error = [0]
     data.filter = [zeros(2)]
 end
 
@@ -83,7 +93,7 @@ function cache!(data::SolverData)
     data.cache[:step_size][iter] = data.step_size
     data.cache[:μⱼ][iter] = data.μⱼ
     data.cache[:logcost][iter] = data.logcost
-    data.cache[:err][iter] = data.err
+    data.cache[:optimality_error][iter] = data.optimality_error
     data.cache[:filter][iter] = data.filter
     return nothing
 end

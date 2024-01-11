@@ -58,7 +58,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
                     end
                 end
                 logcost = J - μⱼ * sum(log.(vcat((-1 .* constr_data.inequalities)...)))
-                err = Inf
+                err = data.optimality_error
             else
                 # infeasible
                 logcost = J - μⱼ * sum(log.(vcat(slacks...)))
@@ -80,9 +80,9 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
                 data.objective[1] = J # update cost
                 data.status[1] = true # update status
                 data.logcost = logcost
-                data.err = err
+                data.optimality_error = err
                 # constraints are updated above
-                data.filter = [data.logcost, data.err]  # update filter
+                data.filter = [data.logcost, data.optimality_error]  # update filter
                 break
             end
         else

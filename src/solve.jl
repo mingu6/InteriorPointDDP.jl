@@ -49,11 +49,11 @@ function ipddp_solve!(solver::Solver; iteration=true)
 
     time = 0
     for iter = 1:solver.options.max_iterations
-        iter_time = @elapsed begin   
+        iter_time = @elapsed begin
             gradients!(problem, mode=:nominal)
-        backward_pass!(policy, problem, data, options)
-        forward_pass!(policy, problem, data, options, min_step_size=solver.options.min_step_size,
-            line_search=solver.options.line_search, verbose=solver.options.verbose)
+            backward_pass!(policy, problem, data, options)
+            forward_pass!(policy, problem, data, options, min_step_size=solver.options.min_step_size,
+                line_search=solver.options.line_search, verbose=solver.options.verbose)
         end 
     
         # info
@@ -68,7 +68,7 @@ function ipddp_solve!(solver::Solver; iteration=true)
                 rpad(@sprintf("%.5e", time+=iter_time), 15), 
                 rpad(@sprintf("%.5e", data.μⱼ), 15), 
                 rpad(@sprintf("%.5e", data.objective[1]), 15), 
-                rpad(@sprintf("%.5e", options.opterr), 15), 
+                rpad(@sprintf("%.5e", data.optimality_error), 15), 
                 rpad(@sprintf("%.3e", options.reg), 13), 
                 rpad(@sprintf("%.5e", data.step_size[1]), 15)
             )            
@@ -85,7 +85,7 @@ function ipddp_solve!(solver::Solver; iteration=true)
             return nothing
         end
 
-        if options.opterr <= 0.2 * data.μⱼ
+        if data.optimality_error <= 0.2 * data.μⱼ
             data.μⱼ = max(options.objective_tolerance / 10.0, min(0.2 * data.μⱼ, data.μⱼ^1.2))
             reset_filter!(data, options)
         end
