@@ -16,7 +16,6 @@ function ipddp_solve!(solver::Solver; iteration=true)
     # iteration counters
     j::Int = 1  # outer loop iteration
     k::Int = 1  # inner loop iteration (barrier sub-problem)
-    l::Int = 1  # line search iteration
 
 	# data
 	policy = solver.policy
@@ -58,16 +57,12 @@ function ipddp_solve!(solver::Solver; iteration=true)
             end
             gradients!(problem, mode=:nominal)
             backward_pass!(policy, problem, data, options)
-            opt_err = optimality_error(policy, problem, options, 0.0)
+            # check convergence
+            opt_err = optimality_error(policy, problem, options, data.μ_j)
             data.optimality_error = opt_err
-            if opt_err <= options.optimality_tolerance  # converged!!! woohoo
-                println("~~~~~~~~~~~~~~~~~~~")
-                println("Optimality reached!")
-                data.μ_j = 0.  # allows profiling, TODO: fix hack
-                return nothing
-            end
-            opt_err_barrier = optimality_error(policy, problem, options, data.μ_j)
-            if opt_err_barrier <= options.κ_ϵ * data.μ_j
+            max(opt_err, data.μ_j) <= options.optimality_tolerance && break
+            # check barrier problem convergence
+            if opt_err <= options.κ_ϵ * data.μ_j
                 data.μ_j = max(options.optimality_tolerance / 10.0, min(options.κ_μ * data.μ_j, data.μ_j^options.θ_μ))
                 reset_filter!(data, options)
                 j += 1
@@ -124,7 +119,7 @@ function reset_regularisation!(data::SolverData, options::Options)
     options.recovery = 0.0
 end
 
-function optimality_error(policy::PolicyData, problem::ProblemData, options::Options, μ::Float64)
+function optimality_error(policy::PolicyData, problem::ProblemData, options::Options, μ_j::Float64)
     stat_err::Float64 = 0   # stationarity of Lagrangian
     viol_err::Float64 = 0   # constraint violation (equality and slacks + ineq)
     cs_err::Float64 = 0     # complementary slackness
@@ -140,10 +135,10 @@ function optimality_error(policy::PolicyData, problem::ProblemData, options::Opt
     for t = 1:N-1
         stat_err = max(stat_err, norm(Qu[t], Inf))
         if options.feasible
-            cs_err = max(cs_err, norm(s[t] .* c[t] .+ μ, Inf))
+            cs_err = max(cs_err, norm(s[t] .* c[t] .+ μ_j, Inf))
         else
             viol_err = max(viol_err, norm(c[t] + y[t], Inf))
-            cs_err = max(cs_err, norm(s[t] .* y[t] .- μ, Inf))
+            cs_err = max(cs_err, norm(s[t] .* y[t] .- μ_j, Inf))
         end
         s_norm += norm(s[t], 1)
     end
