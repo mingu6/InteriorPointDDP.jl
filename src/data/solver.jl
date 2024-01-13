@@ -24,8 +24,7 @@ mutable struct SolverData{T}
     filter::Vector{T}                   # filter
 end
 
-function solver_data(dynamics::Vector{Dynamics{T}};
-    max_cache=1000) where T
+function solver_data(dynamics::Vector{Dynamics{T}}; max_cache=1000) where T
 
     # indices x and u
     indices_state = Vector{Int}[]

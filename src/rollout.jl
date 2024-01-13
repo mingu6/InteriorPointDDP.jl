@@ -31,7 +31,7 @@ function rollout_infeasible!(policy::PolicyData, problem::ProblemData, perturbat
     actions = problem.actions
     params = problem.parameters
 
-    constr_data = problem.objective.costs.constraint_data
+    constr_data = problem.constraints
     ineq_duals = constr_data.ineq_duals
     slacks = constr_data.slacks
 
@@ -99,7 +99,7 @@ function rollout_feasible!(policy::PolicyData, problem::ProblemData, perturbatio
     actions = problem.actions
     params = problem.parameters
 
-    constr_data = problem.objective.costs.constraint_data
+    constr_data = problem.constraints
     ineq_duals = constr_data.ineq_duals
 
     nominal_states = deepcopy(problem.nominal_states) # best states so far

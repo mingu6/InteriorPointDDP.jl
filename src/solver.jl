@@ -1,14 +1,14 @@
 """
     Problem Data
 """
-mutable struct Solver{T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX}
-    problem::ProblemData{T,X,U,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX}
+mutable struct Solver{T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX,C,CX,CU}
+    problem::ProblemData{T,X,U,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX,C,CX,CU}
 	policy::PolicyData{N,M,NN,MM,MN,NNN,MNN}
 	data::SolverData{T}
     options::Options{T}
 end
 
-function Solver(dynamics::Vector{Dynamics{T}}, objective::Objective{T}; 
+function Solver(dynamics::Vector{Dynamics{T}}, objective::Objective{T}, constraints::Constraint{T}; 
     parameters=[[zeros(d.num_parameter) for d in dynamics]..., zeros(0)],
     options=Options{T}()) where T
 
@@ -16,8 +16,7 @@ function Solver(dynamics::Vector{Dynamics{T}}, objective::Objective{T};
     policy = policy_data(dynamics)
 
     # allocate problem data
-    problem = problem_data(dynamics, objective, 
-        parameters=parameters)
+    problem = problem_data(dynamics, objective, constraints, parameters=parameters)
 
     # allocate solver data
     data = solver_data(dynamics)
@@ -29,17 +28,11 @@ function Solver(dynamics::Vector{Dynamics{T}}, costs::Vector{Cost{T}}, constrain
     parameters=[[zeros(d.num_parameter) for d in dynamics]..., zeros(0)],
     options=Options{T}()) where T
 
-    if options.method == :ip
-        # interior point
-        objective = interior_point(dynamics, costs, constraints)
-    end
-
     # allocate policy data  
     policy = policy_data(dynamics, constraints)
 
     # allocate model data
-    problem = problem_data(dynamics, objective, 
-        parameters=parameters)
+    problem = problem_data(dynamics, costs, constraints, parameters=parameters)
 
     # allocate solver data
     data = solver_data(dynamics)

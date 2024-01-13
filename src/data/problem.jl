@@ -1,4 +1,4 @@
-mutable struct ProblemData{T,X,U,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX}
+mutable struct ProblemData{T,X,U,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX,C,CX,CU}
     # current trajectory
     states::Vector{X}
     actions::Vector{U}
@@ -14,8 +14,11 @@ mutable struct ProblemData{T,X,U,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX}
     # model data
     model::ModelData{T,FX,FU,FW}
 
-    # objective data
+    # objective/cost data
     objective::ObjectiveData{O,OX,OU,OXX,OUU,OUX}
+    
+    # constraints data
+    constraints::ConstraintsData{T,C,CX,CU}
 
     # trajectory: z = (x1,..., xT, u1,..., uT-1) | Δz = (Δx1..., ΔxT, Δu1,..., ΔuT-1)
     trajectory::Vector{T}
@@ -23,8 +26,7 @@ mutable struct ProblemData{T,X,U,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX}
     horizon::Int
 end
 
-function problem_data(dynamics, costs; 
-    parameters=[[zeros(d.num_parameter) for d in dynamics]..., zeros(0)])
+function problem_data(dynamics, costs, constraints; parameters=[[zeros(d.num_parameter) for d in dynamics]..., zeros(0)])
 
     length(parameters) == length(dynamics) && (parameters = [parameters..., zeros(0)])
     @assert length(dynamics) + 1 == length(parameters)
@@ -40,10 +42,11 @@ function problem_data(dynamics, costs;
 
     model = model_data(dynamics)
     objective = objective_data(dynamics, costs)
+    constr_data = constraint_data(dynamics, constraints)
 
     trajectory = zeros(num_trajectory(dynamics))
     
     horizon = length(costs)
     
-    ProblemData(states, actions, parameters, nominal_states, nominal_actions, model, objective, trajectory, horizon)
+    ProblemData(states, actions, parameters, nominal_states, nominal_actions, model, objective, constr_data, trajectory, horizon)
 end

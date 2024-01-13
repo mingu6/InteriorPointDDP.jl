@@ -1,10 +1,8 @@
 using LinearAlgebra
 
-function backward_pass!(policy::PolicyData, problem::ProblemData, solver_data::SolverData,
-    options::Options, mode=:nominal)
-
+function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverData, options::Options, mode=:nominal)
     N = length(problem.states)
-    constraints = problem.objective.costs.constraint_data
+    constr_data = problem.constraints
     reg::Float64 = options.start_reg
 
     # Jacobians of system dynamics
@@ -14,9 +12,9 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, solver_data::S
     # fxx = problem.model.hessian_state_state
     # fxu = problem.model.hessian_state_action
     # fuu = problem.model.hessian_action_action
-    # Jacobian constraints 
-    Qsx = constraints.jacobian_state
-    Qsu = constraints.jacobian_action
+    # Jacobian constr_data 
+    Qsx = constr_data.jacobian_state
+    Qsu = constr_data.jacobian_action
     # Cost gradients
     qx = problem.objective.gradient_state
     qu = problem.objective.gradient_action
@@ -42,12 +40,12 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, solver_data::S
     Vx = policy.value.gradient
     Vxx = policy.value.hessian
     
-    c = constraints.inequalities
-    s = constraints.ineq_duals
-    y = constraints.slacks
+    c = constr_data.inequalities
+    s = constr_data.ineq_duals
+    y = constr_data.slacks
 
     # terminal value function
-    # TODO: Extension: Implement terminal constraints 
+    # TODO: Extension: Implement terminal constr_data 
     Vxx[N] .= qxx[N]
     Vx[N] .= qx[N]
 
@@ -80,7 +78,7 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, solver_data::S
         
         cy = options.feasible ? -c[t] : y[t]
         # for infeasible, directly computes \hat{r} from (17) is the same as r in (9) in Pavlov et al.
-        r = s[t] .* c[t] .+ solver_data.μ_j
+        r = s[t] .* c[t] .+ data.μ_j
         cy_inv = 1. ./ cy
         s_cy_inv = s[t] .* cy_inv
         

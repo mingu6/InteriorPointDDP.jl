@@ -1,4 +1,4 @@
-function solve!(solver::Solver{T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O}, args...; kwargs...) where {T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O<:InteriorPoint{T}}
+function solve!(solver::Solver{T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O}, args...; kwargs...) where {T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O<:Objective{T}}
     ipddp_solve!(solver, args...; kwargs...)
 end
 
@@ -25,24 +25,24 @@ function ipddp_solve!(solver::Solver; iteration=true)
 	data = solver.data
     options = solver.options
     options.reset_cache && reset!(data)
-    constraints = solver.problem.objective.costs.constraint_data
+    constr_data = solver.problem.constraints
 
     # initial rollout is performed in caller file
 	initial_cost = cost!(data, problem, mode=:nominal)
-    constraint!(constraints, problem.nominal_states, problem.nominal_actions, problem.parameters)
+    constraint!(constr_data, problem.nominal_states, problem.nominal_actions, problem.parameters)
 	
 	# initialize θ_max to initialise filter
 	if !options.feasible
-        slacks = problem.objective.costs.constraint_data.slacks
-        data.θ_max = norm(constraints.violations + slacks, 1)
+        slacks = problem.constraints.slacks
+        data.θ_max = norm(constr_data.violations + slacks, 1)
     else
-        data.θ_max = Inf
+        data.θ_max = Inf  # no need to track constraint violations for feasible IPDDP
     end
     
     if data.μ_j == 0
         initial_cost = initial_cost[1] # = data.objective[1] which is the obj func/cost for first iteration
         n_minus_1 = problem.horizon - 1
-        num_inequals = constraints.constraints[1].num_inequality
+        num_inequals = constr_data.constraints[1].num_inequality
         data.μ_j = initial_cost / n_minus_1 / num_inequals
     end
 
@@ -53,7 +53,7 @@ function ipddp_solve!(solver::Solver; iteration=true)
     while k <= options.max_iterations
         iter_time = @elapsed begin
             if k > 1
-                constraint!(constraints, problem.nominal_states, problem.nominal_actions, problem.parameters)
+                constraint!(constr_data, problem.nominal_states, problem.nominal_actions, problem.parameters)
             end
             gradients!(problem, mode=:nominal)
             backward_pass!(policy, problem, data, options)
@@ -127,10 +127,10 @@ function optimality_error(policy::PolicyData, problem::ProblemData, options::Opt
     
     N = length(problem.states)
     Qu = policy.action_value.gradient_action
-    constraints = problem.objective.costs.constraint_data
-    s = constraints.ineq_duals
-    y = constraints.slacks
-    c = constraints.inequalities
+    constr_data = problem.constraints
+    s = constr_data.ineq_duals
+    y = constr_data.slacks
+    c = constr_data.inequalities
     
     for t = 1:N-1
         stat_err = max(stat_err, norm(Qu[t], Inf))

@@ -27,9 +27,8 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     data.step_size[1] = 1.0
     iteration = 1
 
-    feasible = options.feasible
     μ_j = data.μ_j
-    constr_data = problem.objective.costs.constraint_data
+    constr_data = problem.constraints
     constraints = constr_data.constraints
     dynamics = problem.model.dynamics
     violations = constr_data.violations
@@ -40,7 +39,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
 
         J = Inf
         
-        data.status[1] = rollout!(policy, problem, feasible, μ_j, step_size=data.step_size[1])
+        data.status[1] = rollout!(policy, problem, options.feasible, μ_j, step_size=data.step_size[1])
 
         if data.status[1] # not failed
             cost!(data, problem, mode=:current)[1] # calls cost in methods.jl, which calls cost in interior_point.jl, saves result in data.objective[1]

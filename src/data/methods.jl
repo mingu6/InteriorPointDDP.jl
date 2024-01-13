@@ -1,6 +1,4 @@
-function cost(problem::ProblemData; 
-    mode=:nominal)
-
+function cost(problem::ProblemData; mode=:nominal)
     if mode == :nominal
         return cost(problem.objective.costs, problem.nominal_states, problem.nominal_actions, problem.parameters)
     elseif mode == :current
@@ -10,9 +8,7 @@ function cost(problem::ProblemData;
     end
 end
 
-function cost!(data::SolverData, problem::ProblemData; 
-    mode=:nominal)
-
+function cost!(data::SolverData, problem::ProblemData; mode=:nominal)
 	if mode == :nominal
 		data.objective[1] = cost(problem.objective.costs, problem.nominal_states, problem.nominal_actions, problem.parameters)
 	elseif mode == :current
@@ -24,7 +20,7 @@ end
 
 function update_nominal_trajectory!(data::ProblemData, feasible::Bool) 
     H = data.horizon
-    constraints = data.objective.costs.constraint_data
+    constraints = data.constraints
 
     data.nominal_states[1:H] .= data.states[1:H]
     if H > 1
@@ -51,8 +47,7 @@ function trajectory_sensitivities(problem::ProblemData, policy::PolicyData, data
     end
 end
 
-function trajectories(problem::ProblemData; 
-    mode=:nominal) 
+function trajectories(problem::ProblemData; mode=:nominal) 
     x = mode == :nominal ? problem.nominal_states : problem.states
     u = mode == :nominal ? problem.nominal_actions : problem.actions
     w = problem.parameters

@@ -16,7 +16,7 @@ struct ConstraintsData{T,C,CX,CU}
     nominal_slacks::Vector{Vector{T}}
 end
 
-function constraint_data(model::Model, constraints::Constraints) 
+function constraint_data(model::Model, constraints::Constraints)
     H = length(constraints)
     c = [zeros(constraints[t].num_constraint) for t = 1:H]
     ineqs = [zeros(constraints[t].num_inequality) for t = 1:H]
@@ -45,8 +45,7 @@ function constraint!(constraint_data::ConstraintsData, x, u, w)
     constraint!(constraint_data.violations, constraint_data.inequalities, constraint_data.constraints, x, u, w)
 end
 
-function constraint_violation(constraint_data::ConstraintsData; 
-    norm_type=Inf)
+function constraint_violation(constraint_data::ConstraintsData; norm_type=Inf)
 
     constraints = constraint_data.constraints
     H = length(constraints)
