@@ -57,9 +57,9 @@ function solver_data(dynamics::Vector{Dynamics{T}}; max_cache=1000) where T
 end
 
 function reset!(data::SolverData) 
-    fill!(data.objective, 0.0) 
+    fill!(data.costs, 0.0) 
     fill!(data.gradient, 0.0)
-    fill!(data.cache[:objective], 0.0) 
+    fill!(data.cache[:costs], 0.0) 
     fill!(data.cache[:gradient], 0.0) 
     fill!(data.cache[:θ_max], 0.0) 
     fill!(data.cache[:step_size], 0.0) 
@@ -75,8 +75,8 @@ end
 # TODO: fix iter
 function cache!(data::SolverData)
     iter = 1 #data.cache[:iter] 
-    # (iter > length(data[:objective])) && (@warn "solver data cache exceeded")
-    data.cache[:objective][iter] = data.objective[1]
+    # (iter > length(data[:costs])) && (@warn "solver data cache exceeded")
+    data.cache[:costs][iter] = data.costs[1]
     data.cache[:gradient][iter] = data.gradient
     data.cache[:step_size][iter] = data.step_size
     data.cache[:μ_j][iter] = data.μ_j

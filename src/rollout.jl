@@ -1,6 +1,4 @@
-function rollout!(policy::PolicyData, problem::ProblemData, feasible::Bool, perturbation::Float64;
-    step_size=1.0)
-
+function rollout!(policy::PolicyData, problem::ProblemData, feasible::Bool, perturbation::Float64; step_size=1.0)
     if feasible
         return rollout_feasible!(policy, problem, perturbation; step_size)
     else # infeasible
@@ -11,7 +9,6 @@ end
     
 function rollout(dynamics::Vector{Dynamics{T}}, initial_state, actions, 
     parameters=[zeros(d.num_parameter) for d in dynamics]) where T
-
     x_history = [initial_state]
     for (t, d) in enumerate(dynamics) 
         push!(x_history, copy(dynamics!(d, x_history[end], actions[t], parameters[t])))
@@ -21,8 +18,7 @@ function rollout(dynamics::Vector{Dynamics{T}}, initial_state, actions,
 end
 
 
-function rollout_infeasible!(policy::PolicyData, problem::ProblemData, perturbation;
-    step_size=1.0)
+function rollout_infeasible!(policy::PolicyData, problem::ProblemData, perturbation; step_size=1.0)
     # model 
     dynamics = problem.model.dynamics
 
@@ -35,10 +31,10 @@ function rollout_infeasible!(policy::PolicyData, problem::ProblemData, perturbat
     ineq_duals = constr_data.ineq_duals
     slacks = constr_data.slacks
 
-    nominal_states = deepcopy(problem.nominal_states) # best states so far  # why is a deepcopy happening???
-    nominal_actions = deepcopy(problem.nominal_actions) # best actions so far
-    nominal_ineq_duals = deepcopy(constr_data.nominal_ineq_duals)
-    nominal_slacks = deepcopy(constr_data.nominal_slacks) # current slack variables
+    nominal_states = problem.nominal_states
+    nominal_actions = problem.nominal_actions
+    nominal_ineq_duals = constr_data.nominal_ineq_duals
+    nominal_slacks = constr_data.nominal_slacks
 
     # initial state
     states[1] .= nominal_states[1]
@@ -67,16 +63,16 @@ function rollout_infeasible!(policy::PolicyData, problem::ProblemData, perturbat
         # check slack and dual positivity  TODO: ensure indices inequality used so equality constraints can be handled
         num_ineq = constr_data.constraints[t].num_inequality 
         if check_positivity(ineq_duals[t], nominal_ineq_duals[t], num_ineq, tau) == false
-            constr_data.ineq_duals .= deepcopy(nominal_ineq_duals)
-            constr_data.nominal_ineq_duals .= deepcopy(nominal_ineq_duals)
-            constr_data.slacks .= deepcopy(nominal_slacks)
-            constr_data.nominal_slacks .= deepcopy(nominal_slacks)  # why reset to nominal slacks? these are just allocated memory for compute right?
+            constr_data.ineq_duals .= copy(nominal_ineq_duals)
+            constr_data.nominal_ineq_duals .= copy(nominal_ineq_duals)
+            constr_data.slacks .= copy(nominal_slacks)
+            constr_data.nominal_slacks .= copy(nominal_slacks)  # why reset to nominal slacks? these are just allocated memory for compute right?
             return false
         elseif check_positivity(slacks[t], nominal_slacks[t], num_ineq, tau) == false
-            constr_data.ineq_duals .= deepcopy(nominal_ineq_duals)
-            constr_data.nominal_ineq_duals .= deepcopy(nominal_ineq_duals)
-            constr_data.slacks .= deepcopy(nominal_slacks)
-            constr_data.nominal_slacks .= deepcopy(nominal_slacks)
+            constr_data.ineq_duals .= copy(nominal_ineq_duals)
+            constr_data.nominal_ineq_duals .= copy(nominal_ineq_duals)
+            constr_data.slacks .= copy(nominal_slacks)
+            constr_data.nominal_slacks .= copy(nominal_slacks)
             return false
         end
         
@@ -84,13 +80,12 @@ function rollout_infeasible!(policy::PolicyData, problem::ProblemData, perturbat
         # update!(actions[t], nominal_actions[t], Ku[t], ku[t], states[t], nominal_states[t], step_size)
         actions[t] = nominal_actions[t] + step_size * ku[t] + Ku[t] * (states[t] - nominal_states[t])
         # states[t+1] = dynamics!(d, states[t], actions[t], params[t])
-        states[t+1] = deepcopy(dynamics!(d, states[t], actions[t], params[t]))
+        states[t+1] = copy(dynamics!(d, states[t], actions[t], params[t]))
     end        
     return true
 end
 
-function rollout_feasible!(policy::PolicyData, problem::ProblemData, perturbation;
-    step_size=1.0)
+function rollout_feasible!(policy::PolicyData, problem::ProblemData, perturbation; step_size=1.0)
     # model 
     dynamics = problem.model.dynamics
 
@@ -101,10 +96,10 @@ function rollout_feasible!(policy::PolicyData, problem::ProblemData, perturbatio
 
     constr_data = problem.constraints
     ineq_duals = constr_data.ineq_duals
-
-    nominal_states = deepcopy(problem.nominal_states) # best states so far
-    nominal_actions = deepcopy(problem.nominal_actions) # best actions so far
-    nominal_ineq_duals = deepcopy(constr_data.nominal_ineq_duals)
+    
+    nominal_states = problem.nominal_states # best states so far
+    nominal_actions = problem.nominal_actions # best actions so far
+    nominal_ineq_duals = constr_data.nominal_ineq_duals
 
     # initial state
     states[1] .= nominal_states[1]
@@ -133,24 +128,24 @@ function rollout_feasible!(policy::PolicyData, problem::ProblemData, perturbatio
         num_ineq = constr_data.constraints[t].num_inequality 
         # check dual variable positivity
         if check_positivity(ineq_duals[t], nominal_ineq_duals[t], num_ineq, tau) == false
-            constr_data.ineq_duals .= deepcopy(nominal_ineq_duals)
-            constr_data.nominal_ineq_duals .= deepcopy(nominal_ineq_duals)
-            problem.actions .= deepcopy(nominal_actions)
-            problem.nominal_actions .= deepcopy(nominal_actions)
+            constr_data.ineq_duals .= copy(nominal_ineq_duals)
+            constr_data.nominal_ineq_duals .= copy(nominal_ineq_duals)
+            problem.actions .= copy(nominal_actions)
+            problem.nominal_actions .= copy(nominal_actions)
             return false
         end
 
         # check strict constraint satisfaction
         if check_constr_sat!(constraints[t], violations[t], tau, states[t], actions[t], params[t]) == false
-            constr_data.ineq_duals .= deepcopy(nominal_ineq_duals)
-            constr_data.nominal_ineq_duals .= deepcopy(nominal_ineq_duals)
-            problem.actions .= deepcopy(nominal_actions)
-            problem.nominal_actions .= deepcopy(nominal_actions)
+            constr_data.ineq_duals .= copy(nominal_ineq_duals)
+            constr_data.nominal_ineq_duals .= copy(nominal_ineq_duals)
+            problem.actions .= copy(nominal_actions)
+            problem.nominal_actions .= copy(nominal_actions)
             return false
         end
 
         # states[t+1] .= dynamics!(d, states[t], actions[t], params[t])
-        states[t+1] = deepcopy(dynamics!(d, states[t], actions[t], params[t]))
+        states[t+1] = copy(dynamics!(d, states[t], actions[t], params[t]))
     end
     return true
 end

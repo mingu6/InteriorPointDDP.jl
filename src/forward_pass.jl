@@ -42,20 +42,12 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         data.status[1] = rollout!(policy, problem, options.feasible, μ_j, step_size=data.step_size[1])
 
         if data.status[1] # not failed
-            cost!(data, problem, mode=:current)[1] # calls cost in methods.jl, which calls cost in interior_point.jl, saves result in data.costs[1]
+            cost!(data, problem, mode=:current)[1]
             J = data.costs[1]
 
             if options.feasible
                 # update constraints with computed values in the cache (from rollout_feasible!)
                 constraint!(constr_data.violations, constr_data.inequalities, constraints, problem.states, problem.actions, problem.parameters)
-                if any(vcat(constr_data.inequalities...) .> 0.)
-                    for (i, el) = enumerate(constr_data.inequalities)
-                        if any(el .> 0.)
-                            display(i)
-                            display(el)
-                        end
-                    end
-                end
                 logcost = J - μ_j * sum(log.(vcat((-1 .* constr_data.inequalities)...)))
                 err = data.optimality_error
             else
