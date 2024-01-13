@@ -78,7 +78,6 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, solver_data::S
         mul!(Qux[t], policy.ux̂_tmp[t], fx[t])
         Qux[t] .+= qux[t]
         
-        
         cinv = 1.0 ./ c[t]
         
         code = 0
@@ -126,7 +125,6 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, solver_data::S
             # for reg=options.start_reg:options.reg_step:options.end_reg
             while reg < options.end_reg
                 policy.uu_tmp[t] .= Quu[t] + quu[t] * (1.6^reg - 1) .+ Qsu[t]' * (s_yinv .* Qsu[t])
-                policy.uu_tmp[t] .+= Quu[t]
                 (_, code) = LAPACK.potrf!('U', policy.uu_tmp[t])
                 if code > 0
                     reg += options.reg_step
