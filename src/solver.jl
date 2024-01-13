@@ -8,7 +8,7 @@ mutable struct Solver{T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX,
     options::Options{T}
 end
 
-function Solver(dynamics::Vector{Dynamics{T}}, objective::Objective{T}, constraints::Constraint{T}; 
+function Solver(dynamics::Vector{Dynamics{T}}, costs::Costs{T}, constraints::Constraint{T}; 
     parameters=[[zeros(d.num_parameter) for d in dynamics]..., zeros(0)],
     options=Options{T}()) where T
 
@@ -16,7 +16,7 @@ function Solver(dynamics::Vector{Dynamics{T}}, objective::Objective{T}, constrai
     policy = policy_data(dynamics)
 
     # allocate problem data
-    problem = problem_data(dynamics, objective, constraints, parameters=parameters)
+    problem = problem_data(dynamics, costs, constraints, parameters=parameters)
 
     # allocate solver data
     data = solver_data(dynamics)

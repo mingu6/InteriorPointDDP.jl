@@ -1,4 +1,4 @@
-function solve!(solver::Solver{T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O}, args...; kwargs...) where {T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O<:Objective{T}}
+function solve!(solver::Solver{T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O}, args...; kwargs...) where {T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O<:Costs{T}}
     ipddp_solve!(solver, args...; kwargs...)
 end
 
@@ -21,7 +21,7 @@ function ipddp_solve!(solver::Solver; iteration=true)
 	policy = solver.policy
     problem = solver.problem
     reset!(problem.model)
-    reset!(problem.objective)
+    reset!(problem.costs)
 	data = solver.data
     options = solver.options
     options.reset_cache && reset!(data)
@@ -40,7 +40,7 @@ function ipddp_solve!(solver::Solver; iteration=true)
     end
     
     if data.μ_j == 0
-        initial_cost = initial_cost[1] # = data.objective[1] which is the obj func/cost for first iteration
+        initial_cost = initial_cost[1] # = data.costs[1] which is the obj func/cost for first iteration
         n_minus_1 = problem.horizon - 1
         num_inequals = constr_data.constraints[1].num_inequality
         data.μ_j = initial_cost / n_minus_1 / num_inequals
@@ -86,14 +86,14 @@ function ipddp_solve!(solver::Solver; iteration=true)
                 rpad(string(k), 15), 
                 rpad(@sprintf("%.5e", time+=iter_time), 15), 
                 rpad(@sprintf("%.5e", data.μ_j), 15), 
-                rpad(@sprintf("%.5e", data.objective[1]), 15), 
+                rpad(@sprintf("%.5e", data.costs[1]), 15), 
                 rpad(@sprintf("%.5e", data.optimality_error), 15), 
                 rpad(@sprintf("%.3e", options.reg), 13), 
                 rpad(@sprintf("%.5e", data.step_size[1]), 15)
             )            
         end 
 
-        push!(costs, data.objective[1])
+        push!(costs, data.costs[1])
         push!(steps, data.step_size[1])
     end
     

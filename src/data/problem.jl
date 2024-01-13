@@ -15,7 +15,7 @@ mutable struct ProblemData{T,X,U,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX,C,CX,CU}
     model::ModelData{T,FX,FU,FW}
 
     # objective/cost data
-    objective::ObjectiveData{O,OX,OU,OXX,OUU,OUX}
+    costs::CostsData{O,OX,OU,OXX,OUU,OUX}
     
     # constraints data
     constraints::ConstraintsData{T,C,CX,CU}
@@ -41,12 +41,12 @@ function problem_data(dynamics, costs, constraints; parameters=[[zeros(d.num_par
     nominal_actions = [[zeros(d.num_action) for d in dynamics]..., zeros(0)]
 
     model = model_data(dynamics)
-    objective = objective_data(dynamics, costs)
+    costs_dat = costs_data(dynamics, costs)
     constr_data = constraint_data(dynamics, constraints)
 
     trajectory = zeros(num_trajectory(dynamics))
     
     horizon = length(costs)
     
-    ProblemData(states, actions, parameters, nominal_states, nominal_actions, model, objective, constr_data, trajectory, horizon)
+    ProblemData(states, actions, parameters, nominal_states, nominal_actions, model, costs_dat, constr_data, trajectory, horizon)
 end

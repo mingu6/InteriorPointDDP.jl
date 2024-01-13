@@ -29,5 +29,4 @@ Base.@kwdef mutable struct Options{T}
     
     # IPDDP Params
     feasible::Bool = false
-    method::Symbol=:ip # can be :al for augmented lagrangian
 end 

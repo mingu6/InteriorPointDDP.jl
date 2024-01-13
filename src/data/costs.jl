@@ -1,7 +1,7 @@
 
 
-struct ObjectiveData{C,X,U,XX,UU,UX}
-    costs::C # this is where the interior point object is stored
+struct CostsData{C,X,U,XX,UU,UX}
+    costs::C
     gradient_state::Vector{X}
     gradient_action::Vector{U}
     hessian_state_state::Vector{XX}
@@ -9,7 +9,7 @@ struct ObjectiveData{C,X,U,XX,UU,UX}
     hessian_action_state::Vector{UX}
 end
 
-function objective_data(dynamics::Vector{Dynamics{T}}, costs) where T
+function costs_data(dynamics::Vector{Dynamics{T}}, costs) where T
 	gradient_state = [[zeros(d.num_state) for d in dynamics]..., 
         zeros(dynamics[end].num_next_state)]
     gradient_action = [zeros(d.num_action) for d in dynamics]
@@ -17,10 +17,10 @@ function objective_data(dynamics::Vector{Dynamics{T}}, costs) where T
         zeros(dynamics[end].num_next_state, dynamics[end].num_next_state)]
     hessian_action_action = [zeros(d.num_action, d.num_action) for d in dynamics]
     hessian_action_state = [zeros(d.num_action, d.num_state) for d in dynamics]
-    ObjectiveData(costs, gradient_state, gradient_action, hessian_state_state, hessian_action_action, hessian_action_state)
+    CostsData(costs, gradient_state, gradient_action, hessian_state_state, hessian_action_action, hessian_action_state)
 end
 
-function reset!(data::ObjectiveData) 
+function reset!(data::CostsData) 
     H = length(data.gradient_state) 
     for t = 1:H 
         fill!(data.gradient_state[t], 0.0) 

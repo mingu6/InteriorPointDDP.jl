@@ -10,7 +10,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     data.status[1] = true # this is the same as (not) failed in MATLAB
 
     # # previous cost
-    # J_prev = data.objective[1]
+    # J_prev = data.costs[1]
 
     # TODO: ARMIJO LINE SEARCH
     # # gradient of Lagrangian
@@ -42,8 +42,8 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         data.status[1] = rollout!(policy, problem, options.feasible, μ_j, step_size=data.step_size[1])
 
         if data.status[1] # not failed
-            cost!(data, problem, mode=:current)[1] # calls cost in methods.jl, which calls cost in interior_point.jl, saves result in data.objective[1]
-            J = data.objective[1]
+            cost!(data, problem, mode=:current)[1] # calls cost in methods.jl, which calls cost in interior_point.jl, saves result in data.costs[1]
+            J = data.costs[1]
 
             if options.feasible
                 # update constraints with computed values in the cache (from rollout_feasible!)
@@ -77,7 +77,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
                 # logcost and err are both lower than filter
                 # update variables
                 update_nominal_trajectory!(problem, options.feasible) # updates states, actions, duals, and slack vars
-                data.objective[1] = J # update cost
+                data.costs[1] = J # update cost
                 data.status[1] = true # update status
                 data.logcost = logcost
                 data.optimality_error = err

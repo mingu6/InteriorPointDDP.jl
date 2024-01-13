@@ -1,8 +1,8 @@
 function cost(problem::ProblemData; mode=:nominal)
     if mode == :nominal
-        return cost(problem.objective.costs, problem.nominal_states, problem.nominal_actions, problem.parameters)
+        return cost(problem.costs.costs, problem.nominal_states, problem.nominal_actions, problem.parameters)
     elseif mode == :current
-        return cost(problem.objective.costs, problem.states, problem.actions, problem.parameters)
+        return cost(problem.costs.costs, problem.states, problem.actions, problem.parameters)
     else 
         return 0.0 
     end
@@ -10,12 +10,11 @@ end
 
 function cost!(data::SolverData, problem::ProblemData; mode=:nominal)
 	if mode == :nominal
-		data.objective[1] = cost(problem.objective.costs, problem.nominal_states, problem.nominal_actions, problem.parameters)
+		data.costs[1] = cost(problem.costs.costs, problem.nominal_states, problem.nominal_actions, problem.parameters)
 	elseif mode == :current
-		data.objective[1] = cost(problem.objective.costs, problem.states, problem.actions, problem.parameters)
+		data.costs[1] = cost(problem.costs.costs, problem.states, problem.actions, problem.parameters)
 	end
-
-	return data.objective
+	return data.costs
 end
 
 function update_nominal_trajectory!(data::ProblemData, feasible::Bool) 

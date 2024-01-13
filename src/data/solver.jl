@@ -2,8 +2,8 @@
     Solver Data
 """
 mutable struct SolverData{T}
-    objective::Vector{T}                # objective value
-    gradient::Vector{T}                 # Lagrangian gradient
+    costs::Vector{T}                    # cost value
+    gradient::Vector{T}                 # Lagrangian gradient TODO: remove
     θ_max::T                            # filter initialization for maximum allowable constraint violation
 
     indices_state::Vector{Vector{Int}}  # indices for state trajectory
@@ -16,7 +16,7 @@ mutable struct SolverData{T}
 
     cache::Dict{Symbol,Vector{T}}       # solver stats
 
-    μ_j::Float64                         # perturbation value
+    μ_j::Float64                        # perturbation value
     # τⱼ::Float64                       # fraction to the boundary value
     logcost::Float64                    # log of cost for i-th iteration
     optimality_error::Float64           # optimality error for problem (not barrier)
@@ -25,7 +25,6 @@ mutable struct SolverData{T}
 end
 
 function solver_data(dynamics::Vector{Dynamics{T}}; max_cache=1000) where T
-
     # indices x and u
     indices_state = Vector{Int}[]
     indices_action = Vector{Int}[] 
@@ -40,11 +39,11 @@ function solver_data(dynamics::Vector{Dynamics{T}}; max_cache=1000) where T
     end
     push!(indices_state, collect(n_sum .+ (1:dynamics[end].num_next_state)))
 
-    objective = [Inf]
+    costs = [Inf]
     θ_max = 0.0
     step_size = [1.0]
     gradient = zeros(num_trajectory(dynamics))
-    cache = Dict(:objective     => zeros(max_cache), 
+    cache = Dict(:costs     => zeros(max_cache), 
                  :gradient      => zeros(max_cache), 
                  :θ_max => zeros(max_cache), 
                  :step_size     => zeros(max_cache))
@@ -54,7 +53,7 @@ function solver_data(dynamics::Vector{Dynamics{T}}; max_cache=1000) where T
     optimality_error = 0.0
     filter = [Inf , 0.0]
 
-    SolverData(objective, gradient, θ_max, indices_state, indices_action, step_size, [false], [0], cache, μ_j, logcost, optimality_error, filter)
+    SolverData(costs, gradient, θ_max, indices_state, indices_action, step_size, [false], [0], cache, μ_j, logcost, optimality_error, filter)
 end
 
 function reset!(data::SolverData) 

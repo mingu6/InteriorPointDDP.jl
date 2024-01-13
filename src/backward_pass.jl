@@ -16,12 +16,12 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
     Qsx = constr_data.jacobian_state
     Qsu = constr_data.jacobian_action
     # Cost gradients
-    qx = problem.objective.gradient_state
-    qu = problem.objective.gradient_action
+    qx = problem.costs.gradient_state
+    qu = problem.costs.gradient_action
     # Cost hessians
-    qxx = problem.objective.hessian_state_state
-    quu = problem.objective.hessian_action_action
-    qux = problem.objective.hessian_action_state
+    qxx = problem.costs.hessian_state_state
+    quu = problem.costs.hessian_action_action
+    qux = problem.costs.hessian_action_state
     # Action-Value function approximation
     Qx = policy.action_value.gradient_state
     Qu = policy.action_value.gradient_action

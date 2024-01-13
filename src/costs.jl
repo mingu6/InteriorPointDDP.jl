@@ -43,7 +43,7 @@ function Cost(f::Function, num_state::Int, num_action::Int; num_parameter::Int=0
         zeros(num_state, num_state), zeros(num_action, num_action), zeros(num_action, num_state))
 end
 
-Objective{T} = Vector{Cost{T}} where T
+Costs{T} = Vector{Cost{T}} where T
 
 function cost(costs::Vector{Cost{T}}, states, actions, parameters) where T
     J = 0.0

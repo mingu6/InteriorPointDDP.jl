@@ -11,7 +11,7 @@ include("costs.jl")
 include("dynamics.jl")
 include("constraints.jl")
 include(joinpath("data", "model.jl"))
-include(joinpath("data", "objective.jl"))
+include(joinpath("data", "costs.jl"))
 include(joinpath("data", "constraints.jl"))
 include(joinpath("data", "policy.jl"))
 include(joinpath("data", "problem.jl"))
@@ -20,14 +20,13 @@ include(joinpath("data", "methods.jl"))
 include("options.jl")
 include("solver.jl")
 include("rollout.jl")
-include("interior_point.jl")
 include("gradients.jl")
 include("backward_pass.jl")
 include("forward_pass.jl")
 include("print.jl")
 include("solve.jl")
 
-# objective 
+# costs
 export Cost
 
 # constraints 
