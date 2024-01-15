@@ -77,21 +77,40 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
         Qux[t] .+= qux[t]
         
         cy = options.feasible ? -c[t] : y[t]
-        # for infeasible, directly computes \hat{r} from (17) is the same as r in (9) in Pavlov et al.
-        r = s[t] .* c[t] .+ data.μ_j
-        cy_inv = 1. ./ cy
-        s_cy_inv = s[t] .* cy_inv
+        # for infeasible, directly computes r̂ from (17) is the same as r in (9) in Pavlov et al.
+        policy.r_tmp[t] .= s[t]
+        policy.r_tmp[t] .*= c[t]
+        policy.r_tmp[t] .+= data.μ_j
+        policy.r_tmp[t] ./= cy  # r̂ ./ c[t] or r̂ ./ y[t]
+        
+        policy.su_tmp[t] .= Qsu[t]
+        policy.su_tmp[t] .*= s[t]
+        policy.su_tmp[t] ./= cy
+        
+        policy.sx_tmp[t] .= Qsx[t]
+        policy.sx_tmp[t] .*= s[t]
+        policy.sx_tmp[t] ./= cy
+        
+        # r = s[t] .* c[t] .+ data.μ_j
         
         # update local feedback policy/gains, e.g., LHS of (11)
         code = 0
         while reg < options.end_reg
-            policy.uu_tmp[t] .= Quu[t] + quu[t] * (1.6^reg - 1) .+ Qsu[t]' * (s_cy_inv .* Qsu[t])
+            # policy.uu_tmp[t] .= Quu[t] + quu[t] * (1.6^reg - 1) .+ Qsu[t]' * diag(s[t]) * diag(c[t] or y[t])^-1 .* Qsu[t]
+            policy.uu_tmp[t] .= quu[t]
+            policy.uu_tmp[t] .*= (1.6^reg - 1.)
+            policy.uu_tmp[t] .+= Quu[t]
+            mul!(policy.uu_tmp[t], transpose(Qsu[t]), policy.su_tmp[t], 1.0, 1.0)
             (_, code) = LAPACK.potrf!('U', policy.uu_tmp[t])
             if code > 0
                 reg += options.reg_step
                 continue
             end
-            kkt_soln[t] .= -hcat(Qu[t] + Qsu[t]' * (cy_inv .* r), Qux[t] + Qsu[t]' * (s_cy_inv .* Qsx[t]))
+            # kkt_soln[t] .= -hcat(Qu[t] + Qsu[t]' * diag(c[t] or y[t])^-1 * r, Qux[t] + Qsu[t]' * diag(s[t]) * diag(c[t] or y[t])^-1 .* Qsx[t])
+            kkt_soln[t][:, 1] .= Qu[t]
+            mul!(@view(kkt_soln[t][:, 1]), transpose(Qsu[t]), policy.r_tmp[t], -1.0, -1.0)
+            kkt_soln[t][:, 2:end] .= Qux[t]
+            mul!(@view(kkt_soln[t][:, 2:end]), transpose(Qsu[t]), policy.sx_tmp[t], -1.0, -1.0)
             LAPACK.potrs!('U', policy.uu_tmp[t], kkt_soln[t])
             break
         end
@@ -99,35 +118,54 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             error("Regularisation failed for all values")
         end
         options.reg = reg
-        ku[t] = kkt_soln[t][:, 1]
-        Ku[t] = kkt_soln[t][:, 2:end]
-        ks[t] = cy_inv .* (r .+ s[t] .* Qsu[t] * ku[t])
-        Ks[t] = s_cy_inv .* (Qsx[t] + Qsu[t] * Ku[t])
+        
+        ku[t] .= kkt_soln[t][:, 1]
+        Ku[t] .= kkt_soln[t][:, 2:end]
+        
+        # ks[t] .= diag(c[t] or y[t])^-1 .* (r .+ s[t] .* Qsu[t] * ku[t])
+        mul!(ks[t], policy.su_tmp[t], ku[t])
+        ks[t] .+= policy.r_tmp[t]
+        
+        # Ks[t] .= s_cy_inv .* (Qsx[t] + Qsu[t] * Ku[t])
+        mul!(Ks[t], policy.su_tmp[t], Ku[t])
+        Ks[t] .+= policy.sx_tmp[t]
+        
         if !options.feasible
-            ky[t] = -(c[t] .+ y[t]) - Qsu[t] * ku[t]
-            Ky[t] = -Qsx[t] - Qsu[t] * Ku[t]
+            # ky[t] .= -(c[t] .+ y[t]) - Qsu[t] * ku[t]
+            ky[t] .= c[t]
+            ky[t] .+= y[t]
+            mul!(ky[t], Qsu[t], ku[t], -1.0, -1.0)
+            
+            # Ky[t] .= -Qsx[t] - Qsu[t] * Ku[t]
+            Ky[t] .= Qsx[t]
+            mul!(Ky[t], Qsu[t], Ku[t], -1.0, -1.0)
         end
     
         # Update value function approximation
-        Quu[t] .+= Qsu[t]' * (s_cy_inv .* Qsu[t])
-        Qux[t] .+= transpose(Qsx[t]' * (s_cy_inv .* Qsu[t]))
-        Qxx[t] .+= Qsx[t]' * (s_cy_inv .* Qsx[t])
-        Qu[t] .+= Qsu[t]' * (cy_inv .* r)
-        Qx[t] .+= Qsx[t]' * (cy_inv .* r)
+        # Quu[t] = Quu[t] + Qsu[t]' * diag(s[t]) * diag(c[t] or y[t])^-1 * Qsu[t]
+        mul!(Quu[t], transpose(Qsu[t]), policy.su_tmp[t], 1.0, 1.0)
+        # Qux[t] = Qux[t] + Qsx[t]' * diag(s[t]) * diag(c[t] or y[t])^-1 * Qsu[t]
+        mul!(Qux[t], transpose(policy.su_tmp[t]), Qsx[t], 1.0, 1.0)
+        # Qxx[t] = Qsx[t]' + diag(s[t]) * diag(c[t] or y[t])^-1 * Qsx[t]
+        mul!(Qxx[t], transpose(Qsx[t]), policy.sx_tmp[t], 1.0, 1.0)
+        # Qu[t] .+= Qsu[t]' * diag(c[t] or y[t])^-1 * r
+        mul!(Qu[t], transpose(Qsu[t]), policy.r_tmp[t], 1.0, 1.0)
+        # Qx[t] .+= Qsx[t]' * diag(c[t] or y[t])^-1 * r
+        mul!(Qx[t], transpose(Qsx[t]), policy.r_tmp[t], 1.0, 1.0)
         
         # Update value function approx.
         # Vxx[t] .=  Qxx[t] + (K[t]' * (Quu[t] * K[t])) + (K[t]' * Qux[t]) + (Qux[t]' * K[t])
         mul!(policy.ux_tmp[t], Quu[t], Ku[t])
         mul!(Vxx[t], transpose(Ku[t]), policy.ux_tmp[t])
-        mul!(Vxx[t], transpose(Ku[t]), Qux[t], 1.0, 1.0) # apply appropriate scaling 
-        mul!(Vxx[t], transpose(Qux[t]), Ku[t], 1.0, 1.0) # apply appropriate scaling
+        mul!(Vxx[t], transpose(Ku[t]), Qux[t], 1.0, 1.0)
+        mul!(Vxx[t], transpose(Qux[t]), Ku[t], 1.0, 1.0)
         Vxx[t] .+= Qxx[t]
     
         # Vx[t] .=  Qx[t] + (K[t]' * Quu[t] * k[t]) + (K[t]' * Qu[t]) + (Qux[t]' * k[t])
         mul!(policy.u_tmp[t], Quu[t], ku[t])
         mul!(Vx[t], transpose(Ku[t]), policy.u_tmp[t])
-        mul!(Vx[t], transpose(Ku[t]), Qu[t], 1.0, 1.0) # apply appropriate scaling
-        mul!(Vx[t], transpose(Qux[t]), ku[t], 1.0, 1.0) # apply appropriate scaling
+        mul!(Vx[t], transpose(Ku[t]), Qu[t], 1.0, 1.0)
+        mul!(Vx[t], transpose(Qux[t]), ku[t], 1.0, 1.0)
         Vx[t] .+= Qx[t]
     end
 end

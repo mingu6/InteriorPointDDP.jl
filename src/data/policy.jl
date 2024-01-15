@@ -20,13 +20,11 @@ end
 """
     Policy Data
 """
-struct PolicyData{N,M,NN,MM,MN,NNN,MNN,S,SN,MNp1} 
+struct PolicyData{N,M,NN,MM,MN,NNN,MNN,S,SN,SM,MNp1} 
     # policy u = ū + K * (x - x̄) + k
     Ku::Vector{MN} # β
     ku::Vector{M}  # α
 
-    # S = # of inequality dual variables
-    # N = # of states
     Ks::Vector{SN} # θ
     ks::Vector{S} # η
 
@@ -46,6 +44,9 @@ struct PolicyData{N,M,NN,MM,MN,NNN,MNN,S,SN,MNp1}
 	ux̂_tmp::Vector{MNN}
 	uu_tmp::Vector{MM}
 	ux_tmp::Vector{MN}
+	su_tmp::Vector{SM}
+	sx_tmp::Vector{SN}
+	r_tmp::Vector{S}
 	kkt_soln_tmp::Vector{MNp1}
 end
 
@@ -54,12 +55,12 @@ function policy_data(dynamics::Vector{Dynamics{T}}, constraints::Constraints{T})
 	Ku = [zeros(d.num_action, d.num_state) for d in dynamics]
     ku = [zeros(d.num_action) for d in dynamics]
 
-    H = length(dynamics) # number of time steps
-	Ks = [zeros(constraints[t].num_inequality, dynamics[t].num_state) for t = 1:H] # S by N
-    ks = [zeros(c.num_inequality) for c in constraints] # S-length vector
+    H = length(dynamics)
+	Ks = [zeros(constraints[t].num_inequality, dynamics[t].num_state) for t = 1:H]
+    ks = [zeros(c.num_inequality) for c in constraints]
 
-	Ky = [zeros(constraints[t].num_inequality, dynamics[t].num_state) for t = 1:H] # S by N
-    ky = [zeros(c.num_inequality) for c in constraints] # S-length vector
+	Ky = [zeros(constraints[t].num_inequality, dynamics[t].num_state) for t = 1:H]
+    ky = [zeros(c.num_inequality) for c in constraints]
 
     # value function approximation
     P = [[zeros(d.num_state, d.num_state) for d in dynamics]..., 
@@ -84,10 +85,13 @@ function policy_data(dynamics::Vector{Dynamics{T}}, constraints::Constraints{T})
 	ux̂_tmp = [zeros(d.num_action, d.num_next_state) for d in dynamics]
 	uu_tmp = [zeros(d.num_action, d.num_action) for d in dynamics]
 	ux_tmp = [zeros(d.num_action, d.num_state) for d in dynamics]
+	su_tmp = [zeros(c.num_inequality, d.num_action) for (c, d) in zip(constraints, dynamics)]
+	sx_tmp = [zeros(c.num_inequality, d.num_state) for (c, d) in zip(constraints, dynamics)]
+	r_tmp = [zeros(c.num_inequality) for c in constraints]
     kkt_soln_tmp = [zeros(d.num_action, d.num_state + 1) for d in dynamics]
 
     PolicyData(Ku, ku, Ks, ks, Ky, ky,
         value,
         action_value,
-        x_tmp, u_tmp, xx̂_tmp, ux̂_tmp, uu_tmp, ux_tmp, kkt_soln_tmp)
+        x_tmp, u_tmp, xx̂_tmp, ux̂_tmp, uu_tmp, ux_tmp, su_tmp, sx_tmp, r_tmp, kkt_soln_tmp)
 end

@@ -8,12 +8,10 @@ function rollout!(policy::PolicyData, problem::ProblemData, feasible::Bool, μ_j
     constr_data = problem.constraints
     s = constr_data.ineq_duals
     y = constr_data.slacks
-    x̄ = problem.nominal_states # best states so far
-    ū = problem.nominal_actions # best actions so far
+    x̄ = problem.nominal_states
+    ū = problem.nominal_actions
     s̄ = constr_data.nominal_ineq_duals
     ȳ = constr_data.nominal_slacks
-
-    # initial state
     x[1] .= x̄[1]
 
     # policy
@@ -37,7 +35,7 @@ function rollout!(policy::PolicyData, problem::ProblemData, feasible::Bool, μ_j
         mul!(u[t], Ku[t], x[t], 1.0, 1.0)
         mul!(u[t], Ku[t], x̄[t], -1.0, 1.0)
 
-        # s[t] .= s̄[t] + Ks[t] * (x[t] -x̄[t]) + step_size * ks[t]
+        # s[t] .= s̄[t] + Ks[t] * (x[t] - x̄[t]) + step_size * ks[t]
         s[t] .= ks[t]
         s[t] .*= step_size
         s[t] .+= s̄[t]
@@ -45,7 +43,7 @@ function rollout!(policy::PolicyData, problem::ProblemData, feasible::Bool, μ_j
         mul!(s[t], Ks[t], x̄[t], -1.0, 1.0)
         
         if !feasible
-            # y[t] .= ȳ[t] + Ky[t] * (x[t] -x̄[t]) + step_size * ky[t]
+            # y[t] .= ȳ[t] + Ky[t] * (x[t] - x̄[t]) + step_size * ky[t]
             y[t] .= ky[t]
             y[t] .*= step_size
             y[t] .+= ȳ[t]
