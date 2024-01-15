@@ -23,9 +23,8 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     #     delta_grad_product = 0.0
     # end
 
-    # line search with rollout
     data.step_size[1] = 1.0
-    iteration = 1
+    l = 1  # line search iteration
 
     μ_j = data.μ_j
     constr_data = problem.constraints
@@ -35,7 +34,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     slacks = constr_data.slacks
 
     while data.step_size[1] >= min_step_size # check whether we still want it to be this
-        iteration > max_iterations && (verbose && (@warn "forward pass failure"), break)
+        l > max_iterations && (verbose && (@warn "forward pass failure"), break)
 
         J = Inf
         
@@ -63,12 +62,12 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
             if all(candidate .>= data.filter)
                 data.status[1] = false
                 data.step_size[1] *= 0.5
-                iteration += 1
+                l += 1
                 continue
             else
                 # logcost and err are both lower than filter
                 # update variables
-                update_nominal_trajectory!(problem, options.feasible) # updates states, actions, duals, and slack vars
+                update_nominal_trajectory!(problem, options.feasible)
                 data.costs[1] = J # update cost
                 data.status[1] = true # update status
                 data.logcost = logcost
@@ -79,7 +78,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
             end
         else
             data.step_size[1] *= 0.5
-            iteration += 1
+            l += 1
             continue
         end
     end
