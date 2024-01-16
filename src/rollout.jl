@@ -22,11 +22,6 @@ function rollout!(policy::PolicyData, problem::ProblemData, feasible::Bool, μ_j
     Ky = policy.Ky
     ky = policy.ky
 
-    τ = max(0.99, 1 - μ_j)
-
-    constraints = constr_data.constraints
-    c = constr_data.inequalities
-
     for (t, d) in enumerate(dynamics)
         # u[t] .= ū[t] + K[t] * (x[t] - x̄[t]) + step_size * k[t]
         u[t] .= ku[t]
@@ -50,34 +45,9 @@ function rollout!(policy::PolicyData, problem::ProblemData, feasible::Bool, μ_j
             mul!(y[t], Ky[t], x[t], 1.0, 1.0)
             mul!(y[t], Ky[t], x̄[t], -1.0, 1.0)
         end
-        
-        # check fraction to the boundary condition for dual variables
-        for i = 1:constraints[t].num_inequality 
-            if s[t][i] < (1. - τ) .* s̄[t][i]
-                return false
-            end
-        end
-        
-        if feasible
-            # check fraction to the boundary condition for primal (feasible IPDDP only)
-            constraints[t].evaluate(constraints[t].evaluate_cache, x[t], u[t], params[t])
-            for i = 1:constraints[t].num_inequality
-                if constraints[t].evaluate_cache[constraints[t].indices_inequality[i]] > (1. - τ) *  c[t][i]
-                    return false
-                end
-            end
-        else
-            # check fraction to the boundary condition for slack variables
-            for i = 1:constraints[t].num_inequality
-                if y[t][i] < (1. - τ) .* ȳ[t][i]
-                    return false
-                end
-            end
-        end
 
         x[t+1] .= dynamics!(d, x[t], u[t], params[t])
     end
-    return true
 end
 
     

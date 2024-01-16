@@ -12,10 +12,6 @@ function ipddp_solve!(solver::Solver; iteration=true)
     costs = []
     steps = []
     (solver.options.verbose && iteration==1) && solver_info()
-    
-    # iteration counters
-    j::Int = 1  # outer loop iteration  # TODO: move to solver data
-    k::Int = 1  # inner loop iteration (barrier sub-problem)
 
 	# data
 	policy = solver.policy
@@ -50,11 +46,8 @@ function ipddp_solve!(solver::Solver; iteration=true)
     reset_regularisation!(data, options)
 
     time = 0
-    while k <= options.max_iterations
+    while data.k <= options.max_iterations
         iter_time = @elapsed begin
-            if k > 1
-                constraint!(constr_data, problem.nominal_states, problem.nominal_actions, problem.parameters)
-            end
             gradients!(problem, mode=:nominal)
             backward_pass!(policy, problem, data, options)
             
@@ -67,8 +60,8 @@ function ipddp_solve!(solver::Solver; iteration=true)
             if opt_err <= options.κ_ϵ * data.μ_j
                 data.μ_j = max(options.optimality_tolerance / 10.0, min(options.κ_μ * data.μ_j, data.μ_j^options.θ_μ))
                 reset_filter!(data, options)
-                j += 1
-                if k == 1
+                data.j += 1
+                if data.k == 1
                     continue
                 end
             end
@@ -78,13 +71,13 @@ function ipddp_solve!(solver::Solver; iteration=true)
         end
         # info
         data.iterations[1] += 1
-        if k % 10 == 1
+        if data.k % 10 == 1
             println("")
             println(rpad("Iteration", 15), rpad("Elapsed time", 15), rpad("μ", 15), rpad("Cost", 15), rpad("Opt.error", 15), rpad("Reg.power", 13), rpad("Stepsize", 15))
         end
         if options.verbose
             println(
-                rpad(string(k), 15), 
+                rpad(string(data.k), 15), 
                 rpad(@sprintf("%.5e", time+=iter_time), 15), 
                 rpad(@sprintf("%.5e", data.μ_j), 15), 
                 rpad(@sprintf("%.5e", data.costs[1]), 15), 
@@ -96,7 +89,7 @@ function ipddp_solve!(solver::Solver; iteration=true)
 
         push!(costs, data.costs[1])
         push!(steps, data.step_size[1])
-        k += 1
+        data.k += 1
     end
     
     data.μ_j = 0.  # allows profiling, TODO: fix hack

@@ -27,22 +27,33 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     l = 1  # line search iteration
 
     μ_j = data.μ_j
+    τ = max(0.99, 1 - μ_j)  # fraction-to-boundary parameter set 0.99 as parameter in options
     constr_data = problem.constraints
     
     H = length(problem.states)
     c = constr_data.inequalities
+    s = constr_data.ineq_duals
     y = constr_data.slacks
+    c = constr_data.inequalities
+    c̄ = constr_data.nominal_inequalities
+    s̄ = constr_data.nominal_ineq_duals
+    ȳ = constr_data.nominal_slacks
 
     while data.step_size[1] >= min_step_size # check whether we still want it to be this
         # generate proposed increment
-        data.status[1] = rollout!(policy, problem, options.feasible, μ_j, step_size=data.step_size[1])
+        rollout!(policy, problem, options.feasible, μ_j, step_size=data.step_size[1])
+        
+        # check positivity using fraction-to-boundary condition on dual/slack variables (or constraints for feasible IPDDP)
+        constraint!(constr_data, problem.states, problem.actions, problem.parameters)
+        data.status[1] = check_positivity(s, s̄, problem, τ, false)
+        data.status[1] = data.status[1] && (options.feasible ? check_positivity(c, c̄, problem, τ, true) : check_positivity(y, ȳ, problem, τ, false))
         !data.status[1] && (data.step_size[1] *= 0.5, l += 1, continue)  # failed, reduce step size
         
         # compute 1-norm of constraint violation to assess quality of iterate
         constr_violation = 0.  # 1-norm of constraint violation of proposed step (infeasible IPDDP only)
         if !options.feasible
             for t = 1:H
-                n_e = constr_data[t].constraints.num_inequality
+                n_e = constr_data.constraints[t].num_inequality
                 for i = 1:n_e
                     constr_violation += abs(c[t][i] + y[t][i])
                 end
@@ -50,8 +61,6 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         end
         
         # evaluate objective function of barrier problem to assess quality of iterate
-        # TODO: evaluate constraints!!! maybe do separately outside of rollout. eval constriant after rollout. check non-negativity here
-        constraint!(constr_data, problem.states, problem.actions, problem.parameters)
         barrier_obj = options.feasible ? barrier_obj_feasible!(problem, data, μ_j) : barrier_obj_infeasible!(problem, data, μ_j)
         
         # check acceptability to filter A-5.4 IPOPT
@@ -111,3 +120,23 @@ function barrier_obj_infeasible!(problem::ProblemData, data::SolverData, μ::Flo
     return barrier_obj
 end
 
+function check_positivity(s, s̄, problem::ProblemData, τ::Float64, flip::Bool)
+    H = problem.horizon
+    constraints = problem.constraints.constraints
+    if !flip
+        for t = 1:H
+            n = constraints[t].num_inequality
+            for i = 1:n
+                s[t][i] < (1. - τ) *  s̄[t][i] && return false
+            end
+        end
+    else
+        for t = 1:H
+            n = constraints[t].num_inequality
+            for i = 1:n
+                s[t][i] > (1. - τ) *  s̄[t][i] && return false
+            end
+        end
+    end
+    return true
+end

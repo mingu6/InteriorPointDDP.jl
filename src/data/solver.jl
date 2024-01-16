@@ -15,6 +15,9 @@ mutable struct SolverData{T}
     iterations::Vector{Int}
 
     cache::Dict{Symbol,Vector{T}}       # solver stats
+    
+    j::Int                              # outer iteration counter (i.e., j-th barrier subproblem)
+    k::Int                              # overall iteration counter
 
     μ_j::Float64                        # perturbation value
     # τⱼ::Float64                       # fraction to the boundary value
@@ -55,7 +58,8 @@ function solver_data(dynamics::Vector{Dynamics{T}}; max_cache=1000) where T
     optimality_error = 0.0
     filter = [[0.0 , 0.0]]
 
-    SolverData(costs, gradient, θ_max, indices_state, indices_action, step_size, [false], [0], cache, μ_j, constr_viol_norm, barrier_obj, optimality_error, filter)
+    SolverData(costs, gradient, θ_max, indices_state, indices_action, step_size, [false], [0], cache, 1, 1, μ_j,
+               constr_viol_norm, barrier_obj, optimality_error, filter)
 end
 
 function reset!(data::SolverData) 
@@ -68,6 +72,8 @@ function reset!(data::SolverData)
     data.θ_max = Inf
     data.status[1] = false
     data.iterations[1] = 0
+    data.j = 0
+    data.k = 0
     data.μ_j = 0.0
     data.constr_viol_norm = 0.0
     data.barrier_obj = 0.0
@@ -82,6 +88,8 @@ function cache!(data::SolverData)
     data.cache[:costs][iter] = data.costs[1]
     data.cache[:gradient][iter] = data.gradient
     data.cache[:step_size][iter] = data.step_size
+    data.cache[:j][iter] = data.j
+    data.cache[:k][iter] = data.k
     data.cache[:μ_j][iter] = data.μ_j
     data.cache[:constr_viol_norm][iter] = data.constr_viol_norm
     data.cache[:barrier_obj][iter] = data.barrier_obj
