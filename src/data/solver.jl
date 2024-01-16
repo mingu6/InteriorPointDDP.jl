@@ -18,10 +18,11 @@ mutable struct SolverData{T}
 
     μ_j::Float64                        # perturbation value
     # τⱼ::Float64                       # fraction to the boundary value
-    logcost::Float64                    # log of cost for i-th iteration
+    constr_viol_norm::Float64           # magnitude (1-norm) of constraint violation
+    barrier_obj::Float64                # barrier objective function
     optimality_error::Float64           # optimality error for problem (not barrier)
     
-    filter::Vector{T}                   # filter
+    filter::Vector{Vector{T}}           # filter
 end
 
 function solver_data(dynamics::Vector{Dynamics{T}}; max_cache=1000) where T
@@ -49,11 +50,12 @@ function solver_data(dynamics::Vector{Dynamics{T}}; max_cache=1000) where T
                  :step_size     => zeros(max_cache))
 
     μ_j = 0.0
-    logcost = Inf
+    constr_viol_norm = 0.0
+    barrier_obj = 0.0
     optimality_error = 0.0
-    filter = [Inf , 0.0]
+    filter = [[0.0 , 0.0]]
 
-    SolverData(costs, gradient, θ_max, indices_state, indices_action, step_size, [false], [0], cache, μ_j, logcost, optimality_error, filter)
+    SolverData(costs, gradient, θ_max, indices_state, indices_action, step_size, [false], [0], cache, μ_j, constr_viol_norm, barrier_obj, optimality_error, filter)
 end
 
 function reset!(data::SolverData) 
@@ -67,9 +69,10 @@ function reset!(data::SolverData)
     data.status[1] = false
     data.iterations[1] = 0
     data.μ_j = 0.0
-    data.logcost = [0.0]
-    data.optimality_error = [0]
-    data.filter = [zeros(2)]
+    data.constr_viol_norm = 0.0
+    data.barrier_obj = 0.0
+    data.optimality_error = 0.0
+    data.filter = [[zeros(2)]]
 end
 
 # TODO: fix iter
@@ -80,7 +83,8 @@ function cache!(data::SolverData)
     data.cache[:gradient][iter] = data.gradient
     data.cache[:step_size][iter] = data.step_size
     data.cache[:μ_j][iter] = data.μ_j
-    data.cache[:logcost][iter] = data.logcost
+    data.cache[:constr_viol_norm][iter] = data.constr_viol_norm
+    data.cache[:barrier_obj][iter] = data.barrier_obj
     data.cache[:optimality_error][iter] = data.optimality_error
     data.cache[:filter][iter] = data.filter
     return nothing

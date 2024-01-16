@@ -14,7 +14,7 @@ function ipddp_solve!(solver::Solver; iteration=true)
     (solver.options.verbose && iteration==1) && solver_info()
     
     # iteration counters
-    j::Int = 1  # outer loop iteration
+    j::Int = 1  # outer loop iteration  # TODO: move to solver data
     k::Int = 1  # inner loop iteration (barrier sub-problem)
 
 	# data
@@ -57,11 +57,13 @@ function ipddp_solve!(solver::Solver; iteration=true)
             end
             gradients!(problem, mode=:nominal)
             backward_pass!(policy, problem, data, options)
-            # check convergence
+            
+            # check (outer) overall problem convergence
             opt_err = optimality_error(policy, problem, options, data.μ_j)
             data.optimality_error = opt_err
             max(opt_err, data.μ_j) <= options.optimality_tolerance && break
-            # check barrier problem convergence
+            
+            # check (inner) barrier problem convergence
             if opt_err <= options.κ_ϵ * data.μ_j
                 data.μ_j = max(options.optimality_tolerance / 10.0, min(options.κ_μ * data.μ_j, data.μ_j^options.θ_μ))
                 reset_filter!(data, options)
@@ -70,10 +72,9 @@ function ipddp_solve!(solver::Solver; iteration=true)
                     continue
                 end
             end
-            # when to update optimality error? when is filter updated?
+            
             forward_pass!(policy, problem, data, options, min_step_size=options.min_step_size,
                     line_search=options.line_search, verbose=options.verbose)
-            k += 1
         end
         # info
         data.iterations[1] += 1
@@ -95,6 +96,7 @@ function ipddp_solve!(solver::Solver; iteration=true)
 
         push!(costs, data.costs[1])
         push!(steps, data.step_size[1])
+        k += 1
     end
     
     data.μ_j = 0.  # allows profiling, TODO: fix hack
@@ -103,9 +105,9 @@ end
 
 function reset_filter!(data::SolverData, options::Options) 
     if !options.feasible
-        data.filter = [Inf, data.θ_max]
+        data.filter = [[data.θ_max, Inf]]
     else
-        data.filter = [Inf, Inf]
+        data.filter = [[0.0, Inf]]
     end
     data.status[1] = true
 end
