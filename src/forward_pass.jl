@@ -27,7 +27,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     l = 1  # line search iteration
 
     μ_j = data.μ_j
-    τ = max(0.99, 1 - μ_j)  # fraction-to-boundary parameter set 0.99 as parameter in options
+    τ = max(options.τ_min, 1 - μ_j)  # fraction-to-boundary parameter set 0.99 as parameter in options
     constr_data = problem.constraints
     
     H = length(problem.states)
@@ -119,18 +119,18 @@ end
 
 function check_positivity(s, s̄, problem::ProblemData, τ::Float64, flip::Bool)
     H = problem.horizon
-    constraints = problem.constraints.constraints
+    constr_data = problem.constraints
     if !flip
         for t = 1:H
-            n = constraints[t].num_inequality
-            for i = 1:n
+            num_constraint = constr_data.constraints[t].num_inequality
+            for i = 1:num_constraint
                 s[t][i] < (1. - τ) *  s̄[t][i] && return false
             end
         end
     else
         for t = 1:H
-            n = constraints[t].num_inequality
-            for i = 1:n
+            num_constraint = constr_data.constraints[t].num_inequality
+            for i = 1:num_constraint
                 s[t][i] > (1. - τ) *  s̄[t][i] && return false
             end
         end

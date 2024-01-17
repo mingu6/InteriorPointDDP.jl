@@ -76,8 +76,8 @@ function constraint_violation_1norm(constr_data::ConstraintsData)
     
     constr_violation = 0.
     for t = 1:H
-        n_e = constr_data.constraints[t].num_inequality
-        for i = 1:n_e
+        num_constraint = constr_data.constraints[t].num_inequality
+        for i = 1:num_constraint
             constr_violation += abs(c[t][i] + y[t][i])
         end
     end

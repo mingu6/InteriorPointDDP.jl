@@ -6,7 +6,7 @@ mutable struct SolverData{T}
     gradient::Vector{T}                 # Lagrangian gradient TODO: remove
     θ_max::T                            # filter initialization for maximum allowable constraint violation
 
-    indices_state::Vector{Vector{Int}}  # indices for state trajectory
+    indices_state::Vector{Vector{Int}}  # indices for state trajectory  TODO: MAY NOT NEED THIS????
     indices_action::Vector{Vector{Int}} # indices for control trajectory
 
     step_size::Vector{T}                # step length
@@ -20,7 +20,6 @@ mutable struct SolverData{T}
     k::Int                              # overall iteration counter
 
     μ_j::Float64                        # perturbation value
-    # τⱼ::Float64                       # fraction to the boundary value
     constr_viol_norm::Float64           # magnitude (1-norm) of constraint violation
     barrier_obj::Float64                # barrier objective function
     optimality_error::Float64           # optimality error for problem (not barrier)

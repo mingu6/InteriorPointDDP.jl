@@ -26,6 +26,7 @@ Base.@kwdef mutable struct Options{T}
     θ_μ::Float64 = 1.5
     s_max::Float64 = 100
     τ_min::Float64 = 0.99
+    μ_0::Float64 = 0.1
     
     # IPDDP Params
     feasible::Bool = false

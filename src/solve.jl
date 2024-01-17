@@ -27,12 +27,8 @@ function ipddp_solve!(solver::Solver; iteration=true)
 	initial_cost = cost!(data, problem, mode=:nominal)
     constraint!(constr_data, problem.nominal_states, problem.nominal_actions, problem.parameters)
 	
-	# initialize θ_max to initialise filter
-	if !options.feasible
-        data.θ_max = constraint_violation_1norm(constr_data)
-    else
-        data.θ_max = Inf  # no need to track constraint violations for feasible IPDDP
-    end
+    # initialize θ_max to initialise filter for infeasible IPDDP
+    data.θ_max = options.feasible ? Inf : constraint_violation_1norm(constr_data)
     
     if data.μ_j == 0
         initial_cost = initial_cost[1] # = data.costs[1] which is the obj func/cost for first iteration
@@ -40,6 +36,7 @@ function ipddp_solve!(solver::Solver; iteration=true)
         num_inequals = constr_data.constraints[1].num_inequality
         data.μ_j = initial_cost / n_minus_1 / num_inequals
     end
+    # data.μ_j = options.μ_0
 
     reset_filter!(data, options)
     reset_regularisation!(data, options)
@@ -119,26 +116,32 @@ function optimality_error(policy::PolicyData, problem::ProblemData, options::Opt
     cs_err::Float64 = 0     # complementary slackness
     s_norm::Float64 = 0     # optimality error rescaling term
     
-    N = length(problem.states)
+    H = length(problem.states)
     Qu = policy.action_value.gradient_action
     constr_data = problem.constraints
+    c = constr_data.inequalities
     s = constr_data.ineq_duals
     y = constr_data.slacks
-    c = constr_data.inequalities
+    cy = options.feasible ? c : y
+    !options.feasible && (μ_j *= -1)
     
-    for t = 1:N-1
+    for t = 1:H-1
         stat_err = max(stat_err, norm(Qu[t], Inf))
-        if options.feasible
-            cs_err = max(cs_err, norm(s[t] .* c[t] .+ μ_j, Inf))
-        else
-            viol_err = max(viol_err, norm(c[t] + y[t], Inf))
-            cs_err = max(cs_err, norm(s[t] .* y[t] .- μ_j, Inf))
+        num_inequality = constr_data.constraints[t].num_inequality
+        for i = 1:num_inequality
+            cs_err = max(cs_err, abs(s[t][i] * cy[t][i] + μ_j))
+        end
+        if !options.feasible
+            for i = 1:num_inequality
+                viol_err = max(viol_err, abs(c[t][i] + y[t][i]))
+            end
         end
         s_norm += norm(s[t], 1)
     end
     
+    
     s_max = options.s_max
-    s_d = max(s_max, s_norm / (N * length(s[1])))  / s_max
+    s_d = max(s_max, s_norm / (H * length(s[1])))  / s_max
     optimality_error = options.feasible ? max(stat_err / s_d, cs_err / s_d) : max(stat_err / s_d, viol_err, cs_err / s_d)
     return optimality_error
 end
