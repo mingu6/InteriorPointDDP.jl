@@ -47,7 +47,7 @@ function constraint!(constraint_data::ConstraintsData, x, u, w)
     constraint!(constraint_data.violations, constraint_data.inequalities, constraint_data.constraints, x, u, w)
 end
 
-function constraint_violation(constraint_data::ConstraintsData; norm_type=Inf)  # TODO: needed????
+function constraint_violation(constraint_data::ConstraintsData)  # TODO: needed????
     constraints = constraint_data.constraints
     H = length(constraints)
     max_violation = 0.0
@@ -66,6 +66,20 @@ end
 function constraint_violation(constraint_data::ConstraintsData, x, u, w; 
     norm_type=Inf)
     constraint!(constraint_data, x, u, w)
-    constraint_violation(constraint_data, 
-        norm_type=norm_type)
+    constraint_violation(constraint_data, norm_type=norm_type)
+end
+
+function constraint_violation_1norm(constr_data::ConstraintsData)
+    y = constr_data.slacks
+    c = constr_data.inequalities
+    H = length(c)
+    
+    constr_violation = 0.
+    for t = 1:H
+        n_e = constr_data.constraints[t].num_inequality
+        for i = 1:n_e
+            constr_violation += abs(c[t][i] + y[t][i])
+        end
+    end
+    return constr_violation
 end

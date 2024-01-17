@@ -49,25 +49,21 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         data.status[1] = data.status[1] && (options.feasible ? check_positivity(c, c̄, problem, τ, true) : check_positivity(y, ȳ, problem, τ, false))
         !data.status[1] && (data.step_size[1] *= 0.5, l += 1, continue)  # failed, reduce step size
         
-        # compute 1-norm of constraint violation to assess quality of iterate
-        constr_violation = 0.  # 1-norm of constraint violation of proposed step (infeasible IPDDP only)
-        if !options.feasible
-            for t = 1:H
-                n_e = constr_data.constraints[t].num_inequality
-                for i = 1:n_e
-                    constr_violation += abs(c[t][i] + y[t][i])
-                end
-            end
-        end
+        # 1-norm of constraint violation of proposed step for filter (infeasible IPDDP only)
+        constr_violation = options.feasible ? 0. : constraint_violation_1norm(constr_data)  
         
         # evaluate objective function of barrier problem to assess quality of iterate
         barrier_obj = options.feasible ? barrier_obj_feasible!(problem, data, μ_j) : barrier_obj_infeasible!(problem, data, μ_j)
         
         # check acceptability to filter A-5.4 IPOPT
-        for pt in data.filter
+        ind_replace_filter = 0
+        for (i, pt) in enumerate(data.filter)
             if constr_violation >= pt[1] && barrier_obj >= pt[2]  # violation should stay 0. for fesible IPDDP
                 data.status[1] = false
                 break
+            end
+            if constr_violation < pt[1] && barrier_obj < pt[2]  # if we update the filter, replace an existing point if possible
+                ind_replace_filter = i
             end
         end
         !data.status[1] && (data.step_size[1] *= 0.5, l += 1, continue)  # failed, reduce step size
@@ -82,7 +78,8 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         
         # check if filter should be augmented using accepted point
         if true
-            push!(data.filter, [constr_violation, barrier_obj])
+            new_filter_pt = [constr_violation, barrier_obj]
+            ind_replace_filter == 0 ? push!(data.filter, new_filter_pt) : data.filter[ind_replace_filter] = new_filter_pt
         end
         l += 1
         break

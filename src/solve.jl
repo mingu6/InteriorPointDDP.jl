@@ -29,8 +29,7 @@ function ipddp_solve!(solver::Solver; iteration=true)
 	
 	# initialize θ_max to initialise filter
 	if !options.feasible
-        slacks = problem.constraints.slacks
-        data.θ_max = norm(constr_data.violations + slacks, 1)
+        data.θ_max = constraint_violation_1norm(constr_data)
     else
         data.θ_max = Inf  # no need to track constraint violations for feasible IPDDP
     end
@@ -98,7 +97,7 @@ end
 
 function reset_filter!(data::SolverData, options::Options) 
     if !options.feasible
-        data.filter = [[data.θ_max, Inf]]
+        data.filter = [[data.θ_max, -Inf]]
     else
         data.filter = [[0.0, Inf]]
     end
