@@ -53,7 +53,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         constr_violation = options.feasible ? 0. : constraint_violation_1norm(constr_data)  
         
         # evaluate objective function of barrier problem to assess quality of iterate
-        barrier_obj = options.feasible ? barrier_obj_feasible!(problem, data, μ_j) : barrier_obj_infeasible!(problem, data, μ_j)
+        barrier_obj = barrier_objective!(problem, data, μ_j, options.feasible)
         
         # check acceptability to filter A-5.4 IPOPT
         ind_replace_filter = 0
@@ -87,28 +87,25 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     !data.status[1] && (verbose && (@warn "line search failure"))  # to do, just exit!!!
 end
 
-function barrier_obj_feasible!(problem::ProblemData, data::SolverData, μ::Float64)
+function barrier_objective!(problem::ProblemData, data::SolverData, μ::Float64, feasible::Bool)
+    H = problem.horizon
     constr_data = problem.constraints
+    c = constr_data.inequalities
+    y = constr_data.slacks
     barrier_obj = 0.
-    for (t, c_t) in enumerate(constr_data.inequalities)
-        n_e = constr_data.constraints[t].num_inequality
-        for i = 1:n_e
-            barrier_obj -= log(-c_t[i])
+    if feasible
+        for t = 1:H
+            num_inequality = constr_data.constraints[t].num_inequality
+            for i = 1:num_inequality
+                barrier_obj -= log(-c[t][i])
+            end
         end
-    end
-    barrier_obj *= μ
-    cost!(data, problem, mode=:current)[1]
-    barrier_obj += data.costs[1]
-    return barrier_obj
-end
-
-function barrier_obj_infeasible!(problem::ProblemData, data::SolverData, μ::Float64)
-    constr_data = problem.constraints
-    barrier_obj = 0.
-    for (t, y_t) in enumerate(constr_data.slacks)
-        n_e = constr_data.constraints[t].num_inequality
-        for i = 1:n_e
-            barrier_obj -= log(y_t[i])
+    else
+        for t = 1:H
+            num_inequality = constr_data.constraints[t].num_inequality
+            for i = 1:num_inequality
+                barrier_obj -= log(y[t][i])
+            end
         end
     end
     barrier_obj *= μ
@@ -136,4 +133,19 @@ function check_positivity(s, s̄, problem::ProblemData, τ::Float64, flip::Bool)
         end
     end
     return true
+end
+
+function trajectory_directional_derivative(problem::ProblemData)
+    # barrier objective gradient
+    problem.costs.gradient_state
+    problem.costs.gradient_action
+    problem.constraints.jacobian_state
+    problem.constraints.jacobian_action
+    problem.constraints.inequalities
+    problem.constraints.slacks
+    # DDP descent direction
+    problem.states
+    problem.actions
+    problem.nominal_states
+    problem.nominal_actions
 end
