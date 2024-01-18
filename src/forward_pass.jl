@@ -83,7 +83,6 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
             end
             ind_replace_filter == 0 ? push!(data.filter, new_filter_pt) : data.filter[ind_replace_filter] = new_filter_pt
         end
-        l += 1
         break
     end
     !data.status[1] && (verbose && (@warn "Line search failed to find a suitable iterate"))
