@@ -17,7 +17,7 @@ struct ConstraintsData{T,C,CX,CU}
     nominal_slacks::Vector{Vector{T}}
 end
 
-function constraint_data(model::Model, constraints::Constraints)
+function constraint_data(model::Model, constraints::Constraints, κ_1::Float64, κ_2::Float64)
     H = length(constraints)
     c = [zeros(constraints[t].num_constraint) for t = 1:H]
     ineqs = [zeros(constraints[t].num_inequality) for t = 1:H]
@@ -34,11 +34,11 @@ function constraint_data(model::Model, constraints::Constraints)
     
     constraint_duals = [zeros(constraints[t].num_constraint) for t = 1:H]
     
-    ineq_duals = [0.1 .* ones(constraints[t].num_inequality) for t = 1:H]
-    nominal_ineq_duals = [0.1 .* ones(constraints[t].num_inequality) for t = 1:H]
+    ineq_duals = [κ_1 * ones(constraints[t].num_inequality) for t = 1:H]
+    nominal_ineq_duals = [κ_1 * ones(constraints[t].num_inequality) for t = 1:H]
 
-    slacks = [0.01 .* ones(constraints[t].num_inequality) for t = 1:H]
-    nominal_slacks = [0.01 .* ones(constraints[t].num_inequality) for t = 1:H]
+    slacks = [κ_2 .* ones(constraints[t].num_inequality) for t = 1:H]
+    nominal_slacks = [κ_2 .* ones(constraints[t].num_inequality) for t = 1:H]
 
     return ConstraintsData(constraints, c, cx, cu, ineqs, nominal_ineqs, constraint_duals, ineq_duals, nominal_ineq_duals, slacks, nominal_slacks)
 end
@@ -69,9 +69,9 @@ function constraint_violation(constraint_data::ConstraintsData, x, u, w;
     constraint_violation(constraint_data, norm_type=norm_type)
 end
 
-function constraint_violation_1norm(constr_data::ConstraintsData)
-    y = constr_data.slacks
+function constraint_violation_1norm(constr_data::ConstraintsData; mode=:nominal)
     c = constr_data.inequalities
+    y = constr_data.slacks
     H = length(c)
     
     constr_violation = 0.

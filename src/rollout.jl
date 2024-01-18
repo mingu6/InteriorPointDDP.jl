@@ -1,4 +1,4 @@
-function rollout!(policy::PolicyData, problem::ProblemData, feasible::Bool, μ_j::Float64; step_size=1.0)
+function rollout!(policy::PolicyData, problem::ProblemData, feasible::Bool; step_size=1.0)
     dynamics = problem.model.dynamics
 
     # trajectories

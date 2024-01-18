@@ -1,33 +1,13 @@
-function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverData, options::Options;
-    line_search=:armijo,
-    min_step_size=1.0e-5,
-    c1=1.0e-4,
-    c2=0.9,
-    max_iterations=100,
+function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverData, options::Options; min_step_size=1.0e-5,
     verbose=false)
 
     # reset solver status
     data.status[1] = true # this is the same as (not) failed in MATLAB
-
-    # # previous cost
-    # J_prev = data.costs[1]
-
-    # TODO: ARMIJO LINE SEARCH
-    # # gradient of Lagrangian
-    # lagrangian_gradient!(data, policy, problem)
-
-    # if line_search == :armijo
-    #     trajectory_sensitivities(problem, policy, data) ## used to calculate problem.trajectory
-    #     delta_grad_product = data.gradient' * problem.trajectory
-    # else
-    #     delta_grad_product = 0.0
-    # end
-
     data.step_size[1] = 1.0
     l = 1  # line search iteration
 
     μ_j = data.μ_j
-    τ = max(options.τ_min, 1 - μ_j)  # fraction-to-boundary parameter set 0.99 as parameter in options
+    τ = max(options.τ_min, 1 - μ_j)  # fraction-to-boundary parameter
     constr_data = problem.constraints
     
     H = length(problem.states)
@@ -41,7 +21,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
 
     while data.step_size[1] >= min_step_size # check whether we still want it to be this
         # generate proposed increment
-        rollout!(policy, problem, options.feasible, μ_j, step_size=data.step_size[1])
+        rollout!(policy, problem, options.feasible, step_size=data.step_size[1])
         
         # check positivity using fraction-to-boundary condition on dual/slack variables (or constraints for feasible IPDDP)
         constraint!(constr_data, problem.states, problem.actions, problem.parameters)
@@ -53,65 +33,60 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         constr_violation = options.feasible ? 0. : constraint_violation_1norm(constr_data)  
         
         # evaluate objective function of barrier problem to assess quality of iterate
-        barrier_obj = barrier_objective!(problem, data, μ_j, options.feasible)
+        barrier_obj = barrier_objective!(problem, data, options.feasible, mode=:current)
         
         # check acceptability to filter A-5.4 IPOPT
         ind_replace_filter = 0
-        for (i, pt) in enumerate(data.filter)
+        for pt in data.filter
             if constr_violation >= pt[1] && barrier_obj >= pt[2]  # violation should stay 0. for fesible IPDDP
                 data.status[1] = false
                 break
             end
-            if constr_violation < pt[1] && barrier_obj < pt[2]  # if we update the filter, replace an existing point if possible
-                ind_replace_filter = i
-            end
         end
         !data.status[1] && (data.step_size[1] *= 0.5, l += 1, continue)  # failed, reduce step size
         
-        # additional checks for validity, e.g., armijo
-        # if failed, then update step size
+        # additional checks for validity, e.g., switching condition, armijo or sufficient improvement w.r.t. filter
+        dir_deriv = trajectory_directional_derivative(problem, μ_j, options.feasible)
+        # if feasible, constraint violation not considered. just check armijo condition to accept trial point
+        # switching =  options.feasible ? true : ((dir_deriv < 0.0) && 
+        #     ((- dir_deriv / data.step_size[1]) ^ options.s_φ * data.step_size[1] > options.δ * data.constr_viol_norm ^ options.s_θ))
+        switching = ((dir_deriv < 0.0) && 
+            ((- dir_deriv / data.step_size[1]) ^ options.s_φ * data.step_size[1] > options.δ * data.constr_viol_norm ^ options.s_θ))
+        armijo = barrier_obj - data.barrier_obj <= options.η_φ * dir_deriv
+        if (constr_violation <= data.θ_min) && switching
+            data.status[1] = armijo
+        else
+            # sufficient progress conditions
+            suff = !options.feasible ? (constr_violation <= (1. - options.γ_θ) * data.constr_viol_norm) : false
+            suff = suff || (barrier_obj <= data.barrier_obj - options.γ_φ * data.constr_viol_norm)
+            !suff && (data.status[1] = false)
+        end
+        !data.status[1] && (data.step_size[1] *= 0.5, l += 1, continue)  # failed, reduce step size
         
-        # accept step!!! update nominal trajectory w/rollout
+        # accept step!!! update nominal trajectory w/rollout TODO: move below out of forward pass to solve.jl
         update_nominal_trajectory!(problem, options.feasible)
         data.barrier_obj = barrier_obj
         data.constr_viol_norm = constr_violation
+        # TODO: rescale dual variables if required (16)
         
         # check if filter should be augmented using accepted point
-        if true
-            new_filter_pt = [constr_violation, barrier_obj]
+        if !armijo || !switching
+            new_filter_pt = [(1. - options.γ_θ) * data.constr_viol_norm, data.barrier_obj - options.γ_φ * data.constr_viol_norm]
+            # update filter by replacing existing point or adding new point
+            filter_sz = length(data.filter)
+            ind_replace_filter = 0
+            for i in 1:filter_sz
+                if new_filter_pt[1] <= data.filter[i][1] && new_filter_pt[2] <= data.filter[i][2]
+                    ind_replace_filter = i
+                    break
+                end
+            end
             ind_replace_filter == 0 ? push!(data.filter, new_filter_pt) : data.filter[ind_replace_filter] = new_filter_pt
         end
         l += 1
         break
     end
-    !data.status[1] && (verbose && (@warn "line search failure"))  # to do, just exit!!!
-end
-
-function barrier_objective!(problem::ProblemData, data::SolverData, μ::Float64, feasible::Bool)
-    H = problem.horizon
-    constr_data = problem.constraints
-    c = constr_data.inequalities
-    y = constr_data.slacks
-    barrier_obj = 0.
-    if feasible
-        for t = 1:H
-            num_inequality = constr_data.constraints[t].num_inequality
-            for i = 1:num_inequality
-                barrier_obj -= log(-c[t][i])
-            end
-        end
-    else
-        for t = 1:H
-            num_inequality = constr_data.constraints[t].num_inequality
-            for i = 1:num_inequality
-                barrier_obj -= log(y[t][i])
-            end
-        end
-    end
-    barrier_obj *= μ
-    cost!(data, problem, mode=:current)[1]
-    barrier_obj += data.costs[1]
-    return barrier_obj
+    !data.status[1] && (verbose && (@warn "Line search failed to find a suitable iterate"))
 end
 
 function check_positivity(s, s̄, problem::ProblemData, τ::Float64, flip::Bool)
@@ -135,17 +110,66 @@ function check_positivity(s, s̄, problem::ProblemData, τ::Float64, flip::Bool)
     return true
 end
 
-function trajectory_directional_derivative(problem::ProblemData)
-    # barrier objective gradient
-    problem.costs.gradient_state
-    problem.costs.gradient_action
-    problem.constraints.jacobian_state
-    problem.constraints.jacobian_action
-    problem.constraints.inequalities
-    problem.constraints.slacks
-    # DDP descent direction
-    problem.states
-    problem.actions
-    problem.nominal_states
-    problem.nominal_actions
+function trajectory_directional_derivative(problem::ProblemData, μ_j::Float64, feasible::Bool)
+    H = problem.horizon
+    # required to compute barrier objective gradient
+    qx = problem.costs.gradient_state
+    qu = problem.costs.gradient_action
+    cx = problem.constraints.jacobian_state
+    cu = problem.constraints.jacobian_action
+    c = problem.constraints.inequalities
+    y = problem.constraints.slacks
+    
+    # required to compute DDP increment
+    x = problem.states
+    u = problem.actions
+    x̄ = problem.nominal_states
+    ū = problem.nominal_actions
+    ȳ = problem.constraints.nominal_slacks
+    
+    dir_deriv = 0.0  # grad. of barrier obj * DDP increment
+    
+    if feasible
+        for t = 1:H-1
+            num_inequalities = length(y[t])
+            num_states = length(x[t])
+            for i = 1:num_states
+                dx = (x[t][i] - x̄[t][i])
+                grad_obj_x_t = 0.0
+                for j = 1:num_inequalities
+                    grad_obj_x_t -= cx[t][j, i] / c[t][j]
+                end
+                grad_obj_x_t *= μ_j
+                grad_obj_x_t += qx[t][i]
+                dir_deriv += dx * grad_obj_x_t
+            end
+            num_actions = length(u[t])
+            for i = 1:num_actions
+                du = (u[t][i] - ū[t][i])
+                grad_obj_u_t = 0.0
+                for j = 1:num_inequalities
+                    grad_obj_u_t += cu[t][j, i] / c[t][j]
+                end
+                grad_obj_u_t *= μ_j
+                grad_obj_u_t += qx[t][i]
+                dir_deriv += du * grad_obj_u_t
+            end
+        end
+    else
+        for t = 1:H
+            num_states = length(x[t])
+            for i = 1:num_states
+                dir_deriv += (x[t][i] - x̄[t][i]) * qx[t][i]
+            end
+            num_actions = length(u[t])
+            for i = 1:num_actions
+                dir_deriv += (u[t][i] - ū[t][i]) * qu[t][i]
+            end
+            num_inequalities = length(y[t])
+            for i = 1:num_inequalities
+                dir_deriv -= (y[t][i] - ȳ[t][i]) * μ_j / y[t][i]
+            end
+        end
+    end
+    return dir_deriv
 end

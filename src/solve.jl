@@ -23,20 +23,24 @@ function ipddp_solve!(solver::Solver; iteration=true)
     options.reset_cache && reset!(data)
     constr_data = solver.problem.constraints
 
-    # initial rollout is performed in caller file
-	initial_cost = cost!(data, problem, mode=:nominal)
+    H = problem.horizon
     constraint!(constr_data, problem.nominal_states, problem.nominal_actions, problem.parameters)
-	
-    # initialize θ_max to initialise filter for infeasible IPDDP
-    data.θ_max = options.feasible ? Inf : constraint_violation_1norm(constr_data)
-    
-    if data.μ_j == 0
-        initial_cost = initial_cost[1] # = data.costs[1] which is the obj func/cost for first iteration
-        n_minus_1 = problem.horizon - 1
-        num_inequals = constr_data.constraints[1].num_inequality
-        data.μ_j = initial_cost / n_minus_1 / num_inequals
+    # update constraint evaluations for nominal trajectory
+    if options.feasible
+        for t = 1:H-1
+            constr_data.nominal_inequalities[t] .= constr_data.inequalities[t]
+        end
     end
-    # data.μ_j = options.μ_0
+    
+    # initialize θ_max to initialise filter parameters for infeasible IPDDP
+    θ_0 = options.feasible ? 0.0 : constraint_violation_1norm(constr_data)
+    data.θ_max = !options.feasible ? 1e4 * max(1.0, θ_0) : 0.0
+    data.θ_min = !options.feasible ? 1e-4 * max(1.0, θ_0) : 0.0
+    data.constr_viol_norm = θ_0
+    
+    cost!(data, problem, mode=:nominal)[1]
+    data.μ_j = options.μ_0 * data.costs[1] / H
+    data.barrier_obj = barrier_objective!(problem, data, options.feasible, mode=:nominal)
 
     reset_filter!(data, options)
     reset_regularisation!(data, options)
@@ -54,16 +58,17 @@ function ipddp_solve!(solver::Solver; iteration=true)
             
             # check (inner) barrier problem convergence
             if opt_err <= options.κ_ϵ * data.μ_j
-                data.μ_j = max(options.optimality_tolerance / 10.0, min(options.κ_μ * data.μ_j, data.μ_j^options.θ_μ))
+                data.μ_j = max(options.optimality_tolerance / 10.0, min(options.κ_μ * data.μ_j, data.μ_j ^ options.θ_μ))
                 reset_filter!(data, options)
+                data.barrier_obj = barrier_objective!(problem, data, options.feasible, mode=:nominal)
                 data.j += 1
                 if data.k == 1
                     continue
                 end
             end
             
-            forward_pass!(policy, problem, data, options, min_step_size=options.min_step_size,
-                    line_search=options.line_search, verbose=options.verbose)
+            forward_pass!(policy, problem, data, options, min_step_size=options.min_step_size, verbose=options.verbose)
+            !data.status[1] && break  # exit if line search failed
         end
         # info
         data.iterations[1] += 1
@@ -139,9 +144,7 @@ function optimality_error(policy::PolicyData, problem::ProblemData, options::Opt
         s_norm += norm(s[t], 1)
     end
     
-    
-    s_max = options.s_max
-    s_d = max(s_max, s_norm / (H * length(s[1])))  / s_max
+    s_d = max(options.s_max, s_norm / (H * length(s[1])))  / options.s_max
     optimality_error = options.feasible ? max(stat_err / s_d, cs_err / s_d) : max(stat_err / s_d, viol_err, cs_err / s_d)
     return optimality_error
 end

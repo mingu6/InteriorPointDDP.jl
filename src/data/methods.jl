@@ -17,6 +17,34 @@ function cost!(data::SolverData, problem::ProblemData; mode=:nominal)
 	return data.costs
 end
 
+function barrier_objective!(problem::ProblemData, data::SolverData, feasible::Bool; mode=:nominal)
+    H = problem.horizon
+    constr_data = problem.constraints
+    c = constr_data.inequalities
+    y = constr_data.slacks
+
+    barrier_obj = 0.
+    if feasible
+        for t = 1:H
+            num_inequality = constr_data.constraints[t].num_inequality
+            for i = 1:num_inequality
+                barrier_obj -= log(-c[t][i])
+            end
+        end
+    else
+        for t = 1:H
+            num_inequality = constr_data.constraints[t].num_inequality
+            for i = 1:num_inequality
+                barrier_obj -= log(y[t][i])
+            end
+        end
+    end
+    barrier_obj *= data.μ_j
+    cost!(data, problem, mode=mode)
+    barrier_obj += data.costs[1]
+    return barrier_obj
+end
+
 function update_nominal_trajectory!(data::ProblemData, feasible::Bool) 
     H = data.horizon
     constraints = data.constraints
@@ -31,21 +59,6 @@ function update_nominal_trajectory!(data::ProblemData, feasible::Bool)
         else
             constraints.nominal_slacks[t] .= constraints.slacks[t]
         end 
-    end
-end
-
-#TODO: clean up
-function trajectory_sensitivities(problem::ProblemData, policy::PolicyData, data::SolverData)
-    H = length(problem.states)
-    fill!(problem.trajectory, 0.0)
-    for t = 1:H-1
-        zx = @views problem.trajectory[data.indices_state[t]]
-        zu = @views problem.trajectory[data.indices_action[t]]
-        zy = @views problem.trajectory[data.indices_state[t+1]]
-        zu .= policy.k[t] 
-        mul!(zu, policy.K[t], zx, 1.0, 1.0)
-        mul!(zy, problem.model.jacobian_action[t], zu)
-        mul!(zy, problem.model.jacobian_state[t], zx, 1.0, 1.0)
     end
 end
 

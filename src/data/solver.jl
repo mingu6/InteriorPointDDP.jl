@@ -5,6 +5,7 @@ mutable struct SolverData{T}
     costs::Vector{T}                    # cost value
     gradient::Vector{T}                 # Lagrangian gradient TODO: remove
     θ_max::T                            # filter initialization for maximum allowable constraint violation
+    θ_min::T                            # minimum constraint violation for checking acceptable steps
 
     indices_state::Vector{Vector{Int}}  # indices for state trajectory  TODO: MAY NOT NEED THIS????
     indices_action::Vector{Vector{Int}} # indices for control trajectory
@@ -44,6 +45,7 @@ function solver_data(dynamics::Vector{Dynamics{T}}; max_cache=1000) where T
 
     costs = [Inf]
     θ_max = 0.0
+    θ_min = 0.0
     step_size = [1.0]
     gradient = zeros(num_trajectory(dynamics))
     cache = Dict(:costs     => zeros(max_cache), 
@@ -57,7 +59,7 @@ function solver_data(dynamics::Vector{Dynamics{T}}; max_cache=1000) where T
     optimality_error = 0.0
     filter = [[0.0 , 0.0]]
 
-    SolverData(costs, gradient, θ_max, indices_state, indices_action, step_size, [false], [0], cache, 1, 1, μ_j,
+    SolverData(costs, gradient, θ_max, θ_min, indices_state, indices_action, step_size, [false], [0], cache, 1, 1, μ_j,
                constr_viol_norm, barrier_obj, optimality_error, filter)
 end
 
@@ -66,9 +68,9 @@ function reset!(data::SolverData)
     fill!(data.gradient, 0.0)
     fill!(data.cache[:costs], 0.0) 
     fill!(data.cache[:gradient], 0.0) 
-    fill!(data.cache[:θ_max], 0.0) 
     fill!(data.cache[:step_size], 0.0) 
     data.θ_max = Inf
+    data.θ_min = 0.0
     data.status[1] = false
     data.iterations[1] = 0
     data.j = 0

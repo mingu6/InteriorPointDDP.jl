@@ -72,7 +72,7 @@ function constraint!(violations, inequalities, constraints::Constraints{T}, stat
         @views violations[t] .= con.evaluate_cache
         # take inequalities and package them together
         @views inequalities[t] .= con.evaluate_cache[con.indices_inequality] # cool indexing trick
-        # fill!(con.evaluate_cache, 0.0) # TODO: confirm this is necessary
+        fill!(con.evaluate_cache, 0.0) # TODO: confirm this is necessary
     end
 end
 

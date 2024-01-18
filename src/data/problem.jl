@@ -26,7 +26,7 @@ mutable struct ProblemData{T,X,U,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX,C,CX,CU}
     horizon::Int
 end
 
-function problem_data(dynamics, costs, constraints; parameters=[[zeros(d.num_parameter) for d in dynamics]..., zeros(0)])
+function problem_data(dynamics, costs, constraints, options; parameters=[[zeros(d.num_parameter) for d in dynamics]..., zeros(0)])
 
     length(parameters) == length(dynamics) && (parameters = [parameters..., zeros(0)])
     @assert length(dynamics) + 1 == length(parameters)
@@ -42,7 +42,7 @@ function problem_data(dynamics, costs, constraints; parameters=[[zeros(d.num_par
 
     model = model_data(dynamics)
     costs_dat = costs_data(dynamics, costs)
-    constr_data = constraint_data(dynamics, constraints)
+    constr_data = constraint_data(dynamics, constraints, options.κ_1, options.κ_2)
 
     trajectory = zeros(num_trajectory(dynamics))
     
