@@ -1,10 +1,9 @@
-function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverData, options::Options; min_step_size=1.0e-5,
+function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverData, options::Options; #min_step_size=1.0e-5,
     verbose=false)
-
-    # reset solver status
-    data.status[1] = true # this is the same as (not) failed in MATLAB
+    data.status[1] = true
     data.step_size[1] = 1.0
     l = 1  # line search iteration
+    min_step_size = -Inf
 
     μ_j = data.μ_j
     τ = max(options.τ_min, 1 - μ_j)  # fraction-to-boundary parameter
@@ -22,6 +21,19 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     while data.step_size[1] >= min_step_size # check whether we still want it to be this
         # generate proposed increment
         rollout!(policy, problem, options.feasible, step_size=data.step_size[1])
+        # calibrate minimum step size
+        if l == 1
+            dir_deriv = trajectory_directional_derivative(problem, μ_j, options.feasible)
+            if dir_deriv < 0.0 && data.constr_viol_norm <= data.θ_min
+                min_step_size = min(options.γ_θ, -options.γ_φ * data.constr_viol_norm / dir_deriv,
+                    options.δ * data.constr_viol_norm ^ options.s_θ / (-dir_deriv) ^ options.s_φ)
+            elseif dir_deriv < 0.0 && data.constr_viol_norm > data.θ_min
+                min_step_size = min(options.γ_θ, -options.γ_φ * data.constr_viol_norm / dir_deriv)
+            else
+                min_step_size = options.γ_θ
+            end
+            min_step_size *= options.γ_α
+        end
         
         # check positivity using fraction-to-boundary condition on dual/slack variables (or constraints for feasible IPDDP)
         constraint!(constr_data, problem.states, problem.actions, problem.parameters)
@@ -48,8 +60,6 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         # additional checks for validity, e.g., switching condition, armijo or sufficient improvement w.r.t. filter
         dir_deriv = trajectory_directional_derivative(problem, μ_j, options.feasible)
         # if feasible, constraint violation not considered. just check armijo condition to accept trial point
-        # switching =  options.feasible ? true : ((dir_deriv < 0.0) && 
-        #     ((- dir_deriv / data.step_size[1]) ^ options.s_φ * data.step_size[1] > options.δ * data.constr_viol_norm ^ options.s_θ))
         switching = ((dir_deriv < 0.0) && 
             ((- dir_deriv / data.step_size[1]) ^ options.s_φ * data.step_size[1] > options.δ * data.constr_viol_norm ^ options.s_θ))
         armijo = barrier_obj - data.barrier_obj <= options.η_φ * dir_deriv

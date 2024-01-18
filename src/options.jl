@@ -1,5 +1,5 @@
 Base.@kwdef mutable struct Options{T}
-    feasible::Bool = false  # feasible start IPDDP
+    feasible::Bool = true  # feasible start IPDDP
     optimality_tolerance::T = 1.0e-7
     max_iterations::Int = 1000
     min_step_size::T = 1.0e-8
@@ -30,6 +30,9 @@ Base.@kwdef mutable struct Options{T}
     s_φ::Float64 = 2.3
     δ::Float64 = 1.0
     s_θ::Float64 = 1.1
+    γ_α::Float64 = 0.05  # for min. step size calibration
     γ_θ::Float64 = 1e-5
     γ_φ::Float64 = 1e-5
+    # misc.
+    κ_Σ::Float64 = 1e10  # dual variable rescaling threshold param.
 end 

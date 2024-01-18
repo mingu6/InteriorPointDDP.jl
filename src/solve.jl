@@ -67,7 +67,8 @@ function ipddp_solve!(solver::Solver; iteration=true)
                 end
             end
             
-            forward_pass!(policy, problem, data, options, min_step_size=options.min_step_size, verbose=options.verbose)
+            # forward_pass!(policy, problem, data, options, min_step_size=options.min_step_size, verbose=options.verbose)
+            forward_pass!(policy, problem, data, options, verbose=options.verbose)
             !data.status[1] && break  # exit if line search failed
         end
         # info

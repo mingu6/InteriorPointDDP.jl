@@ -43,7 +43,7 @@ x̄ = rollout(dynamics, x1, ū)
 function stage_cost(x, u)
     Q = I(num_state)
     R = I(num_action)
-    return 0.5 * h * (transpose(x) * Q * x + + transpose(u) * R * u)
+    return 0.5 * h * (transpose(x) * Q * x + transpose(u) * R * u)
 end
 
 function final_cost(x)
