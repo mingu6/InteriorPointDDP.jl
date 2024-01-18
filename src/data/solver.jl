@@ -79,7 +79,7 @@ function reset!(data::SolverData)
     data.constr_viol_norm = 0.0
     data.barrier_obj = 0.0
     data.optimality_error = 0.0
-    data.filter = [[zeros(2)]]
+    data.filter = [[0.0 , 0.0]]
 end
 
 # TODO: fix iter

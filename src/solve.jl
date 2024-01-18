@@ -39,7 +39,7 @@ function ipddp_solve!(solver::Solver; iteration=true)
     data.constr_viol_norm = θ_0
     
     cost!(data, problem, mode=:nominal)[1]
-    data.μ_j = options.μ_0 * data.costs[1] / H
+    data.μ_j = data.μ_j == 0.0 ? options.μ_0 * data.costs[1] / H : data.μ_j
     data.barrier_obj = barrier_objective!(problem, data, options.feasible, mode=:nominal)
 
     reset_filter!(data, options)
@@ -92,8 +92,6 @@ function ipddp_solve!(solver::Solver; iteration=true)
         push!(steps, data.step_size[1])
         data.k += 1
     end
-    
-    data.μ_j = 0.  # allows profiling, TODO: fix hack
     return nothing
 end
 
