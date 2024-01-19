@@ -1,5 +1,5 @@
 Base.@kwdef mutable struct Options{T}
-    feasible::Bool = true  # feasible start IPDDP
+    feasible::Bool = false  # feasible start IPDDP
     optimality_tolerance::T = 1.0e-7
     max_iterations::Int = 1000
     min_step_size::T = 1.0e-8
@@ -10,9 +10,6 @@ Base.@kwdef mutable struct Options{T}
     start_reg::Int8 = 0
     end_reg::Int8 = 24
     reg_step::Int8 = 1
-    # Error Params 
-    opterr::Float64 = 0.0
-    recovery::Float64 = 0.0
     # dual/slack initialization
     κ_1::Float64 = 0.1  # dual (s)
     κ_2::Float64 = 0.1  # slack (y)

@@ -99,9 +99,10 @@ function ipddp_solve!(solver::Solver; iteration=true)
         end
         # info
         data.iterations[1] += 1
-        if data.k % 10 == 1
+        if options.verbose && data.k % 10 == 1
             println("")
-            println(rpad("Iteration", 15), rpad("Elapsed time", 15), rpad("μ", 15), rpad("Cost", 15), rpad("Opt.error", 15), rpad("Reg.power", 13), rpad("Stepsize", 15))
+            println(rpad("Iteration", 15), rpad("Time (s)", 15), rpad("Perturb. (μ)", 15), rpad("Cost", 15), rpad("Constr. Viol.", 15), 
+                    rpad("Barrier Obj.", 15), rpad("Opt. Err.", 15), rpad("BP Reg.", 13), rpad("Step Size", 15))
         end
         if options.verbose
             println(
@@ -109,6 +110,8 @@ function ipddp_solve!(solver::Solver; iteration=true)
                 rpad(@sprintf("%.5e", time+=iter_time), 15), 
                 rpad(@sprintf("%.5e", data.μ_j), 15), 
                 rpad(@sprintf("%.5e", data.costs[1]), 15), 
+                rpad(@sprintf("%.5e", data.constr_viol_norm), 15), 
+                rpad(@sprintf("%.5e", data.barrier_obj), 15), 
                 rpad(@sprintf("%.5e", data.optimality_error), 15), 
                 rpad(@sprintf("%.3e", options.reg), 13), 
                 rpad(@sprintf("%.5e", data.step_size[1]), 15)
