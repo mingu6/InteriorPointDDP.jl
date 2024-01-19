@@ -17,6 +17,11 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     c̄ = constr_data.nominal_inequalities
     s̄ = constr_data.nominal_ineq_duals
     ȳ = constr_data.nominal_slacks
+    
+    constr_violation = 0.0
+    barrier_obj = 0.0
+    switching = false
+    armijo = false
 
     while data.step_size[1] >= min_step_size # check whether we still want it to be this
         # generate proposed increment
@@ -33,6 +38,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
                 min_step_size = options.γ_θ
             end
             min_step_size *= options.γ_α
+            min_step_size = max(min_step_size, 1e-16)  # machine eps lower bound
         end
         
         # check positivity using fraction-to-boundary condition on dual/slack variables (or constraints for feasible IPDDP)
@@ -48,7 +54,6 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         barrier_obj = barrier_objective!(problem, data, options.feasible, mode=:current)
         
         # check acceptability to filter A-5.4 IPOPT
-        ind_replace_filter = 0
         for pt in data.filter
             if constr_violation >= pt[1] && barrier_obj >= pt[2]  # violation should stay 0. for fesible IPDDP
                 data.status[1] = false
@@ -72,30 +77,10 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
             !suff && (data.status[1] = false)
         end
         !data.status[1] && (data.step_size[1] *= 0.5, l += 1, continue)  # failed, reduce step size
-        
-        # accept step!!! update nominal trajectory w/rollout TODO: move below out of forward pass to solve.jl
-        update_nominal_trajectory!(problem, options.feasible)
-        data.barrier_obj = barrier_obj
-        data.constr_viol_norm = constr_violation
-        # TODO: rescale dual variables if required (16)
-        
-        # check if filter should be augmented using accepted point
-        if !armijo || !switching
-            new_filter_pt = [(1. - options.γ_θ) * data.constr_viol_norm, data.barrier_obj - options.γ_φ * data.constr_viol_norm]
-            # update filter by replacing existing point or adding new point
-            filter_sz = length(data.filter)
-            ind_replace_filter = 0
-            for i in 1:filter_sz
-                if new_filter_pt[1] <= data.filter[i][1] && new_filter_pt[2] <= data.filter[i][2]
-                    ind_replace_filter = i
-                    break
-                end
-            end
-            ind_replace_filter == 0 ? push!(data.filter, new_filter_pt) : data.filter[ind_replace_filter] = new_filter_pt
-        end
         break
     end
     !data.status[1] && (verbose && (@warn "Line search failed to find a suitable iterate"))
+    return constr_violation, barrier_obj, switching, armijo
 end
 
 function check_positivity(s, s̄, problem::ProblemData, τ::Float64, flip::Bool)
@@ -181,4 +166,26 @@ function trajectory_directional_derivative(problem::ProblemData, μ_j::Float64, 
         end
     end
     return dir_deriv
+end
+
+function rescale_duals!(s, cy, problem::ProblemData, μ_j::Float64, options::Options)
+    H = problem.horizon
+    constr_data = problem.constraints
+    κ_Σ = options.κ_Σ 
+    change = false
+    if options.feasible
+        for t = 1:H
+            num_constraint = constr_data.constraints[t].num_inequality
+            for i = 1:num_constraint
+                s[t][i] = max(min(s[t][i], -κ_Σ * μ_j / cy[t][i]), -μ_j / (κ_Σ *  cy[t][i]))
+            end
+        end
+    else
+        for t = 1:H
+            num_constraint = constr_data.constraints[t].num_inequality
+            for i = 1:num_constraint
+                s[t][i] = max(min(s[t][i], κ_Σ * μ_j / cy[t][i]), μ_j / (κ_Σ *  cy[t][i]))
+            end
+        end
+    end
 end

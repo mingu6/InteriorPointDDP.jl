@@ -22,6 +22,9 @@ function ipddp_solve!(solver::Solver; iteration=true)
     options = solver.options
     options.reset_cache && reset!(data)
     constr_data = solver.problem.constraints
+    c = constr_data.inequalities
+    s = constr_data.ineq_duals
+    y = constr_data.slacks
 
     H = problem.horizon
     constraint!(constr_data, problem.nominal_states, problem.nominal_actions, problem.parameters)
@@ -68,8 +71,31 @@ function ipddp_solve!(solver::Solver; iteration=true)
             end
             
             # forward_pass!(policy, problem, data, options, min_step_size=options.min_step_size, verbose=options.verbose)
-            forward_pass!(policy, problem, data, options, verbose=options.verbose)
+            constr_violation, barrier_obj, switching, armijo = forward_pass!(policy, problem, data, options, verbose=options.verbose)
             !data.status[1] && break  # exit if line search failed
+            
+            # accept trial step from forward pass! update nominal trajectory w/rollout
+            options.feasible ? rescale_duals!(s, c, problem, data.μ_j, options::Options) : rescale_duals!(s, y, problem, data.μ_j, options::Options)
+            update_nominal_trajectory!(problem, options.feasible)
+            
+            # check if filter should be augmented using accepted point
+            if !armijo || !switching
+                new_filter_pt = [(1. - options.γ_θ) * data.constr_viol_norm, data.barrier_obj - options.γ_φ * data.constr_viol_norm]
+                # update filter by replacing existing point or adding new point
+                filter_sz = length(data.filter)
+                ind_replace_filter = 0
+                for i in 1:filter_sz
+                    if new_filter_pt[1] <= data.filter[i][1] && new_filter_pt[2] <= data.filter[i][2]
+                        ind_replace_filter = i
+                        break
+                    end
+                end
+                ind_replace_filter == 0 ? push!(data.filter, new_filter_pt) : data.filter[ind_replace_filter] = new_filter_pt
+            end
+            
+            # update criteria for new iterate
+            data.barrier_obj = barrier_obj
+            data.constr_viol_norm = constr_violation
         end
         # info
         data.iterations[1] += 1

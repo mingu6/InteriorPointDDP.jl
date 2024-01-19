@@ -3,7 +3,7 @@ Base.@kwdef mutable struct Options{T}
     optimality_tolerance::T = 1.0e-7
     max_iterations::Int = 1000
     min_step_size::T = 1.0e-8
-    reset_cache::Bool = false
+    reset_cache::Bool = true
     verbose = true
     # Regularisation Params
     reg::Int8 = 0

@@ -10,7 +10,7 @@ mutable struct SolverData{T}
     indices_state::Vector{Vector{Int}}  # indices for state trajectory  TODO: MAY NOT NEED THIS????
     indices_action::Vector{Vector{Int}} # indices for control trajectory
 
-    step_size::Vector{T}                # step lengths (separate from dual and primal) [primal, dual]
+    step_size::Vector{T}
     status::Vector{Bool}                # solver status
 
     iterations::Vector{Int}
@@ -73,8 +73,9 @@ function reset!(data::SolverData)
     data.θ_min = 0.0
     data.status[1] = false
     data.iterations[1] = 0
-    data.j = 0
-    data.k = 0
+    data.step_size[1] = 0.0
+    data.j = 1
+    data.k = 1
     data.μ_j = 0.0
     data.constr_viol_norm = 0.0
     data.barrier_obj = 0.0
