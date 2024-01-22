@@ -22,23 +22,24 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     barrier_obj = 0.0
     switching = false
     armijo = false
+    Δφ = 0.0
 
     while data.step_size[1] >= min_step_size # check whether we still want it to be this
         # generate proposed increment
         rollout!(policy, problem, options.feasible, step_size=data.step_size[1])
-        # calibrate minimum step size
+        # calibrate minimum step size based on linear approximation of optimality conditions
         if l == 1
-            dir_deriv = trajectory_directional_derivative(problem, μ_j, options.feasible)
-            if dir_deriv < 0.0 && data.constr_viol_norm <= data.θ_min
-                min_step_size = min(options.γ_θ, -options.γ_φ * data.constr_viol_norm / dir_deriv,
-                    options.δ * data.constr_viol_norm ^ options.s_θ / (-dir_deriv) ^ options.s_φ)
-            elseif dir_deriv < 0.0 && data.constr_viol_norm > data.θ_min
-                min_step_size = min(options.γ_θ, -options.γ_φ * data.constr_viol_norm / dir_deriv)
+            Δφ = expected_decrease_barrier_obj(policy)
+            if Δφ < 0.0 && data.constr_viol_norm <= data.θ_min
+                min_step_size = min(options.γ_θ, -options.γ_φ * data.constr_viol_norm / Δφ,
+                    options.δ * data.constr_viol_norm ^ options.s_θ / (-Δφ) ^ options.s_φ)
+            elseif Δφ < 0.0 && data.constr_viol_norm > data.θ_min
+                min_step_size = min(options.γ_θ, -options.γ_φ * data.constr_viol_norm / Δφ)
             else
                 min_step_size = options.γ_θ
             end
             min_step_size *= options.γ_α
-            min_step_size = max(min_step_size, 1e-16)  # machine eps lower bound
+            min_step_size = max(min_step_size, eps(Float64))  # machine eps lower bound
         end
         
         # check positivity using fraction-to-boundary condition on dual/slack variables (or constraints for feasible IPDDP)
@@ -62,12 +63,12 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         end
         !data.status[1] && (data.step_size[1] *= 0.5, l += 1, continue)  # failed, reduce step size
         
-        # additional checks for validity, e.g., switching condition, armijo or sufficient improvement w.r.t. filter
-        dir_deriv = trajectory_directional_derivative(problem, μ_j, options.feasible)
-        # if feasible, constraint violation not considered. just check armijo condition to accept trial point
-        switching = ((dir_deriv < 0.0) && 
-            ((- dir_deriv / data.step_size[1]) ^ options.s_φ * data.step_size[1] > options.δ * data.constr_viol_norm ^ options.s_θ))
-        armijo = barrier_obj - data.barrier_obj <= options.η_φ * dir_deriv
+        # additional checks for validity, e.g., switching condition + armijo or sufficient improvement w.r.t. filter
+        # NOTE: if feasible, constraint violation not considered. just check armijo condition to accept trial point
+        switching = ((Δφ < 0.0) && 
+            ((-Δφ) ^ options.s_φ * data.step_size[1] > options.δ * data.constr_viol_norm ^ options.s_θ))
+        # for armijo condition, add adjustment to account for round-off error
+        armijo = barrier_obj - data.barrier_obj - 10. * eps(Float64) * abs(data.barrier_obj) <= options.η_φ * data.step_size[1] * Δφ
         if (constr_violation <= data.θ_min) && switching
             data.status[1] = armijo
         else
@@ -104,75 +105,24 @@ function check_positivity(s, s̄, problem::ProblemData, τ::Float64, flip::Bool)
     return true
 end
 
-function trajectory_directional_derivative(problem::ProblemData, μ_j::Float64, feasible::Bool)
-    H = problem.horizon
-    # required to compute barrier objective gradient
-    qx = problem.costs.gradient_state
-    qu = problem.costs.gradient_action
-    cx = problem.constraints.jacobian_state
-    cu = problem.constraints.jacobian_action
-    c = problem.constraints.inequalities
-    y = problem.constraints.slacks
+function expected_decrease_barrier_obj(policy::PolicyData)
+    Δφ = 0.0  # expected barrier cost decrease
+    Quu_fact = policy.uu_tmp  # assume Quu has been factorised from backward pass
+    Qu = policy.action_value.gradient_action
+    H = length(Qu) + 1
     
-    # required to compute DDP increment
-    x = problem.states
-    u = problem.actions
-    x̄ = problem.nominal_states
-    ū = problem.nominal_actions
-    ȳ = problem.constraints.nominal_slacks
-    
-    dir_deriv = 0.0  # grad. of barrier obj * DDP increment
-    
-    if feasible
-        for t = 1:H-1
-            num_inequalities = length(y[t])
-            num_states = length(x[t])
-            for i = 1:num_states
-                dx = (x[t][i] - x̄[t][i])
-                grad_obj_x_t = 0.0
-                for j = 1:num_inequalities
-                    grad_obj_x_t -= cx[t][j, i] / c[t][j]
-                end
-                grad_obj_x_t *= μ_j
-                grad_obj_x_t += qx[t][i]
-                dir_deriv += dx * grad_obj_x_t
-            end
-            num_actions = length(u[t])
-            for i = 1:num_actions
-                du = (u[t][i] - ū[t][i])
-                grad_obj_u_t = 0.0
-                for j = 1:num_inequalities
-                    grad_obj_u_t += cu[t][j, i] / c[t][j]
-                end
-                grad_obj_u_t *= μ_j
-                grad_obj_u_t += qx[t][i]
-                dir_deriv += du * grad_obj_u_t
-            end
-        end
-    else
-        for t = 1:H
-            num_states = length(x[t])
-            for i = 1:num_states
-                dir_deriv += (x[t][i] - x̄[t][i]) * qx[t][i]
-            end
-            num_actions = length(u[t])
-            for i = 1:num_actions
-                dir_deriv += (u[t][i] - ū[t][i]) * qu[t][i]
-            end
-            num_inequalities = length(y[t])
-            for i = 1:num_inequalities
-                dir_deriv -= (y[t][i] - ȳ[t][i]) * μ_j / y[t][i]
-            end
-        end
+    for t = 1:H-1
+        policy.u_tmp[t] .= Qu[t]
+        LAPACK.potrs!('U', Quu_fact[t], policy.u_tmp[t])
+        Δφ -= dot(Qu[t], policy.u_tmp[t])
     end
-    return dir_deriv
+    return Δφ
 end
 
 function rescale_duals!(s, cy, problem::ProblemData, μ_j::Float64, options::Options)
     H = problem.horizon
     constr_data = problem.constraints
     κ_Σ = options.κ_Σ 
-    change = false
     if options.feasible
         for t = 1:H
             num_constraint = constr_data.constraints[t].num_inequality

@@ -48,6 +48,7 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
     # TODO: Extension: Implement terminal constr_data 
     Vxx[N] .= qxx[N]
     Vx[N] .= qx[N]
+    stat_err = 0.0  # optimality_error (stationarity)
 
     for t = N-1:-1:1
         # update Q function approx.
@@ -57,9 +58,11 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
         Qx[t] .+= qx[t] + policy.x_tmp[t]
         
         # Qu[t] .= qu[t] + (Qsu[t]' * s[t]) + (fu[t]' * Vx[t+1])
-        mul!(policy.u_tmp[t], transpose(Qsu[t]), s[t])
-        mul!(Qu[t], transpose(fu[t]), Vx[t+1])
-        Qu[t] .+= qu[t] + policy.u_tmp[t]
+        mul!(Qu[t], transpose(Qsu[t]), s[t])
+        mul!(Qu[t], transpose(fu[t]), Vx[t+1], 1.0, 1.0)
+        Qu[t] .+= qu[t]
+        
+        stat_err = max(stat_err, norm(Qu[t], Inf))
         
         # Qxx[t] .= qxx[t] + ((fx[t]' * Vxx[t+1]) * fx[t])
         mul!(policy.xx̂_tmp[t], transpose(fx[t]), Vxx[t+1])
@@ -78,10 +81,10 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
         
         cy = options.feasible ? -c[t] : y[t]
         # for infeasible, directly computes r̂ from (17) is the same as r in (9) in Pavlov et al.
-        policy.r_tmp[t] .= s[t]
-        policy.r_tmp[t] .*= c[t]
-        policy.r_tmp[t] .+= data.μ_j
-        policy.r_tmp[t] ./= cy  # r̂ ./ c[t] or r̂ ./ y[t]
+        policy.s_tmp[t] .= s[t]
+        policy.s_tmp[t] .*= c[t]
+        policy.s_tmp[t] .+= data.μ_j
+        policy.s_tmp[t] ./= cy  # r̂ ./ c[t] or r̂ ./ y[t]
         
         policy.su_tmp[t] .= Qsu[t]
         policy.su_tmp[t] .*= s[t]
@@ -90,8 +93,6 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
         policy.sx_tmp[t] .= Qsx[t]
         policy.sx_tmp[t] .*= s[t]
         policy.sx_tmp[t] ./= cy
-        
-        # r = s[t] .* c[t] .+ data.μ_j
         
         # update local feedback policy/gains, e.g., LHS of (11)
         code = 0
@@ -108,7 +109,7 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             end
             # kkt_soln[t] .= -hcat(Qu[t] + Qsu[t]' * diag(c[t] or y[t])^-1 * r, Qux[t] + Qsu[t]' * diag(s[t]) * diag(c[t] or y[t])^-1 .* Qsx[t])
             kkt_soln[t][:, 1] .= Qu[t]
-            mul!(@view(kkt_soln[t][:, 1]), transpose(Qsu[t]), policy.r_tmp[t], -1.0, -1.0)
+            mul!(@view(kkt_soln[t][:, 1]), transpose(Qsu[t]), policy.s_tmp[t], -1.0, -1.0)
             kkt_soln[t][:, 2:end] .= Qux[t]
             mul!(@view(kkt_soln[t][:, 2:end]), transpose(Qsu[t]), policy.sx_tmp[t], -1.0, -1.0)
             LAPACK.potrs!('U', policy.uu_tmp[t], kkt_soln[t])
@@ -124,7 +125,7 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
         
         # ks[t] .= diag(c[t] or y[t])^-1 .* (r .+ s[t] .* Qsu[t] * ku[t])
         mul!(ks[t], policy.su_tmp[t], ku[t])
-        ks[t] .+= policy.r_tmp[t]
+        ks[t] .+= policy.s_tmp[t]
         
         # Ks[t] .= s_cy_inv .* (Qsx[t] + Qsu[t] * Ku[t])
         mul!(Ks[t], policy.su_tmp[t], Ku[t])
@@ -149,9 +150,9 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
         # Qxx[t] = Qsx[t]' + diag(s[t]) * diag(c[t] or y[t])^-1 * Qsx[t]
         mul!(Qxx[t], transpose(Qsx[t]), policy.sx_tmp[t], 1.0, 1.0)
         # Qu[t] .+= Qsu[t]' * diag(c[t] or y[t])^-1 * r
-        mul!(Qu[t], transpose(Qsu[t]), policy.r_tmp[t], 1.0, 1.0)
+        mul!(Qu[t], transpose(Qsu[t]), policy.s_tmp[t], 1.0, 1.0)
         # Qx[t] .+= Qsx[t]' * diag(c[t] or y[t])^-1 * r
-        mul!(Qx[t], transpose(Qsx[t]), policy.r_tmp[t], 1.0, 1.0)
+        mul!(Qx[t], transpose(Qsx[t]), policy.s_tmp[t], 1.0, 1.0)
         
         # Update value function approx.
         # Vxx[t] .=  Qxx[t] + (K[t]' * (Quu[t] * K[t])) + (K[t]' * Qux[t]) + (Qux[t]' * K[t])
@@ -162,10 +163,10 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
         Vxx[t] .+= Qxx[t]
     
         # Vx[t] .=  Qx[t] + (K[t]' * Quu[t] * k[t]) + (K[t]' * Qu[t]) + (Qux[t]' * k[t])
+        Vx[t] .= Qx[t]
         mul!(policy.u_tmp[t], Quu[t], ku[t])
-        mul!(Vx[t], transpose(Ku[t]), policy.u_tmp[t])
-        mul!(Vx[t], transpose(Ku[t]), Qu[t], 1.0, 1.0)
+        policy.u_tmp[t] .+= Qu[t]
+        mul!(Vx[t], transpose(Ku[t]), policy.u_tmp[t], 1.0, 1.0)
         mul!(Vx[t], transpose(Qux[t]), ku[t], 1.0, 1.0)
-        Vx[t] .+= Qx[t]
     end
 end

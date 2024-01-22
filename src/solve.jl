@@ -42,7 +42,7 @@ function ipddp_solve!(solver::Solver; iteration=true)
     data.constr_viol_norm = θ_0
     
     cost!(data, problem, mode=:nominal)[1]
-    data.μ_j = data.μ_j == 0.0 ? options.μ_0 * data.costs[1] / H : data.μ_j
+    data.μ_j = data.μ_j == 0.0 ? options.μ_0 * data.costs[1] / (H - 1) : data.μ_j
     data.barrier_obj = barrier_objective!(problem, data, options.feasible, mode=:nominal)
 
     reset_filter!(data, options)
@@ -65,9 +65,8 @@ function ipddp_solve!(solver::Solver; iteration=true)
                 reset_filter!(data, options)
                 data.barrier_obj = barrier_objective!(problem, data, options.feasible, mode=:nominal)
                 data.j += 1
-                if data.k == 1
-                    continue
-                end
+                data.k += 1
+                continue
             end
             
             # forward_pass!(policy, problem, data, options, min_step_size=options.min_step_size, verbose=options.verbose)
@@ -75,7 +74,7 @@ function ipddp_solve!(solver::Solver; iteration=true)
             !data.status[1] && break  # exit if line search failed
             
             # accept trial step from forward pass! update nominal trajectory w/rollout
-            options.feasible ? rescale_duals!(s, c, problem, data.μ_j, options::Options) : rescale_duals!(s, y, problem, data.μ_j, options::Options)
+            # options.feasible ? rescale_duals!(s, c, problem, data.μ_j, options::Options) : rescale_duals!(s, y, problem, data.μ_j, options::Options)
             update_nominal_trajectory!(problem, options.feasible)
             
             # check if filter should be augmented using accepted point
@@ -140,7 +139,6 @@ function reset_regularisation!(data::SolverData, options::Options)
     options.end_reg = 24 
     options.reg_step = 1
     data.status[1] = true
-    options.recovery = 0.0
 end
 
 function optimality_error(policy::PolicyData, problem::ProblemData, options::Options, μ_j::Float64)
@@ -174,5 +172,6 @@ function optimality_error(policy::PolicyData, problem::ProblemData, options::Opt
     
     s_d = max(options.s_max, s_norm / (H * length(s[1])))  / options.s_max
     optimality_error = options.feasible ? max(stat_err / s_d, cs_err / s_d) : max(stat_err / s_d, viol_err, cs_err / s_d)
+    # println("err: ", stat_err, " ", cs_err)
     return optimality_error
 end

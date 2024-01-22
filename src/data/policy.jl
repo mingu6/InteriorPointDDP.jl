@@ -20,7 +20,7 @@ end
 """
     Policy Data
 """
-struct PolicyData{N,M,NN,MM,MN,NNN,MNN,S,SN,SM,MNp1} 
+struct PolicyData{N,M,NN,MM,MN,NNN,MNN,S,SN,SM,K} 
     # policy u = ū + K * (x - x̄) + k
     Ku::Vector{MN} # β
     ku::Vector{M}  # α
@@ -40,14 +40,14 @@ struct PolicyData{N,M,NN,MM,MN,NNN,MNN,S,SN,SM,MNp1}
     # pre-allocated memory
     x_tmp::Vector{N}
     u_tmp::Vector{M}
+    s_tmp::Vector{S}
 	xx̂_tmp::Vector{NNN}
 	ux̂_tmp::Vector{MNN}
 	uu_tmp::Vector{MM}
 	ux_tmp::Vector{MN}
 	su_tmp::Vector{SM}
 	sx_tmp::Vector{SN}
-	r_tmp::Vector{S}
-	kkt_soln_tmp::Vector{MNp1}
+	kkt_soln_tmp::Vector{K}
 end
 
 function policy_data(dynamics::Vector{Dynamics{T}}, constraints::Constraints{T}) where T
@@ -79,19 +79,20 @@ function policy_data(dynamics::Vector{Dynamics{T}}, constraints::Constraints{T})
 
     action_value = ActionValue(Qx, Qu, Qxx, Quu, Qux)
 
-    x_tmp = [zeros(d.num_state) for d in dynamics]
+    x_tmp = [[zeros(d.num_state) for d in dynamics]...,
+                zeros(dynamics[end].num_next_state)]
     u_tmp = [zeros(d.num_action) for d in dynamics]
+	s_tmp = [zeros(c.num_inequality) for c in constraints]
 	xx̂_tmp = [zeros(d.num_state, d.num_next_state) for d in dynamics]
 	ux̂_tmp = [zeros(d.num_action, d.num_next_state) for d in dynamics]
 	uu_tmp = [zeros(d.num_action, d.num_action) for d in dynamics]
 	ux_tmp = [zeros(d.num_action, d.num_state) for d in dynamics]
 	su_tmp = [zeros(c.num_inequality, d.num_action) for (c, d) in zip(constraints, dynamics)]
 	sx_tmp = [zeros(c.num_inequality, d.num_state) for (c, d) in zip(constraints, dynamics)]
-	r_tmp = [zeros(c.num_inequality) for c in constraints]
     kkt_soln_tmp = [zeros(d.num_action, d.num_state + 1) for d in dynamics]
 
     PolicyData(Ku, ku, Ks, ks, Ky, ky,
         value,
         action_value,
-        x_tmp, u_tmp, xx̂_tmp, ux̂_tmp, uu_tmp, ux_tmp, su_tmp, sx_tmp, r_tmp, kkt_soln_tmp)
+        x_tmp, u_tmp, s_tmp, xx̂_tmp, ux̂_tmp, uu_tmp, ux_tmp, su_tmp, sx_tmp, kkt_soln_tmp)
 end
