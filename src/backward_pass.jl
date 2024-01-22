@@ -51,6 +51,7 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
     stat_err = 0.0  # optimality_error (stationarity)
 
     for t = N-1:-1:1
+        num_actions = length(Qu[t])
         # update Q function approx.
         # Qx[t] .= qx[t] + (Qsx[t]' * s[t]) + (fx[t]' * Vx[t+1])
         mul!(policy.x_tmp[t], transpose(Qsx[t]), s[t])
@@ -97,10 +98,11 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
         # update local feedback policy/gains, e.g., LHS of (11)
         code = 0
         while reg < options.end_reg
-            # policy.uu_tmp[t] .= Quu[t] + quu[t] * (1.6^reg - 1) .+ Qsu[t]' * diag(s[t]) * diag(c[t] or y[t])^-1 .* Qsu[t]
-            policy.uu_tmp[t] .= quu[t]
-            policy.uu_tmp[t] .*= (1.6^reg - 1.)
-            policy.uu_tmp[t] .+= Quu[t]
+            # policy.uu_tmp[t] .= Quu[t] + I * (1.6^reg - 1) .+ Qsu[t]' * diag(s[t]) * diag(c[t] or y[t])^-1 .* Qsu[t]
+            policy.uu_tmp[t] .= Quu[t]
+            for i = 1:num_actions
+                policy.uu_tmp[t][i, i] += 1.6 ^ reg - 1.
+            end
             mul!(policy.uu_tmp[t], transpose(Qsu[t]), policy.su_tmp[t], 1.0, 1.0)
             (_, code) = LAPACK.potrf!('U', policy.uu_tmp[t])
             if code > 0
