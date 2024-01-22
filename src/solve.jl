@@ -97,7 +97,6 @@ function ipddp_solve!(solver::Solver; iteration=true)
             data.constr_viol_norm = constr_violation
         end
         # info
-        data.iterations[1] += 1
         if options.verbose && data.k % 10 == 1
             println("")
             println(rpad("Iteration", 15), rpad("Time (s)", 15), rpad("Perturb. (μ)", 15), rpad("Cost", 15), rpad("Constr. Viol.", 15), 
@@ -172,6 +171,5 @@ function optimality_error(policy::PolicyData, problem::ProblemData, options::Opt
     
     s_d = max(options.s_max, s_norm / (H * length(s[1])))  / options.s_max
     optimality_error = options.feasible ? max(stat_err / s_d, cs_err / s_d) : max(stat_err / s_d, viol_err, cs_err / s_d)
-    # println("err: ", stat_err, " ", cs_err)
     return optimality_error
 end
