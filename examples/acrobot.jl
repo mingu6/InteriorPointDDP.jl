@@ -4,12 +4,12 @@
 
 # ## Setup
 
-using IterativeLQR 
+using InteriorPointDDP
 using LinearAlgebra
 using Plots
 
 # ## horizon 
-T = 51 
+T = 201 
 
 # ## acrobot 
 num_state = 4 
@@ -99,15 +99,23 @@ x̄ = rollout(dynamics, x1, ū)
 
 # ## objective 
 objective = [
-    [Cost((x, u) -> 0.1 * dot(x[3:4], x[3:4]) + 0.1 * dot(u, u), num_state, num_action) for t = 1:T-1]...,
-    Cost((x, u) -> 0.1 * dot(x[3:4], x[3:4]), num_state, 0),
+    [Cost((x, u) -> 0.1 * dot(x[3:4], x[3:4]) + 0.1 * dot(u, u) + 0.5 * dot(x - xT, x - xT), num_state, num_action) for t = 1:T-1]...,
+    Cost((x, u) -> 0.1 * dot(x[3:4], x[3:4]) + 0.5 * dot(x - xT, x - xT), num_state, 0),
 ] 
 
-# ## constraints
-constraints = [
-    [Constraint() for t = 1:T-1]..., 
-    Constraint((x, u) -> x - xT, num_state, 0)
+objective = [
+    [Cost((x, u) -> 0.5 * dot(x - xT, x - xT), num_state, num_action) for t = 1:T-1]...,
+    Cost((x, u) -> 0.5 * dot(x - xT, x - xT), num_state, 0),
 ] 
+
+constraints = [
+    [Constraint((x, u) -> [
+            u[1] - 2.0; 
+            -u[1] - 2.0
+        ], 
+        num_state, num_action, indices_inequality=collect(1:2)) for t = 1:T-1]..., 
+        Constraint() # no terminal constraint 
+]
 
 # ## solver
 solver = Solver(dynamics, objective, constraints)
