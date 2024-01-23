@@ -20,7 +20,7 @@ end
 """
     Policy Data
 """
-struct PolicyData{N,M,NN,MM,MN,NNN,MNN,S,SN,SM,K} 
+struct PolicyData{N,M,NN,MM,MN,NNN,MNN,S,SN,SM} 
     # policy u = ū + K * (x - x̄) + k
     Ku::Vector{MN} # β
     ku::Vector{M}  # α
@@ -47,7 +47,6 @@ struct PolicyData{N,M,NN,MM,MN,NNN,MNN,S,SN,SM,K}
 	ux_tmp::Vector{MN}
 	su_tmp::Vector{SM}
 	sx_tmp::Vector{SN}
-	kkt_rhs_tmp::Vector{K}
 end
 
 function policy_data(dynamics::Vector{Dynamics{T}}, constraints::Constraints{T}) where T
@@ -89,10 +88,9 @@ function policy_data(dynamics::Vector{Dynamics{T}}, constraints::Constraints{T})
 	ux_tmp = [zeros(d.num_action, d.num_state) for d in dynamics]
 	su_tmp = [zeros(c.num_inequality, d.num_action) for (c, d) in zip(constraints, dynamics)]
 	sx_tmp = [zeros(c.num_inequality, d.num_state) for (c, d) in zip(constraints, dynamics)]
-    kkt_rhs_tmp = [zeros(d.num_action, d.num_state + 1) for d in dynamics]
 
     PolicyData(Ku, ku, Ks, ks, Ky, ky,
         value,
         action_value,
-        x_tmp, u_tmp, s_tmp, xx̂_tmp, ux̂_tmp, uu_tmp, ux_tmp, su_tmp, sx_tmp, kkt_rhs_tmp)
+        x_tmp, u_tmp, s_tmp, xx̂_tmp, ux̂_tmp, uu_tmp, ux_tmp, su_tmp, sx_tmp)
 end

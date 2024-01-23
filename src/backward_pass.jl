@@ -36,7 +36,6 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
     ks = policy.ks
     Ky = policy.Ky
     ky = policy.ky
-    kkt_rhs = policy.kkt_rhs_tmp
     # Value function
     Vx = policy.value.gradient
     Vxx = policy.value.hessian
@@ -102,14 +101,25 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             policy.sx_tmp[t] .*= s[t]
             policy.sx_tmp[t] ./= cy
             
+            # Quu[t] = Quu[t] + Qsu[t]' * diag(s[t]) * diag(c[t] or y[t])^-1 * Qsu[t]
+            mul!(Quu[t], transpose(Qsu[t]), policy.su_tmp[t], 1.0, 1.0)
+            # Qux[t] = Qux[t] + Qsx[t]' * diag(s[t]) * diag(c[t] or y[t])^-1 * Qsu[t]
+            mul!(Qux[t], transpose(policy.su_tmp[t]), Qsx[t], 1.0, 1.0)
+            # Qxx[t] = Qsx[t]' + diag(s[t]) * diag(c[t] or y[t])^-1 * Qsx[t]
+            mul!(Qxx[t], transpose(Qsx[t]), policy.sx_tmp[t], 1.0, 1.0)
+            # Qu[t] .+= Qsu[t]' * diag(c[t] or y[t])^-1 * r
+            mul!(Qu[t], transpose(Qsu[t]), policy.s_tmp[t], 1.0, 1.0)
+            # Qx[t] .+= Qsx[t]' * diag(c[t] or y[t])^-1 * r
+            mul!(Qx[t], transpose(Qsx[t]), policy.s_tmp[t], 1.0, 1.0)
+            
             # update local feedback policy/gains, e.g., LHS of (11)
-            # policy.uu_tmp[t] .= Quu[t] + I_m * (1.6^reg - 1) .+ Qsu[t]' * diag(s[t]) * diag(c[t] or y[t])^-1 .* Qsu[t]
+            # policy.uu_tmp[t] .= Q̂uu[t] + I_m * ϕ
             num_actions = length(ū[t])
             policy.uu_tmp[t] .= Quu[t]
             for i = 1:num_actions
                 policy.uu_tmp[t][i, i] += ϕ
             end
-            mul!(policy.uu_tmp[t], transpose(Qsu[t]), policy.su_tmp[t], 1.0, 1.0)
+            # solver KKT system for feedback policy
             (_, code) = LAPACK.potrf!('U', policy.uu_tmp[t])
             if code != 0
                 if ϕ == 0.0  # not initialised
@@ -120,15 +130,10 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
                 data.status[1] = false
                 break
             end
-            # kkt_rhs[t] .= -hcat(Qu[t] + Qsu[t]' * diag(c[t] or y[t])^-1 * r, Qux[t] + Qsu[t]' * diag(s[t]) * diag(c[t] or y[t])^-1 .* Qsx[t])
-            kkt_rhs[t][:, 1] .= Qu[t]
-            mul!(@view(kkt_rhs[t][:, 1]), transpose(Qsu[t]), policy.s_tmp[t], -1.0, -1.0)
-            kkt_rhs[t][:, 2:end] .= Qux[t]
-            mul!(@view(kkt_rhs[t][:, 2:end]), transpose(Qsu[t]), policy.sx_tmp[t], -1.0, -1.0)
-            LAPACK.potrs!('U', policy.uu_tmp[t], kkt_rhs[t])
-            
-            ku[t] .= kkt_rhs[t][:, 1]
-            Ku[t] .= kkt_rhs[t][:, 2:end]
+            ku[t] .= -Qu[t]
+            Ku[t] .= -Qux[t]
+            LAPACK.potrs!('U', policy.uu_tmp[t], ku[t])
+            LAPACK.potrs!('U', policy.uu_tmp[t], Ku[t])
             
             # ks[t] .= diag(c[t] or y[t])^-1 .* (r .+ s[t] .* Qsu[t] * ku[t])
             mul!(ks[t], policy.su_tmp[t], ku[t])
@@ -148,18 +153,6 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
                 Ky[t] .= Qsx[t]
                 mul!(Ky[t], Qsu[t], Ku[t], -1.0, -1.0)
             end
-            
-            # Update value function approximation
-            # Quu[t] = Quu[t] + Qsu[t]' * diag(s[t]) * diag(c[t] or y[t])^-1 * Qsu[t]
-            mul!(Quu[t], transpose(Qsu[t]), policy.su_tmp[t], 1.0, 1.0)
-            # Qux[t] = Qux[t] + Qsx[t]' * diag(s[t]) * diag(c[t] or y[t])^-1 * Qsu[t]
-            mul!(Qux[t], transpose(policy.su_tmp[t]), Qsx[t], 1.0, 1.0)
-            # Qxx[t] = Qsx[t]' + diag(s[t]) * diag(c[t] or y[t])^-1 * Qsx[t]
-            mul!(Qxx[t], transpose(Qsx[t]), policy.sx_tmp[t], 1.0, 1.0)
-            # Qu[t] .+= Qsu[t]' * diag(c[t] or y[t])^-1 * r
-            mul!(Qu[t], transpose(Qsu[t]), policy.s_tmp[t], 1.0, 1.0)
-            # Qx[t] .+= Qsx[t]' * diag(c[t] or y[t])^-1 * r
-            mul!(Qx[t], transpose(Qsx[t]), policy.s_tmp[t], 1.0, 1.0)
             
             # Update value function approx.
             # Vxx[t] .=  Qxx[t] + (K[t]' * (Quu[t] * K[t])) + (K[t]' * Qux[t]) + (Qux[t]' * K[t])
