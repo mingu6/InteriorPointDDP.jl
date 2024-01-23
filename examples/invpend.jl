@@ -51,18 +51,21 @@ function final_cost(x)
     return 0.5 * transpose(x) * P * x
 end
 
+stage = Cost((x, u) -> stage_cost(x,u), num_state, num_action)
 objective = [
-    [Cost((x, u) -> stage_cost(x,u), num_state, num_action) for t = 1:T-1]...,
+    [stage for t = 1:T-1]...,
     Cost((x, u) -> final_cost(x), num_state, 0)
 ]
 
 # ## constraints
+stage_constr = Constraint((x, u) -> [
+    u[1] - 0.25; 
+    -u[1] - 0.25
+], 
+num_state, num_action, indices_inequality=collect(1:2))
+
 constraints = [
-    [Constraint((x, u) -> [
-            u[1] - 0.25; 
-            -u[1] - 0.25
-        ], 
-        num_state, num_action, indices_inequality=collect(1:2)) for t = 1:T-1]..., 
+    [stage_constr for t = 1:T-1]..., 
         Constraint() # no terminal constraint 
 ]
 
@@ -82,6 +85,6 @@ plot(hcat(x_sol...)')
 plot(hcat(u_sol[1:end-1]...)', linetype=:steppost)
 
 ## benchmark allocations + timing
-# using BenchmarkTools
-# info = @benchmark solve!($solver, x̄, ū) setup=(x̄=deepcopy(x̄), ū=deepcopy(ū))
-# display(info)
+using BenchmarkTools
+info = @benchmark solve!($solver, x̄, ū) setup=(x̄=deepcopy(x̄), ū=deepcopy(ū))
+display(info)

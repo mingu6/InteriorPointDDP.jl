@@ -10,7 +10,7 @@ using Plots
 
 # ## horizon 
 # NOTE: This should be one more than the matlab horizon
-T = 501
+T = 101
 
 # ## car 
 num_state = 4
@@ -65,25 +65,26 @@ function final_cost(x)
     return p
 end
 
+stage = Cost((x, u) -> stage_cost(x,u), num_state, num_action)
 objective = [
-    [Cost((x, u) -> stage_cost(x,u), num_state, num_action) for t = 1:T-1]...,
-    Cost((x, u) -> final_cost(x), num_state, 0)
+    [stage for t = 1:T-1]..., Cost((x, u) -> final_cost(x), num_state, 0)
 ]
 
 # ## constraints
+stage_constr = Constraint((x, u) -> [
+    x[1] - 2; 
+    -x[1] - 2; 
+    x[2] - 2; 
+    -x[2] - 2;
+    -u[1] - 0.5; 
+    -u[1] - 0.5; 
+    u[2] - 2; 
+    -u[2] - 2;
+], 
+num_state, num_action, indices_inequality=collect(1:8)) 
+
 constraints = [
-    [Constraint((x, u) -> [
-            x[1] - 2; 
-            -x[1] - 2; 
-            x[2] - 2; 
-            -x[2] - 2;
-            -u[1] - 0.5; 
-            -u[1] - 0.5; 
-            u[2] - 2; 
-            -u[2] - 2
-        ], 
-        num_state, num_action, indices_inequality=collect(1:8)) for t = 1:T-1]..., 
-        Constraint() # no terminal constraint 
+    [stage_constr for t = 1:T-1]..., Constraint() # no terminal constraint 
 ]
 
 # ## solver
@@ -98,9 +99,10 @@ solve!(solver)
 x_sol, u_sol = get_trajectory(solver)
 
 # ## visualize
-plot(hcat(x_sol...)')
-plot(hcat(u_sol[1:end-1]...)', linetype=:steppost)
+# plot(hcat(x_sol...)')
+# plot(hcat(u_sol[1:end-1]...)', linetype=:steppost)
 
-# ## benchmark allocations + timing
-# using BenchmarkTools
-# info = @benchmark solve!($solver, x̄, ū) setup=(x̄=deepcopy(x̄), ū=deepcopy(ū))
+# # ## benchmark allocations + timing
+using BenchmarkTools
+info = @benchmark solve!($solver, x̄, ū) setup=(x̄=deepcopy(x̄), ū=deepcopy(ū))
+display(info)

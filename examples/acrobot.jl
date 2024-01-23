@@ -94,20 +94,23 @@ dynamics = [acrobot for t = 1:T-1] ## best to instantiate acrobot once to reduce
 # ## initialization
 x1 = [0.0; 0.0; 0.0; 0.0] 
 xT = [π; 0.0; 0.0; 0.0]
-ū = [1.0 * rand(num_action) .- 0.5 for t = 1:T-1] 
+ū = [1.0 * ones(num_action) for t = 1:T-1]
 x̄ = rollout(dynamics, x1, ū)
 
+stage = Cost((x, u) -> 0.01 * dot(x[3:4], x[3:4]) + 0.01 * dot(u, u), num_state, num_action)
 objective = [
-    [Cost((x, u) -> 0.01 * dot(x[3:4], x[3:4]) + 0.01 * dot(u, u), num_state, num_action) for t = 1:T-1]...,
-    Cost((x, u) -> 100.0 * dot(x - xT, x - xT), num_state, 0),
+    [stage for t = 1:T-1]...,
+    Cost((x, u) -> 10.0 * dot(x - xT, x - xT), num_state, 0),
 ] 
 
+stage_constr = Constraint((x, u) -> [
+    u[1] - 5.0; 
+    -u[1] - 5.0
+], 
+num_state, num_action, indices_inequality=collect(1:2))
+
 constraints = [
-    [Constraint((x, u) -> [
-            u[1] - 100.0; 
-            -u[1] - 100.0
-        ], 
-        num_state, num_action, indices_inequality=collect(1:2)) for t = 1:T-1]..., 
+    [stage_constr for t = 1:T-1]..., 
         Constraint() # no terminal constraint 
 ]
 
@@ -127,5 +130,7 @@ plot(hcat(x_sol...)')
 plot(hcat(u_sol...)', linetype=:steppost)
 
 # ## benchmark allocations + timing
+# using BenchmarkTools
 # info = @benchmark solve!($solver, x̄, ū) setup=(x̄=deepcopy(x̄), ū=deepcopy(ū))
+# display(info)
 
