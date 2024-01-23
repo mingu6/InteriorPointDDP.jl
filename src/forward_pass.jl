@@ -8,7 +8,6 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     τ = max(options.τ_min, 1 - μ_j)  # fraction-to-boundary parameter
     constr_data = problem.constraints
     
-    H = length(problem.states)
     c = constr_data.inequalities
     s = constr_data.ineq_duals
     y = constr_data.slacks
@@ -43,8 +42,9 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         
         # check positivity using fraction-to-boundary condition on dual/slack variables (or constraints for feasible IPDDP)
         constraint!(constr_data, problem.states, problem.actions, problem.parameters)
-        data.status[1] = check_positivity(s, s̄, problem, τ, false)
-        data.status[1] = data.status[1] && (options.feasible ? check_positivity(c, c̄, problem, τ, true) : check_positivity(y, ȳ, problem, τ, false))
+        data.status[1] = check_fraction_boundary(s, s̄, problem, τ, false)
+        data.status[1] = data.status[1] && (options.feasible ? check_fraction_boundary(c, c̄, problem, τ, true) 
+            : check_fraction_boundary(y, ȳ, problem, τ, false))
         !data.status[1] && (data.step_size[1] *= 0.5, l += 1, continue)  # failed, reduce step size
         
         # 1-norm of constraint violation of proposed step for filter (infeasible IPDDP only)
@@ -83,7 +83,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     return constr_violation, barrier_obj, switching, armijo
 end
 
-function check_positivity(s, s̄, problem::ProblemData, τ::Float64, flip::Bool)
+function check_fraction_boundary(s, s̄, problem::ProblemData, τ::Float64, flip::Bool)
     H = problem.horizon
     constr_data = problem.constraints
     if !flip

@@ -28,6 +28,10 @@ function ipddp_solve!(solver::Solver; iteration=true)
 
     H = problem.horizon
     constraint!(constr_data, problem.nominal_states, problem.nominal_actions, problem.parameters)
+    if options.feasible && any([any(ct .>= 0.0) for ct in c])
+        options.feasible = false
+        options.verbose && (@warn "Initialisation is infeasible, reverting to infeasible IPDDP.")
+    end
     # update constraint evaluations for nominal trajectory
     if options.feasible
         for t = 1:H-1
@@ -46,7 +50,6 @@ function ipddp_solve!(solver::Solver; iteration=true)
     data.barrier_obj = barrier_objective!(problem, data, options.feasible, mode=:nominal)
 
     reset_filter!(data, options)
-    # reset_regularisation!(data, options)
 
     time = 0
     while data.k <= options.max_iterations
@@ -130,14 +133,6 @@ function reset_filter!(data::SolverData, options::Options)
     else
         data.filter = [[0.0, Inf]]
     end
-    data.status[1] = true
-end
-
-function reset_regularisation!(data::SolverData, options::Options)
-    # TODO: Is this needed or not?
-    options.start_reg = 0
-    options.end_reg = 24 
-    options.reg_step = 1
     data.status[1] = true
 end
 
