@@ -46,7 +46,7 @@ function ipddp_solve!(solver::Solver; iteration=true)
     data.constr_viol_norm = θ_0
     
     cost!(data, problem, mode=:nominal)[1]
-    data.μ_j = data.μ_j == 0.0 ? options.μ_0 * data.costs[1] / (H - 1) : data.μ_j
+    data.μ_j = (data.μ_j == 0.0) ? options.μ_0 * data.costs[1] / (H - 1) : data.μ_j
     data.barrier_obj = barrier_objective!(problem, data, options.feasible, mode=:nominal)
 
     reset_filter!(data, options)
@@ -78,7 +78,7 @@ function ipddp_solve!(solver::Solver; iteration=true)
             !data.status[1] && break  # exit if line search failed
             
             # accept trial step from forward pass! update nominal trajectory w/rollout
-            # options.feasible ? rescale_duals!(s, c, problem, data.μ_j, options::Options) : rescale_duals!(s, y, problem, data.μ_j, options::Options)
+            options.feasible ? rescale_duals!(s, c, problem, data.μ_j, options::Options) : rescale_duals!(s, y, problem, data.μ_j, options::Options)
             update_nominal_trajectory!(problem, options.feasible)
             
             # check if filter should be augmented using accepted point
