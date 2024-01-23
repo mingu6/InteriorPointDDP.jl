@@ -1,18 +1,20 @@
 Base.@kwdef mutable struct Options{T}
     feasible::Bool = true  # feasible start IPDDP
+    gauss_newton::Bool = true # disregard 2nd order dynamics
     optimality_tolerance::T = 1.0e-7
     max_iterations::Int = 500
-    min_step_size::T = 1.0e-8
     reset_cache::Bool = true
     verbose = true
-    # Regularisation Params
-    reg::Int8 = 0
-    start_reg::Int8 = 0
-    end_reg::Int8 = 24
-    reg_step::Int8 = 1
+    # Regularisation schedule
+    ϕ_1::Float64 = 1e-4
+    ϕ_min::Float64 = 1e-20
+    ϕ_max::Float64 = 1e40
+    ψ_p_1::Float64 = 100
+    ψ_p_2::Float64 = 8
+    ψ_m::Float64 = 0.3333333
     # dual/slack initialization
     κ_1::Float64 = 0.1  # dual (s)
-    κ_2::Float64 = 0.1  # slack (y)
+    κ_2::Float64 = 0.01  # slack (y)
     # optimality condition parameters
     κ_ϵ::Float64 = 0.2
     κ_μ::Float64 = 0.2

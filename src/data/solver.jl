@@ -21,6 +21,7 @@ mutable struct SolverData{T}
     k::Int                              # overall iteration counter
 
     μ_j::Float64                        # perturbation value
+    ϕ_last::Float64                     # regularisation in backward pass
     constr_viol_norm::Float64           # magnitude (1-norm) of constraint violation
     barrier_obj::Float64                # barrier objective function
     optimality_error::Float64           # optimality error for problem (not barrier)
@@ -54,13 +55,14 @@ function solver_data(dynamics::Vector{Dynamics{T}}; max_cache=1000) where T
                  :step_size     => zeros(max_cache))
 
     μ_j = 0.0
+    ϕ_last = 0.0
     constr_viol_norm = 0.0
     barrier_obj = 0.0
     optimality_error = 0.0
     filter = [[0.0 , 0.0]]
 
     SolverData(costs, gradient, θ_max, θ_min, indices_state, indices_action, step_size, [false], [0], cache, 1, 1, μ_j,
-               constr_viol_norm, barrier_obj, optimality_error, filter)
+               ϕ_last, constr_viol_norm, barrier_obj, optimality_error, filter)
 end
 
 function reset!(data::SolverData) 
@@ -77,6 +79,7 @@ function reset!(data::SolverData)
     data.j = 1
     data.k = 1
     data.μ_j = 0.0
+    data.ϕ_last = 0.0
     data.constr_viol_norm = 0.0
     data.barrier_obj = 0.0
     data.optimality_error = 0.0
@@ -93,6 +96,7 @@ function cache!(data::SolverData)
     data.cache[:j][iter] = data.j
     data.cache[:k][iter] = data.k
     data.cache[:μ_j][iter] = data.μ_j
+    data.cache[:ϕ_last][iter] = data.ϕ_last
     data.cache[:constr_viol_norm][iter] = data.constr_viol_norm
     data.cache[:barrier_obj][iter] = data.barrier_obj
     data.cache[:optimality_error][iter] = data.optimality_error

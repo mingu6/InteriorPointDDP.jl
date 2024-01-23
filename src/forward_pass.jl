@@ -1,5 +1,4 @@
-function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverData, options::Options; #min_step_size=1.0e-5,
-    verbose=false)
+function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverData, options::Options; verbose=false)
     data.status[1] = true
     data.step_size[1] = 1.0
     l = 1  # line search iteration

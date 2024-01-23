@@ -46,13 +46,14 @@ function ipddp_solve!(solver::Solver; iteration=true)
     data.barrier_obj = barrier_objective!(problem, data, options.feasible, mode=:nominal)
 
     reset_filter!(data, options)
-    reset_regularisation!(data, options)
+    # reset_regularisation!(data, options)
 
     time = 0
     while data.k <= options.max_iterations
         iter_time = @elapsed begin
             gradients!(problem, mode=:nominal)
-            backward_pass!(policy, problem, data, options)
+            backward_pass!(policy, problem, data, options, verbose=options.verbose)
+            !data.status[1] && break  # exit if backward pass fails
             
             # check (outer) overall problem convergence
             opt_err = optimality_error(policy, problem, options, data.μ_j)
@@ -105,13 +106,13 @@ function ipddp_solve!(solver::Solver; iteration=true)
         if options.verbose
             println(
                 rpad(string(data.k), 15), 
-                rpad(@sprintf("%.5e", time+=iter_time), 15), 
+                rpad(@sprintf("%.5e", time += iter_time), 15), 
                 rpad(@sprintf("%.5e", data.μ_j), 15), 
                 rpad(@sprintf("%.5e", data.costs[1]), 15), 
                 rpad(@sprintf("%.5e", data.constr_viol_norm), 15), 
                 rpad(@sprintf("%.5e", data.barrier_obj), 15), 
                 rpad(@sprintf("%.5e", data.optimality_error), 15), 
-                rpad(@sprintf("%.3e", options.reg), 13), 
+                rpad(@sprintf("%.3e", data.ϕ_last), 13), 
                 rpad(@sprintf("%.5e", data.step_size[1]), 15)
             )            
         end 

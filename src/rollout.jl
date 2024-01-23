@@ -45,7 +45,6 @@ function rollout!(policy::PolicyData, problem::ProblemData, feasible::Bool; step
             mul!(y[t], Ky[t], x[t], 1.0, 1.0)
             mul!(y[t], Ky[t], x̄[t], -1.0, 1.0)
         end
-
         x[t+1] .= dynamics!(d, x[t], u[t], params[t])
     end
 end
