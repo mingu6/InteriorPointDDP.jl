@@ -23,8 +23,14 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     Δφ = 0.0
 
     while data.step_size[1] >= min_step_size # check whether we still want it to be this
-        # generate proposed increment
-        rollout!(policy, problem, options.feasible, step_size=data.step_size[1])
+        # generate proposed increment. reduces step size if NaN or Inf encountered
+        try
+            rollout!(policy, problem, options.feasible, step_size=data.step_size[1])
+        catch
+            data.step_size[1] *= 0.5
+            l += 1
+            continue
+        end
         # calibrate minimum step size based on linear approximation of optimality conditions
         if l == 1
             Δφ = expected_decrease_barrier_obj(policy)
