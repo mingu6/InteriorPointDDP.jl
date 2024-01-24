@@ -74,17 +74,17 @@ solver = Solver(dynamics, objective, constraints)
 initialize_controls!(solver, ū)
 initialize_states!(solver, x̄)
 
-## solve
+# ## solve
 solve!(solver)
 
-## solution
+# ## solution
 x_sol, u_sol = get_trajectory(solver)
 
-## visualize
+# ## visualize
 plot(hcat(x_sol...)')
 plot(hcat(u_sol[1:end-1]...)', linetype=:steppost)
 
-## benchmark allocations + timing
-using BenchmarkTools
-info = @benchmark solve!($solver, x̄, ū) setup=(x̄=deepcopy(x̄), ū=deepcopy(ū))
-display(info)
+# ## benchmark allocations + timing
+# using BenchmarkTools
+# info = @benchmark solve!($solver, x̄, ū) setup=(x̄=deepcopy(x̄), ū=deepcopy(ū))
+# display(info)

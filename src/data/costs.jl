@@ -1,4 +1,6 @@
-
+"""
+    Costs Data
+"""
 
 struct CostsData{C,X,U,XX,UU,UX}
     costs::C

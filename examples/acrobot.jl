@@ -94,7 +94,7 @@ dynamics = [acrobot for t = 1:T-1] ## best to instantiate acrobot once to reduce
 # ## initialization
 x1 = [0.0; 0.0; 0.0; 0.0] 
 xT = [π; 0.0; 0.0; 0.0]
-ū = [1.0 * ones(num_action) for t = 1:T-1]
+ū = [1.0 * randn(num_action) for t = 1:T-1]
 x̄ = rollout(dynamics, x1, ū)
 
 stage = Cost((x, u) -> 0.01 * dot(x[3:4], x[3:4]) + 0.01 * dot(u, u), num_state, num_action)
@@ -129,8 +129,19 @@ x_sol, u_sol = get_trajectory(solver)
 plot(hcat(x_sol...)')
 plot(hcat(u_sol...)', linetype=:steppost)
 
-# ## benchmark allocations + timing
+# # ## benchmark allocations + timing
 # using BenchmarkTools
 # info = @benchmark solve!($solver, x̄, ū) setup=(x̄=deepcopy(x̄), ū=deepcopy(ū))
 # display(info)
 
+# function profile_solve(x̄, ū, n)
+#     for i = 1:n
+#         initialize_controls!(solver, ū)
+#         initialize_states!(solver, x̄)
+#         solve!(solver)
+#     end
+# end
+
+# using ProfileView
+# @profview profile_solve(x̄, ū, 1)  # run once to trigger compilation (ignore this one)
+# @profview profile_solve(x̄, ū, 5)

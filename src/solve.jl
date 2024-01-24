@@ -16,10 +16,11 @@ function ipddp_solve!(solver::Solver; iteration=true)
 	# data
 	policy = solver.policy
     problem = solver.problem
+    options = solver.options
     reset!(problem.model)
     reset!(problem.costs)
+    reset!(problem.constraints, options.κ_1, options.κ_2)
 	data = solver.data
-    options = solver.options
     options.reset_cache && reset!(data)
     constr_data = solver.problem.constraints
     c = constr_data.inequalities
@@ -46,7 +47,11 @@ function ipddp_solve!(solver::Solver; iteration=true)
     data.constr_viol_norm = θ_0
     
     cost!(data, problem, mode=:nominal)[1]
-    data.μ_j = (data.μ_j == 0.0) ? options.μ_0 * data.costs[1] / (H - 1) : data.μ_j
+    # automatically select initial perturbation. loosely based on bound of CS condition (duality) for LPs
+    num_constraints = convert(Float64, sum([length(ct) for ct in c]))
+    data.μ_j = (data.μ_j == 0.0) ? options.μ_0 * data.costs[1] / num_constraints : data.μ_j
+    # data.μ_j = (data.μ_j == 0.0) ? options.μ_0 * data.costs[1] / (H -1) : data.μ_j
+    
     data.barrier_obj = barrier_objective!(problem, data, options.feasible, mode=:nominal)
 
     reset_filter!(data, options)
