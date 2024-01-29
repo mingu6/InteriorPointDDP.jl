@@ -49,7 +49,7 @@ function ipddp_solve!(solver::Solver; iteration=true)
     cost!(data, problem, mode=:nominal)[1]
     # automatically select initial perturbation. loosely based on bound of CS condition (duality) for LPs
     num_constraints = convert(Float64, sum([length(ct) for ct in c]))
-    data.μ_j = (data.μ_j == 0.0) ? options.μ_0 * data.costs[1] / num_constraints : data.μ_j
+    data.μ_j = (data.μ_j == 0.0) ? options.μ_0 * data.costs[1] / max(num_constraints, 1.0) : data.μ_j
     # data.μ_j = (data.μ_j == 0.0) ? options.μ_0 * data.costs[1] / (H -1) : data.μ_j
     
     data.barrier_obj = barrier_objective!(problem, data, options.feasible, mode=:nominal)
@@ -170,7 +170,8 @@ function optimality_error(policy::PolicyData, problem::ProblemData, options::Opt
         s_norm += norm(s[t], 1)
     end
     
-    s_d = max(options.s_max, s_norm / (H * length(s[1])))  / options.s_max
+    num_constraints = convert(Float64, sum([length(ct) for ct in c]))
+    s_d = max(options.s_max, s_norm / max(num_constraints, 1.0))  / options.s_max
     optimality_error = options.feasible ? max(stat_err / s_d, cs_err / s_d) : max(stat_err / s_d, viol_err, cs_err / s_d)
     return optimality_error
 end
