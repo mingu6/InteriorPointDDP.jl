@@ -46,39 +46,44 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
     s = constr_data.ineq_duals
     y = constr_data.slacks
     
+    # See (9) ad (17) in Pavlov et al. Same except swap C_t for -Y_t
+    cy = options.feasible ? c : y
+    α = options.feasible ? -1.0 : 1.0
+    
     while ϕ <= options.ϕ_max
         data.status[1] = true
         Vxx[H] .= qxx[H]
         Vx[H] .= qx[H]
         
         for t = H-1:-1:1
-            # update Q function approx.
-            # Qx[t] .= qx[t] + (Qsx[t]' * s[t]) + (fx[t]' * Vx[t+1])
-            mul!(policy.x_tmp[t], transpose(Qsx[t]), s[t])
-            mul!(Qx[t], transpose(fx[t]), Vx[t+1])
-            Qx[t] .+= qx[t] + policy.x_tmp[t]
-            
-            # Qu[t] .= qu[t] + (Qsu[t]' * s[t]) + (fu[t]' * Vx[t+1])
+            # lx = qx + Qsx' * s
+            mul!(Qx[t], transpose(Qsx[t]), s[t])
+            Qx[t] .+= qx[t]
+            # Qx = lx + fx' * Vx
+            mul!(Qx[t], transpose(fx[t]), Vx[t+1], 1.0, 1.0)
+
+            # lu = qu + Qsu' * s
             mul!(Qu[t], transpose(Qsu[t]), s[t])
-            mul!(Qu[t], transpose(fu[t]), Vx[t+1], 1.0, 1.0)
             Qu[t] .+= qu[t]
+            # Qu = lu + fu' * Vx
+            mul!(Qu[t], transpose(fu[t]), Vx[t+1], 1.0, 1.0)
             
-            # Qxx[t] .= qxx[t] + ((fx[t]' * Vxx[t+1]) * fx[t])
+            # Qxx = qxx + fx' * Vxx * fx
             mul!(policy.xx̂_tmp[t], transpose(fx[t]), Vxx[t+1])
             mul!(Qxx[t], policy.xx̂_tmp[t], fx[t])
             Qxx[t] .+= qxx[t]
     
-            # Quu[t] .= quu[t] + ((fu[t]' * Vxx[t+1]) * fu[t])
+            # Quu = quu + fu' * Vxx * fu
             mul!(policy.ux̂_tmp[t], transpose(fu[t]), Vxx[t+1])
             mul!(Quu[t], policy.ux̂_tmp[t], fu[t])
             Quu[t] .+= quu[t]
     
-            # Qux[t] .= qux[t] + ((fu[t]' * Vxx[t+1]) * fx[t])
+            # Qux = qux + fu' * Vxx * fx
             mul!(policy.ux̂_tmp[t], transpose(fu[t]), Vxx[t+1])
             mul!(Qux[t], policy.ux̂_tmp[t], fx[t])
             Qux[t] .+= qux[t]
             
-            # compute second order terms for full DDP
+            # apply second order terms to Q for full DDP, i.e., Vx * fxx, Vx * fuu, Vx * fxu
             if !options.gauss_newton
                 hessian_vector_prod!(fxx[t], fux[t], fuu[t], problem.model.dynamics[t], x̄[t], ū[t], problem.parameters[t], Vx[t+1])
                 Qxx[t] .+= fxx[t]
@@ -86,40 +91,37 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
                 Quu[t] .+= fuu[t]
             end
             
-            cy = options.feasible ? -c[t] : y[t]
-            # for infeasible, directly computes r̂ from (17) is the same as r in (9) in Pavlov et al.
-            policy.s_tmp[t] .= s[t]
-            policy.s_tmp[t] .*= c[t]
-            policy.s_tmp[t] .+= data.μ_j
-            policy.s_tmp[t] ./= cy  # r̂ ./ c[t] or r̂ ./ y[t]
+            # S * r for infeasible and feasible, see for example RHS of (9)
+            fill!(policy.s_tmp[t], data.μ_j)
+            policy.s_tmp[t] ./= s[t]
+            policy.s_tmp[t] .+= c[t]
             
+            # cache S * C^-1 * Qsu (or S * Y^-1 * Qsu)
             policy.su_tmp[t] .= Qsu[t]
             policy.su_tmp[t] .*= s[t]
-            policy.su_tmp[t] ./= cy
+            policy.su_tmp[t] ./= cy[t]
             
+            # cache S * C^-1 Qsx
             policy.sx_tmp[t] .= Qsx[t]
             policy.sx_tmp[t] .*= s[t]
-            policy.sx_tmp[t] ./= cy
+            policy.sx_tmp[t] ./= cy[t]
             
-            # Quu[t] = Quu[t] + Qsu[t]' * diag(s[t]) * diag(c[t] or y[t])^-1 * Qsu[t]
-            mul!(Quu[t], transpose(Qsu[t]), policy.su_tmp[t], 1.0, 1.0)
-            # Qux[t] = Qux[t] + Qsx[t]' * diag(s[t]) * diag(c[t] or y[t])^-1 * Qsu[t]
-            mul!(Qux[t], transpose(policy.su_tmp[t]), Qsx[t], 1.0, 1.0)
-            # Qxx[t] = Qsx[t]' + diag(s[t]) * diag(c[t] or y[t])^-1 * Qsx[t]
-            mul!(Qxx[t], transpose(Qsx[t]), policy.sx_tmp[t], 1.0, 1.0)
-            # Qu[t] .+= Qsu[t]' * diag(c[t] or y[t])^-1 * r
-            mul!(Qu[t], transpose(Qsu[t]), policy.s_tmp[t], 1.0, 1.0)
-            # Qx[t] .+= Qsx[t]' * diag(c[t] or y[t])^-1 * r
-            mul!(Qx[t], transpose(Qsx[t]), policy.s_tmp[t], 1.0, 1.0)
+            # apply Schur complement over LHS of bottom right block of (9) or reduced system in (17) in Pavlov et al. Setup block inverse.
             
-            # update local feedback policy/gains, e.g., LHS of (11)
-            # policy.uu_tmp[t] .= Q̂uu[t] + I_m * ϕ
-            num_actions = length(ū[t])
+            # Q̂uu = Quu - Qsu' * S * C^-1 * Qsu (or Q̂uu = Quu + Qsu' * Y * C^-1 * Qsu)
+            mul!(Quu[t], transpose(Qsu[t]), policy.su_tmp[t], α, 1.0)
+            # Q̂ux = Qux - Qsu' * S * C^-1 * Qsx (or Q̂ux = Qux + Qsx' * Y * C^-1 * Qsx)
+            mul!(Qux[t], transpose(policy.su_tmp[t]), Qsx[t], α, 1.0)
+            # Q̂u = Qu - Qsu' * S * C^-1 * (S * r) (or Q̂u = Qu + Qsu' * S * Y^-1 (S * r))
+            mul!(Qu[t], transpose(policy.su_tmp[t]), policy.s_tmp[t], α, 1.0)
+            # Q̂xx = Qxx - Qsx' * S * C^-1 * Qsx (or Q̂xx = Qxx + Qsx' * S * Y^-1 * Qsx)
+            mul!(Qxx[t], transpose(Qsx[t]), policy.sx_tmp[t], α, 1.0)
+            # Q̂x = Qx - Qsx' * S * C^-1 * (S * r) (or Q̂x = Qx + Qsx' * S * Y^-1 * (S * r))
+            mul!(Qx[t], transpose(policy.sx_tmp[t]), policy.s_tmp[t], α, 1.0)
+            
+            # factorize Schur complement and apply regularisation, i.e., Q̂uu[t] + I_m * ϕ if required
             policy.uu_tmp[t] .= Quu[t]
-            for i = 1:num_actions
-                policy.uu_tmp[t][i, i] += ϕ
-            end
-            # solver KKT system for feedback policy
+            policy.uu_tmp[t][diagind(policy.uu_tmp[t])] .+= ϕ
             (_, code) = LAPACK.potrf!('U', policy.uu_tmp[t])
             if code != 0
                 if ϕ == 0.0  # not initialised
@@ -130,47 +132,49 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
                 data.status[1] = false
                 break
             end
+            # see block inverse formula https://en.wikipedia.org/wiki/Block_matrix (D and complement of D is invertible case)
             ku[t] .= -Qu[t]
             Ku[t] .= -Qux[t]
             LAPACK.potrs!('U', policy.uu_tmp[t], ku[t])
             LAPACK.potrs!('U', policy.uu_tmp[t], Ku[t])
             
             # ks[t] .= diag(c[t] or y[t])^-1 .* (r .+ s[t] .* Qsu[t] * ku[t])
-            mul!(ks[t], policy.su_tmp[t], ku[t])
-            ks[t] .+= policy.s_tmp[t]
+            # note: δs = -S * C^-1 * (S * r) - (S * C^-1 * Qsu) * ku - S * C-1 * (sx + Qsu * Ku) δx (or replace C^-1 for -Y^1)
+            
+            # ks = -S * C ^-1 * (S * r) - (S * C^-1 * Qsu) * ku (or S * Y^-1 * (S * r) + (S * Y^-1 * Qsu) * ku)
+            ks[t] .= policy.s_tmp[t]
+            ks[t] .*= s[t]
+            ks[t] ./= cy[t]
+            mul!(ks[t], policy.su_tmp[t], ku[t], α, α)
             
             # Ks[t] .= s_cy_inv .* (Qsx[t] + Qsu[t] * Ku[t])
-            mul!(Ks[t], policy.su_tmp[t], Ku[t])
-            Ks[t] .+= policy.sx_tmp[t]
+            # Ks = -S * C^-1 * (Qsx + Qsu * Ku) (or Ks = S * Y^-1 * (Qsx + Qsu * Ku))
+            Ks[t] .= policy.sx_tmp[t]
+            mul!(Ks[t], policy.su_tmp[t], Ku[t], α, α)
             
             if !options.feasible
-                # ky[t] .= -(c[t] .+ y[t]) - Qsu[t] * ku[t]
+                # ky = -(c + y) - Qsu * ku
                 ky[t] .= c[t]
                 ky[t] .+= y[t]
                 mul!(ky[t], Qsu[t], ku[t], -1.0, -1.0)
                 
-                # Ky[t] .= -Qsx[t] - Qsu[t] * Ku[t]
+                # Ky = -Qsx - Qsu * Ku
                 Ky[t] .= Qsx[t]
                 mul!(Ky[t], Qsu[t], Ku[t], -1.0, -1.0)
             end
             
-            # Update value function approx.
-            # Vxx[t] .=  Qxx[t] + (K[t]' * (Quu[t] * K[t])) + (K[t]' * Qux[t]) + (Qux[t]' * K[t])
-            mul!(policy.ux_tmp[t], Quu[t], Ku[t])
-            mul!(Vxx[t], transpose(Ku[t]), policy.ux_tmp[t])
-            mul!(Vxx[t], transpose(Ku[t]), Qux[t], 1.0, 1.0)
+            # Update quadratic value function approx. V(x) using (12) from Pavlov et al.
+            # Vxx = Q̂xx + Q̂ux' * Ku
+            Vxx[t] .= Qxx[t]
             mul!(Vxx[t], transpose(Qux[t]), Ku[t], 1.0, 1.0)
-            Vxx[t] .+= Qxx[t]
         
-            # Vx[t] .=  Qx[t] + (K[t]' * Quu[t] * k[t]) + (K[t]' * Qu[t]) + (Qux[t]' * k[t])
+            # Vx = Q̂x + Ku' * Q̂u
             Vx[t] .= Qx[t]
-            mul!(policy.u_tmp[t], Quu[t], ku[t])
-            policy.u_tmp[t] .+= Qu[t]
-            mul!(Vx[t], transpose(Ku[t]), policy.u_tmp[t], 1.0, 1.0)
-            mul!(Vx[t], transpose(Qux[t]), ku[t], 1.0, 1.0)
+            mul!(Vx[t], transpose(Ku[t]), Qu[t], 1.0, 1.0)
         end
         data.status[1] && break
     end
     data.ϕ_last = ϕ
     !data.status[1] && (verbose && (@warn "Backward pass failure, non-positive definite iteration matrix."))
 end
+
