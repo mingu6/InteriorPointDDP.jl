@@ -42,6 +42,7 @@ x1 = [1.0; 1.0; pi*3/2; 0.0]
 
 # ## rollout
 ū = [0.01 * ones(num_action) for t = 1:T-1]
+# ū = [0.01 * rand(num_action) .- 0.01 for t = 1:T-1]
 x̄ = rollout(dynamics, x1, ū)
 
 # ## objective 

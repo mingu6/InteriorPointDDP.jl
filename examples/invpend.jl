@@ -60,7 +60,7 @@ objective = [
 # ## constraints
 stage_constr = Constraint((x, u) -> [
     u[1] - 0.25; 
-    -u[1] - 0.25
+    -u[1] - 0.25;
 ], 
 num_state, num_action, indices_inequality=collect(1:2))
 

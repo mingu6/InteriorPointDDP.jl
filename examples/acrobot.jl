@@ -94,7 +94,8 @@ dynamics = [acrobot for t = 1:T-1] ## best to instantiate acrobot once to reduce
 # ## initialization
 x1 = [0.0; 0.0; 0.0; 0.0] 
 xT = [π; 0.0; 0.0; 0.0]
-ū = [1.0 * randn(num_action) for t = 1:T-1]
+# ū = [1.0 * randn(num_action) for t = 1:T-1]
+ū = [1.0 * ones(num_action) for t = 1:T-1]
 x̄ = rollout(dynamics, x1, ū)
 
 stage = Cost((x, u) -> 0.01 * dot(x[3:4], x[3:4]) + 0.01 * dot(u, u), num_state, num_action)
@@ -113,9 +114,14 @@ constraints = [
     [stage_constr for t = 1:T-1]..., 
         Constraint() # no terminal constraint 
 ]
+# constraints = [
+#     [Constraint() for t = 1:T-1]..., 
+#         Constraint() # no terminal constraint 
+# ]
 
 # ## solver
 solver = Solver(dynamics, objective, constraints)
+# solver = Solver(dynamics, objective)
 initialize_controls!(solver, ū)
 initialize_states!(solver, x̄)
 

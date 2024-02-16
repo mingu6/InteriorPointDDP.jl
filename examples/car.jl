@@ -10,13 +10,10 @@ using BenchmarkTools
 # using TickTock
 
 
-using Profile
-using ProfileView
-
 
 # ## horizon 
 # NOTE: This should be one more than the matlab horizon
-T = 501
+T = 101
 
 # ## car 
 num_state = 4
