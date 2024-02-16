@@ -50,23 +50,41 @@ function ipddp_solve!(solver::Solver; iteration=true)
     # automatically select initial perturbation. loosely based on bound of CS condition (duality) for LPs
     num_constraints = convert(Float64, sum([length(ct) for ct in c]))
     data.μ_j = (data.μ_j == 0.0) ? options.μ_0 * data.costs[1] / max(num_constraints, 1.0) : data.μ_j
-    # data.μ_j = (data.μ_j == 0.0) ? options.μ_0 * data.costs[1] / (H -1) : data.μ_j
     
     data.barrier_obj = barrier_objective!(problem, data, options.feasible, mode=:nominal)
 
     reset_filter!(data, options)
 
-    time = 0
+    time = 0.0
     while data.k <= options.max_iterations
         iter_time = @elapsed begin
             gradients!(problem, mode=:nominal)
-            backward_pass!(policy, problem, data, options, verbose=options.verbose)
-            !data.status[1] && break  # exit if backward pass fails
             
             # check (outer) overall problem convergence
             opt_err = optimality_error(policy, problem, options, data.μ_j)
             data.optimality_error = opt_err
-            max(opt_err, data.μ_j) <= options.optimality_tolerance && break
+            
+            # logging
+            if options.verbose && data.k % 10 == 1
+                println("")
+                println(rpad("Iteration", 15), rpad("Time (s)", 15), rpad("Perturb. (μ)", 15), rpad("Cost", 15), rpad("Constr. Viol.", 15), 
+                        rpad("Barrier Obj.", 15), rpad("Opt. Err.", 15), rpad("BP Reg.", 13), rpad("Step Size", 15))
+            end
+            if options.verbose
+                println(
+                    rpad(string(data.k), 15), 
+                    rpad(@sprintf("%.5e", time), 15), 
+                    rpad(@sprintf("%.5e", data.μ_j), 15), 
+                    rpad(@sprintf("%.5e", data.costs[1]), 15), 
+                    rpad(@sprintf("%.5e", data.constr_viol_norm), 15), 
+                    rpad(@sprintf("%.5e", data.barrier_obj), 15), 
+                    rpad(@sprintf("%.5e", data.optimality_error), 15), 
+                    rpad(@sprintf("%.3e", data.ϕ_last), 13), 
+                    rpad(@sprintf("%.5e", data.step_size[1]), 15)
+                )            
+            end 
+            
+            opt_err <= options.optimality_tolerance && break
             
             # check (inner) barrier problem convergence
             if opt_err <= options.κ_ϵ * data.μ_j
@@ -78,7 +96,9 @@ function ipddp_solve!(solver::Solver; iteration=true)
                 continue
             end
             
-            # forward_pass!(policy, problem, data, options, min_step_size=options.min_step_size, verbose=options.verbose)
+            backward_pass!(policy, problem, data, options, verbose=options.verbose)
+            !data.status[1] && break  # exit if backward pass fails
+            
             constr_violation, barrier_obj, switching, armijo = forward_pass!(policy, problem, data, options, verbose=options.verbose)
             !data.status[1] && break  # exit if line search failed
             
@@ -105,29 +125,11 @@ function ipddp_solve!(solver::Solver; iteration=true)
             data.barrier_obj = barrier_obj
             data.constr_viol_norm = constr_violation
         end
-        # info
-        if options.verbose && data.k % 10 == 1
-            println("")
-            println(rpad("Iteration", 15), rpad("Time (s)", 15), rpad("Perturb. (μ)", 15), rpad("Cost", 15), rpad("Constr. Viol.", 15), 
-                    rpad("Barrier Obj.", 15), rpad("Opt. Err.", 15), rpad("BP Reg.", 13), rpad("Step Size", 15))
-        end
-        if options.verbose
-            println(
-                rpad(string(data.k), 15), 
-                rpad(@sprintf("%.5e", time += iter_time), 15), 
-                rpad(@sprintf("%.5e", data.μ_j), 15), 
-                rpad(@sprintf("%.5e", data.costs[1]), 15), 
-                rpad(@sprintf("%.5e", data.constr_viol_norm), 15), 
-                rpad(@sprintf("%.5e", data.barrier_obj), 15), 
-                rpad(@sprintf("%.5e", data.optimality_error), 15), 
-                rpad(@sprintf("%.3e", data.ϕ_last), 13), 
-                rpad(@sprintf("%.5e", data.step_size[1]), 15)
-            )            
-        end 
 
         push!(costs, data.costs[1])
         push!(steps, data.step_size[1])
         data.k += 1
+        time += iter_time
     end
     return nothing
 end
@@ -147,27 +149,46 @@ function optimality_error(policy::PolicyData, problem::ProblemData, options::Opt
     cs_err::Float64 = 0     # complementary slackness
     s_norm::Float64 = 0     # optimality error rescaling term
     
-    H = length(problem.states)
-    Qu = policy.action_value.gradient_action
+    N = length(problem.states)
     constr_data = problem.constraints
-    c = constr_data.inequalities
-    s = constr_data.ineq_duals
-    y = constr_data.slacks
+    c = constr_data.nominal_inequalities
+    s = constr_data.nominal_ineq_duals
+    y = constr_data.nominal_slacks
     cy = options.feasible ? c : y
     !options.feasible && (μ_j *= -1)
     
-    for t = 1:H-1
-        stat_err = max(stat_err, norm(Qu[t], Inf))
-        num_inequality = constr_data.constraints[t].num_inequality
+    # Jacobians of system dynamics
+    fx = problem.model.jacobian_state
+    fu = problem.model.jacobian_action
+    # Jacobian of inequality constraints 
+    gx = constr_data.jacobian_state
+    gu = constr_data.jacobian_action
+    # Cost gradients
+    lx = problem.costs.gradient_state
+    lu = problem.costs.gradient_action
+    
+    policy.x_tmp[N] .= lx[N]
+    
+    for k = N-1:-1:1
+        # TODO: document. Basically forget x and unroll derivative w.r.t. u recrusively
+        policy.u_tmp[k] .= lu[k]
+        mul!(policy.u_tmp[k], gu[k]', s[k], 1.0, 1.0)
+        mul!(policy.u_tmp[k], fu[k]', policy.x_tmp[k+1], 1.0, 1.0)
+        stat_err = max(stat_err, norm(policy.u_tmp[k], Inf))
+        policy.x_tmp[k] .= lx[k]
+        mul!(policy.x_tmp[k], gx[k]', s[k], 1.0, 1.0)
+        mul!(policy.x_tmp[k], fx[k]', policy.x_tmp[k+1], 1.0, 1.0)
+        
+        num_inequality = constr_data.constraints[k].num_inequality
         for i = 1:num_inequality
-            cs_err = max(cs_err, abs(s[t][i] * cy[t][i] + μ_j))
+            cs_err = max(cs_err, abs(s[k][i] * cy[k][i] + μ_j))
         end
         if !options.feasible
             for i = 1:num_inequality
-                viol_err = max(viol_err, abs(c[t][i] + y[t][i]))
+                viol_err = max(viol_err, abs(c[k][i] + y[k][i]))
             end
         end
-        s_norm += norm(s[t], 1)
+        s_norm += norm(s[k], 1)
     end
     
     num_constraints = convert(Float64, sum([length(ct) for ct in c]))

@@ -19,7 +19,7 @@ end
 
 Model{T} = Vector{Dynamics{T}} where T
 
-function Dynamics(f::Function, num_state::Int, num_action::Int; num_parameter::Int=0, gauss_newton::Bool=false)
+function Dynamics(f::Function, num_state::Int, num_action::Int; num_parameter::Int=0, quasi_newton::Bool=false)
     #TODO: option to load/save methods
     x = Symbolics.variables(:x, 1:num_state)
     u = Symbolics.variables(:u, 1:num_action)
@@ -35,7 +35,7 @@ function Dynamics(f::Function, num_state::Int, num_action::Int; num_parameter::I
     evaluate_func = eval(Symbolics.build_function(y, x, u, w)[2])
     jacobian_state_func = eval(Symbolics.build_function(jacobian_state, x, u, w)[2])
     jacobian_action_func = eval(Symbolics.build_function(jacobian_action, x, u, w)[2])
-    if !gauss_newton
+    if !quasi_newton
         hessian_prod_state_state = sum([vx[t] .* Symbolics.hessian(y[t], x) for t in 1:num_next_state])
         hessian_prod_action_state = sum([vx[t] .* Symbolics.jacobian(Symbolics.gradient(y[t], u), x) for t in 1:num_next_state])
         hessian_prod_action_action = sum([vx[t] .* Symbolics.hessian(y[t], u) for t in 1:num_next_state])

@@ -78,8 +78,7 @@ function policy_data(dynamics::Vector{Dynamics{T}}, constraints::Constraints{T})
 
     action_value = ActionValue(Qx, Qu, Qxx, Quu, Qux)
 
-    x_tmp = [[zeros(d.num_state) for d in dynamics]...,
-                zeros(dynamics[end].num_next_state)]
+    x_tmp = [[zeros(d.num_state) for d in dynamics]..., zeros(dynamics[end].num_next_state)]
     u_tmp = [zeros(d.num_action) for d in dynamics]
 	s_tmp = [zeros(c.num_inequality) for c in constraints]
 	xx̂_tmp = [zeros(d.num_state, d.num_next_state) for d in dynamics]

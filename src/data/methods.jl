@@ -54,9 +54,8 @@ function update_nominal_trajectory!(data::ProblemData, feasible::Bool)
         t == H && continue
         data.nominal_actions[t] .= data.actions[t]
         constraints.nominal_ineq_duals[t] .= constraints.ineq_duals[t]
-        if feasible
-            constraints.nominal_inequalities[t] .= constraints.inequalities[t]
-        else
+        constraints.nominal_inequalities[t] .= constraints.inequalities[t]
+        if !feasible
             constraints.nominal_slacks[t] .= constraints.slacks[t]
         end 
     end

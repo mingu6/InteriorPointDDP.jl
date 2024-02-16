@@ -33,7 +33,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         end
         # calibrate minimum step size based on linear approximation of optimality conditions
         if l == 1
-            Δφ = expected_decrease_barrier_obj(policy)
+            Δφ = expected_decrease_barrier_obj(policy, problem, μ_j, options.feasible)
             if Δφ < 0.0 && data.constr_viol_norm <= data.θ_min
                 min_step_size = min(options.γ_θ, -options.γ_φ * data.constr_viol_norm / Δφ,
                     options.δ * data.constr_viol_norm ^ options.s_θ / (-Δφ) ^ options.s_φ)
@@ -110,16 +110,42 @@ function check_fraction_boundary(s, s̄, problem::ProblemData, τ::Float64, flip
     return true
 end
 
-function expected_decrease_barrier_obj(policy::PolicyData)
+function expected_decrease_barrier_obj(policy::PolicyData, problem::ProblemData, μ_j::Float64, feasible::Bool)
     Δφ = 0.0  # expected barrier cost decrease
-    Quu_fact = policy.uu_tmp  # assume Quu has been factorised from backward pass
     Qu = policy.action_value.gradient_action
-    H = length(Qu) + 1
+    N = length(Qu) + 1
     
-    for t = 1:H-1
-        policy.u_tmp[t] .= Qu[t]
-        LAPACK.potrs!('U', Quu_fact[t], policy.u_tmp[t])
-        Δφ -= dot(Qu[t], policy.u_tmp[t])
+    constr_data = problem.constraints
+    g = constr_data.nominal_inequalities
+    y = constr_data.nominal_slacks
+    
+    # Jacobians of system dynamics
+    fx = problem.model.jacobian_state
+    fu = problem.model.jacobian_action
+    # Jacobian of inequality constraints 
+    gx = constr_data.jacobian_state
+    gu = constr_data.jacobian_action
+    # Cost gradients
+    lx = problem.costs.gradient_state
+    lu = problem.costs.gradient_action
+    
+    policy.x_tmp[N] .= lx[N]
+    
+    for k = N-1:-1:1
+        if feasible
+            policy.u_tmp[k] .= lu[k]
+            mul!(policy.u_tmp[k], gu[k]', 1.0 ./ g[k], -μ_j, 1.0)
+            mul!(policy.u_tmp[k], fu[k]', policy.x_tmp[k+1], 1.0, 1.0)
+            policy.x_tmp[k] .= lx[k]
+            mul!(policy.x_tmp[k], gx[k]', 1.0 ./ g[k], -μ_j, 1.0)
+            mul!(policy.x_tmp[k], fx[k]', policy.x_tmp[k+1], 1.0, 1.0)
+        else
+            policy.u_tmp[k] .= lu[k]
+            mul!(policy.u_tmp[k], fu[k]', policy.x_tmp[k+1], 1.0, 1.0)
+            policy.x_tmp[k] .= lx[k]
+            mul!(policy.x_tmp[k], fx[k]', policy.x_tmp[k+1], 1.0, 1.0)
+        end
+        Δφ += dot(policy.u_tmp[k], policy.ku[k])
     end
     return Δφ
 end

@@ -42,6 +42,7 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
     
     x̄ = problem.nominal_states
     ū = problem.nominal_actions
+    s̄ = constr_data.nominal_ineq_duals
     c = constr_data.inequalities
     s = constr_data.ineq_duals
     y = constr_data.slacks
@@ -69,6 +70,9 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             mul!(Qu[t], transpose(fu[t]), Vx[t+1], 1.0, 1.0)
             
             # Qxx = qxx + fx' * Vxx * fx
+            if options.reg_state
+                Vxx[t+1][diagind(Vxx[t+1])] .+= ϕ
+            end
             mul!(policy.xx̂_tmp[t], transpose(fx[t]), Vxx[t+1])
             mul!(Qxx[t], policy.xx̂_tmp[t], fx[t])
             Qxx[t] .+= qxx[t]
@@ -84,8 +88,13 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             Qux[t] .+= qux[t]
             
             # apply second order terms to Q for full DDP, i.e., Vx * fxx, Vx * fuu, Vx * fxu
-            if !options.gauss_newton
+            if !options.quasi_newton
                 hessian_vector_prod!(fxx[t], fux[t], fuu[t], problem.model.dynamics[t], x̄[t], ū[t], problem.parameters[t], Vx[t+1])
+                Qxx[t] .+= fxx[t]
+                Qux[t] .+= fux[t]
+                Quu[t] .+= fuu[t]
+                
+                hessian_vector_prod!(fxx[t], fux[t], fuu[t], constr_data.constraints[t], x̄[t], ū[t], problem.parameters[t], s̄[t])
                 Qxx[t] .+= fxx[t]
                 Qux[t] .+= fux[t]
                 Quu[t] .+= fuu[t]
@@ -121,7 +130,9 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             
             # factorize Schur complement and apply regularisation, i.e., Q̂uu[t] + I_m * ϕ if required
             policy.uu_tmp[t] .= Quu[t]
-            policy.uu_tmp[t][diagind(policy.uu_tmp[t])] .+= ϕ
+            if !options.reg_state
+                policy.uu_tmp[t][diagind(policy.uu_tmp[t])] .+= ϕ
+            end
             (_, code) = LAPACK.potrf!('U', policy.uu_tmp[t])
             if code != 0
                 if ϕ == 0.0  # not initialised
@@ -175,6 +186,6 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
         data.status[1] && break
     end
     data.ϕ_last = ϕ
-    !data.status[1] && (verbose && (@warn "Backward pass failure, non-positive definite iteration matrix."))
+    !data.status[1] && (verbose && (@warn "Backward pass failure, unable to find positive definite iteration matrix."))
 end
 
