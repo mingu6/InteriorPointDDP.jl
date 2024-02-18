@@ -1,6 +1,6 @@
 using LinearAlgebra
 
-function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverData, options::Options; verbose::Bool=false)
+function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverData, options::Options; mode=:nominal, verbose::Bool=false)
     H = length(problem.states)
     constr_data = problem.constraints
     ϕ::Float64 = 0.0
@@ -40,12 +40,8 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
     Vx = policy.value.gradient
     Vxx = policy.value.hessian
     
-    x̄ = problem.nominal_states
-    ū = problem.nominal_actions
-    s̄ = constr_data.nominal_ineq_duals
-    c = constr_data.inequalities
-    s = constr_data.ineq_duals
-    y = constr_data.slacks
+    x, u, _ = primal_trajectories(problem, mode=mode)
+    c, s, y = dual_trajectories(constr_data, mode=mode)
     
     # See (9) ad (17) in Pavlov et al. Same except swap C_t for -Y_t
     cy = options.feasible ? c : y
@@ -58,7 +54,7 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
         
         for t = H-1:-1:1
             # lx = qx + Qsx' * s
-            mul!(Qx[t], transpose(Qsx[t]), s[t])
+            mul!(Qx[t], transpose(Qsx[t]),s[t])
             Qx[t] .+= qx[t]
             # Qx = lx + fx' * Vx
             mul!(Qx[t], transpose(fx[t]), Vx[t+1], 1.0, 1.0)
@@ -89,12 +85,12 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             
             # apply second order terms to Q for full DDP, i.e., Vx * fxx, Vx * fuu, Vx * fxu
             if !options.quasi_newton
-                hessian_vector_prod!(fxx[t], fux[t], fuu[t], problem.model.dynamics[t], x̄[t], ū[t], problem.parameters[t], Vx[t+1])
+                hessian_vector_prod!(fxx[t], fux[t], fuu[t], problem.model.dynamics[t], x[t], u[t], problem.parameters[t], Vx[t+1])
                 Qxx[t] .+= fxx[t]
                 Qux[t] .+= fux[t]
                 Quu[t] .+= fuu[t]
                 
-                hessian_vector_prod!(fxx[t], fux[t], fuu[t], constr_data.constraints[t], x̄[t], ū[t], problem.parameters[t], s̄[t])
+                hessian_vector_prod!(fxx[t], fux[t], fuu[t], constr_data.constraints[t], x[t], u[t], problem.parameters[t], s[t])
                 Qxx[t] .+= fxx[t]
                 Qux[t] .+= fux[t]
                 Quu[t] .+= fuu[t]

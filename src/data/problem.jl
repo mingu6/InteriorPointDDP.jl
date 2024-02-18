@@ -42,7 +42,7 @@ function problem_data(dynamics, costs, constraints, options; parameters=[[zeros(
 
     model = model_data(dynamics)
     costs_dat = costs_data(dynamics, costs)
-    constr_data = constraint_data(dynamics, constraints, options.κ_1, options.κ_2)
+    constr_data = constraint_data(dynamics, constraints, options.ineq_dual_init, options.slack_init)
 
     trajectory = zeros(num_trajectory(dynamics))
     

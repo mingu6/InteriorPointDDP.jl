@@ -91,27 +91,16 @@ function Constraint(f::Function, fx::Function, fu::Function, num_constraint::Int
         indices_inequality, length(indices_inequality))
 end
 
-function constraint!(violations, inequalities, constraints::Constraints{T}, states, actions, parameters) where T
-    for (t, con) in enumerate(constraints)
-        con.num_constraint == 0 && continue
-        con.evaluate(con.evaluate_cache, states[t], actions[t], parameters[t])
-        @views violations[t] .= con.evaluate_cache
-        # take inequalities and package them together
-        @views inequalities[t] .= con.evaluate_cache[con.indices_inequality] # cool indexing trick
-        fill!(con.evaluate_cache, 0.0) # TODO: confirm this is necessary
-    end
-end
-
 function jacobian!(jacobian_states, jacobian_actions, constraints::Constraints{T}, states, actions, parameters) where T
-    H = length(constraints)
-    for (t, con) in enumerate(constraints)
+    N = length(constraints)
+    for (k, con) in enumerate(constraints)
         con.num_constraint == 0 && continue
-        con.jacobian_state(con.jacobian_state_cache, states[t], actions[t], parameters[t])
-        @views jacobian_states[t] .= con.jacobian_state_cache
+        con.jacobian_state(con.jacobian_state_cache, states[k], actions[k], parameters[k])
+        @views jacobian_states[k] .= con.jacobian_state_cache
         fill!(con.jacobian_state_cache, 0.0) # TODO: confirm this is necessary
-        t == H && continue
-        con.jacobian_action(con.jacobian_action_cache, states[t], actions[t], parameters[t])
-        @views jacobian_actions[t] .= con.jacobian_action_cache
+        k == N && continue
+        con.jacobian_action(con.jacobian_action_cache, states[k], actions[k], parameters[k])
+        @views jacobian_actions[k] .= con.jacobian_action_cache
         fill!(con.jacobian_action_cache, 0.0) # TODO: confirm this is necessary
     end
 end

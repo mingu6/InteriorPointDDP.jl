@@ -17,11 +17,24 @@ function cost!(data::SolverData, problem::ProblemData; mode=:nominal)
 	return data.objective
 end
 
+function constraint!(problem::ProblemData; mode=:nominal)
+    constr_data = problem.constraints
+    states, actions, parameters = primal_trajectories(problem, mode=mode)
+    inequalities, _, _ = dual_trajectories(constr_data, mode=mode)
+    for (k, con) in enumerate(constr_data.constraints)
+        con.num_constraint == 0 && continue
+        con.evaluate(con.evaluate_cache, states[k], actions[k], parameters[k])
+        @views constr_data.violations[k] .= con.evaluate_cache
+        # take inequalities and package them together
+        @views inequalities[k] .= con.evaluate_cache[con.indices_inequality]
+        fill!(con.evaluate_cache, 0.0) # TODO: confirm this is necessary
+    end
+end
+
 function barrier_objective!(problem::ProblemData, data::SolverData, feasible::Bool; mode=:nominal)
     N = problem.horizon
     constr_data = problem.constraints
-    c = constr_data.inequalities
-    y = constr_data.slacks
+    c, _, y = dual_trajectories(constr_data, mode=mode)
     
     barrier_obj = 0.
     for k = 1:N
@@ -35,10 +48,9 @@ function barrier_objective!(problem::ProblemData, data::SolverData, feasible::Bo
     return barrier_obj
 end
 
-function constraint_violation_1norm(constr_data::ConstraintsData)
+function constraint_violation_1norm(constr_data::ConstraintsData; mode=:nominal)
     # TODO: needs to include slack for IPDDP as well as equality
-    c = constr_data.inequalities
-    y = constr_data.slacks
+    c, _, y = dual_trajectories(constr_data, mode=mode)
     N = length(c)
     
     constr_violation = 0.
@@ -53,7 +65,6 @@ end
 function update_nominal_trajectory!(data::ProblemData, feasible::Bool) 
     N = data.horizon
     constraints = data.constraints
-    
     for k = 1:N
         data.nominal_states[k] .= data.states[k]
         k == N && continue
@@ -66,9 +77,16 @@ function update_nominal_trajectory!(data::ProblemData, feasible::Bool)
     end
 end
 
-function trajectories(problem::ProblemData; mode=:nominal) 
+function primal_trajectories(problem::ProblemData; mode=:nominal)
     x = mode == :nominal ? problem.nominal_states : problem.states
     u = mode == :nominal ? problem.nominal_actions : problem.actions
     w = problem.parameters
     return x, u, w 
+end
+
+function dual_trajectories(constr_data::ConstraintsData; mode=:nominal)
+    c = mode == :nominal ? constr_data.nominal_inequalities : constr_data.inequalities
+    s = mode == :nominal ? constr_data.nominal_ineq_duals : constr_data.ineq_duals
+    y = mode == :nominal ? constr_data.nominal_slacks : constr_data.slacks
+    return c, s, y
 end

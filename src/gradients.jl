@@ -1,12 +1,12 @@
 function gradients!(dynamics::Model, data::ProblemData; mode=:nominal)
-    x, u, w = trajectories(data, mode=mode)
+    x, u, w = primal_trajectories(data, mode=mode)
     jx = data.model.jacobian_state
     ju = data.model.jacobian_action
     jacobian!(jx, ju, dynamics, x, u, w)
 end
 
 function gradients!(costs::Costs, data::ProblemData; mode=:nominal)
-    x, u, w = trajectories(data, mode=mode)
+    x, u, w = primal_trajectories(data, mode=mode)
     gx = data.costs.gradient_state
     gu = data.costs.gradient_action
     gxx = data.costs.hessian_state_state
@@ -17,7 +17,7 @@ function gradients!(costs::Costs, data::ProblemData; mode=:nominal)
 end
 
 function gradients!(constraints_data::ConstraintsData, problem::ProblemData; mode=:nominal)
-    x, u, w = trajectories(problem, mode=mode)
+    x, u, w = primal_trajectories(problem, mode=mode)
     cx = constraints_data.jacobian_state
     cu = constraints_data.jacobian_action
     jacobian!(cx, cu, constraints_data.constraints, x, u, w)

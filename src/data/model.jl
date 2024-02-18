@@ -26,13 +26,13 @@ function model_data(dynamics::Vector{Dynamics{T}}) where T
 end
 
 function reset!(data::ModelData) 
-    H = length(data.dynamics) + 1
-    for t = 1:H-1 
-        fill!(data.jacobian_state[t], 0.0) 
-        fill!(data.jacobian_action[t], 0.0) 
-        fill!(data.jacobian_parameter[t], 0.0) 
-        fill!(data.hessian_prod_state_state[t], 0.0)
-        fill!(data.hessian_prod_action_state[t], 0.0)
-        fill!(data.hessian_prod_action_action[t], 0.0) 
+    N = length(data.dynamics) + 1
+    for k = 1:N-1 
+        fill!(data.jacobian_state[k], 0.0) 
+        fill!(data.jacobian_action[k], 0.0) 
+        fill!(data.jacobian_parameter[k], 0.0) 
+        fill!(data.hessian_prod_state_state[k], 0.0)
+        fill!(data.hessian_prod_action_state[k], 0.0)
+        fill!(data.hessian_prod_action_action[k], 0.0) 
     end 
 end 

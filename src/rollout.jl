@@ -1,26 +1,16 @@
 function rollout!(policy::PolicyData, problem::ProblemData, feasible::Bool; step_size=1.0)
     dynamics = problem.model.dynamics
-
-    # trajectories
-    x = problem.states
-    u = problem.actions
-    params = problem.parameters
     constr_data = problem.constraints
-    s = constr_data.ineq_duals
-    y = constr_data.slacks
-    x̄ = problem.nominal_states
-    ū = problem.nominal_actions
-    s̄ = constr_data.nominal_ineq_duals
-    ȳ = constr_data.nominal_slacks
+    
+    x, u, params = primal_trajectories(problem, mode=:current)
+    _, s, y = dual_trajectories(constr_data, mode=:current)
+    x̄, ū, _ = primal_trajectories(problem, mode=:nominal)
+    _, s̄, ȳ = dual_trajectories(constr_data, mode=:nominal)
+    
     x[1] .= x̄[1]
 
-    # policy
-    Ku = policy.Ku
-    ku = policy.ku
-    Ks = policy.Ks
-    ks = policy.ks
-    Ky = policy.Ky
-    ky = policy.ky
+    ku, ks, ky = policy.ku, policy.ks, policy.ky  # feedforward gains
+    Ku, Ks, Ky = policy.Ku, policy.Ks, policy.Ky  # feedback gains
 
     for (t, d) in enumerate(dynamics)
         # u[t] .= ū[t] + K[t] * (x[t] - x̄[t]) + step_size * k[t]

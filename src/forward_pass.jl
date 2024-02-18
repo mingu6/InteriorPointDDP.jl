@@ -20,7 +20,8 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
             l += 1
             continue
         end
-        constraint!(constr_data, problem.states, problem.actions, problem.parameters)
+        # constraint!(constr_data, problem.states, problem.actions, problem.parameters)
+        constraint!(problem, mode=:current)
 
         Δφ = expected_decrease_barrier_obj(policy, problem, data.μ, options.feasible)
         min_step_size == -Inf && (min_step_size = estimate_min_step_size(Δφ, data, options))
@@ -29,42 +30,41 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         !data.status && (data.step_size *= 0.5, l += 1, continue)
         
         # 1-norm of constraint violation of proposed step for filter (infeasible IPDDP only)
-        constr_violation = options.feasible ? 0. : constraint_violation_1norm(constr_data)  
+        θ = options.feasible ? 0. : constraint_violation_1norm(constr_data, mode=:current)  
+        θ_prev = data.primal_1_curr
         
         # evaluate objective function of barrier problem to assess quality of iterate
         φ = barrier_objective!(problem, data, options.feasible, mode=:current)
         φ_prev = data.barrier_obj_curr
         
-        # check acceptability to filter A-5.4 IPOPT
+        # check acceptability to filter A-5.4 IPOPT  # TODO: simplify
         for pt in data.filter
-            if constr_violation >= pt[1] && φ >= pt[2]  # violation should stay 0. for fesible IPDDP
+            if θ >= pt[1] && φ >= pt[2]  # violation should stay 0. for fesible IPDDP
                 data.status = false
                 break
             end
         end
-        # println("filter ", data.status, " ", data.filter)
         !data.status && (data.step_size *= 0.5, l += 1, continue)  # failed, reduce step size
         
         # additional checks for validity, e.g., switching condition + armijo or sufficient improvement w.r.t. filter
         # NOTE: if feasible, constraint violation not considered. just check armijo condition to accept trial point
+        # TODO: separate into function
         data.switching = (Δφ < 0.0) && 
-            ((-Δφ) ^ options.s_φ * α > options.δ * data.primal_1_curr ^ options.s_θ)  # TODO: rename primal_1_curr to θ here
+            ((-Δφ) ^ options.s_φ * α > options.δ * θ_prev ^ options.s_θ)  # TODO: rename primal_1_curr to θ here
         # for armijo condition, add adjustment to account for round-off error
         data.armijo_passed = φ - φ_prev - 10. * eps(Float64) * abs(φ_prev) <= options.η_φ * α * Δφ
-        if (constr_violation <= data.min_primal_1) && data.switching
+        if (θ <= data.min_primal_1) && data.switching
             data.status = data.armijo_passed
-            # println(data.armijo_passed, " ", data.switching, " ", Δφ)
         else
             # sufficient progress conditions
-            suff = !options.feasible ? (constr_violation <= (1. - options.γ_θ) * data.primal_1_curr) : false
-            suff = suff || (φ <= φ_prev - options.γ_φ * data.primal_1_curr)
+            suff = !options.feasible ? (θ <= (1. - options.γ_θ) * θ_prev) : false
+            suff = suff || (φ <= φ_prev - options.γ_φ * θ_prev)
             !suff && (data.status = false)
-            # println(data.armijo_passed, " ", data.switching, " ", suff, " ", Δφ)
         end
-        !data.status && (data.step_size *= 0.5, l += 1, continue)  # failed, reduce step size
-        # step size accepted, update performance of new iterate as current
+        !data.status && (data.step_size *= 0.5, l += 1, continue)  # failed, reduce step Size
+        
         data.barrier_obj_next = φ
-        data.primal_1_next = constr_violation
+        data.primal_1_next = θ
         break
     end
     !data.status && (verbose && (@warn "Line search failed to find a suitable iterate"))

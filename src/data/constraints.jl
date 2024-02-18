@@ -4,6 +4,7 @@
 
 struct ConstraintsData{T,C,CX,CU}
     constraints::Constraints{T}
+    num_ineq::Vector{Int}
     violations::Vector{C} # the current value of each constraint (includes equality and ineq.)
     jacobian_state::Vector{CX} 
     jacobian_action::Vector{CU}
@@ -16,38 +17,38 @@ struct ConstraintsData{T,C,CX,CU}
     nominal_slacks::Vector{Vector{T}}
 end
 
-function constraint_data(model::Model, constraints::Constraints, κ_1::Float64, κ_2::Float64)
-    H = length(constraints)
-    c = [zeros(constraints[t].num_constraint) for t = 1:H]
-    ineqs = [zeros(constraints[t].num_inequality) for t = 1:H]
-    nominal_ineqs = [zeros(constraints[t].num_inequality) for t = 1:H]
+function constraint_data(model::Model, constraints::Constraints, ineq_dual_init::Float64, slack_init::Float64)
+    N = length(constraints)
+    c = [zeros(constraints[k].num_constraint) for k = 1:N]
+    ineqs = [zeros(constraints[k].num_inequality) for k = 1:N]
+    nominal_ineqs = [zeros(constraints[k].num_inequality) for k = 1:N]
+    num_ineq = [mapreduce(x -> x.num_inequality, +, constraints)]
 
     # take inequalities and package them together
-    for t = 1:H
-        @views c[t] .= constraints[t].evaluate_cache
-        @views ineqs[t] .= constraints[t].evaluate_cache[constraints[t].indices_inequality] # cool indexing trick
+    for k = 1:N
+        @views c[k] .= constraints[k].evaluate_cache
+        @views ineqs[k] .= constraints[k].evaluate_cache[constraints[k].indices_inequality] # cool indexing trick
     end
     
-    cx = [zeros(constraints[t].num_constraint, t < H ? model[t].num_state : model[H-1].num_next_state) for t = 1:H]
-    cu = [zeros(constraints[t].num_constraint, model[t].num_action) for t = 1:H-1]
+    cx = [zeros(constraints[k].num_constraint, model[k].num_state) for k = 1:N-1]
+    push!(cx, zeros(constraints[N].num_constraint, model[N-1].num_next_state))
+    cu = [zeros(constraints[k].num_constraint, model[k].num_action) for k = 1:N-1]
     
-    constraint_duals = [zeros(constraints[t].num_constraint) for t = 1:H]
+    constraint_duals = [zeros(constraints[k].num_constraint) for k = 1:N]
     
-    ineq_duals = [κ_1 * ones(constraints[t].num_inequality) for t = 1:H]
-    nominal_ineq_duals = [κ_1 * ones(constraints[t].num_inequality) for t = 1:H]
+    ineq_duals = [ineq_dual_init .* ones(constraints[k].num_inequality) for k = 1:N]
+    nominal_ineq_duals = [ineq_dual_init .* ones(constraints[k].num_inequality) for k = 1:N]
 
-    slacks = [κ_2 .* ones(constraints[t].num_inequality) for t = 1:H]
-    nominal_slacks = [κ_2 .* ones(constraints[t].num_inequality) for t = 1:H]
+    slacks = [slack_init .* ones(constraints[k].num_inequality) for k = 1:N]
+    nominal_slacks = [slack_init .* ones(constraints[k].num_inequality) for k = 1:N]
 
-    return ConstraintsData(constraints, c, cx, cu, ineqs, nominal_ineqs, constraint_duals, ineq_duals, nominal_ineq_duals, slacks, nominal_slacks)
-end
-
-function constraint!(constraint_data::ConstraintsData, x, u, w)
-    constraint!(constraint_data.violations, constraint_data.inequalities, constraint_data.constraints, x, u, w)
+    return ConstraintsData(constraints, num_ineq, c, cx, cu, ineqs, nominal_ineqs,
+        constraint_duals, ineq_duals, nominal_ineq_duals, slacks, nominal_slacks)
 end
 
 function reset!(data::ConstraintsData, κ_1::Float64, κ_2::Float64) 
     N = length(data.constraints)
+    data.num_ineq[1] = mapreduce(x -> x.num_inequality, +, data.constraints)
     for k = 1:N
         fill!(data.violations[k], 0.0)
         fill!(data.jacobian_state[k], 0.0)
