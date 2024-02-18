@@ -2,104 +2,81 @@
     Solver Data
 """
 mutable struct SolverData{T}
-    costs::Vector{T}                    # cost value
-    gradient::Vector{T}                 # Lagrangian gradient TODO: remove
-    θ_max::T                            # filter initialization for maximum allowable constraint violation
-    θ_min::T                            # minimum constraint violation for checking acceptable steps
-
-    indices_state::Vector{Vector{Int}}  # indices for state trajectory  TODO: MAY NOT NEED THIS????
-    indices_action::Vector{Vector{Int}} # indices for control trajectory
-
-    step_size::Vector{T}
-    status::Vector{Bool}                # solver status
-
-    iterations::Vector{Int}
-
-    cache::Dict{Symbol,Vector{T}}       # solver stats
-    
-    j::Int                              # outer iteration counter (i.e., j-th barrier subproblem)
-    k::Int                              # overall iteration counter
-
-    μ_j::Float64                        # perturbation value
-    ϕ_last::Float64                     # regularisation in backward pass
-    constr_viol_norm::Float64           # magnitude (1-norm) of constraint violation
-    barrier_obj::Float64                # barrier objective function
-    optimality_error::Float64           # optimality error for problem (not barrier)
-    
-    filter::Vector{Vector{T}}           # filter
+    max_primal_1::T               # maximum allowable 1-norm of constraint violation (IPOPT θ_max)
+    min_primal_1::T               # minimum 1-norm of constraint violation (IPOPT θ_min) 
+    step_size::T                  # current step size for line search
+    status::Bool                  # solver status
+    j::Int                        # outer iteration counter (i.e., j-th barrier subproblem)
+    k::Int                        # overall iteration counter
+    l::Int                        # line search iteration counter
+    wall_time::T                  # elapsed wall clock time
+    μ::T                          # current subproblem perturbation value
+    ϕ_last::T                     # regularisation in backward pass
+    objective::T                  # objective function value of current iterate
+    primal_inf::T                 # ∞-norm of constraint violation (primal infeasibility)
+    dual_inf::T                   # ∞-norm of gradient of Lagrangian (dual infeasibility)
+    cs_inf::T                     # ∞-norm of complementary slackness error
+    barrier_obj_curr::T           # barrier objective function for subproblem at current iterate
+    primal_1_curr::T              # 1-norm of constraint violation at current iterate (primal infeasibility)
+    barrier_obj_next::T           # barrier objective function for subproblem at next iterate
+    primal_1_next::T              # 1-norm of constraint violation at next iterate (primal infeasibility)
+    update_filter::Bool           # updated filter at current iteration
+    switching::Bool               # switching condition satisfied (sufficient decrease on barrier obj. relative to constr. viol.)
+    armijo_passed::Bool           # sufficient decrease condition of barrier obj. satisfied for current iterate
+    filter::Vector{Vector{T}}     # filter points TODO: move to staticarrays
 end
 
-function solver_data(dynamics::Vector{Dynamics{T}}; max_cache=1000) where T
-    # indices x and u
-    indices_state = Vector{Int}[]
-    indices_action = Vector{Int}[] 
-    n_sum = 0 
-    m_sum = 0 
-    n_total = sum([d.num_state for d in dynamics]) + dynamics[end].num_next_state
-    for d in dynamics
-        push!(indices_state, collect(n_sum .+ (1:d.num_state))) 
-        push!(indices_action, collect(n_total + m_sum .+ (1:d.num_action)))
-        n_sum += d.num_state 
-        m_sum += d.num_action 
-    end
-    push!(indices_state, collect(n_sum .+ (1:dynamics[end].num_next_state)))
-
-    costs = [Inf]
-    θ_max = 0.0
-    θ_min = 0.0
-    step_size = [1.0]
-    gradient = zeros(num_trajectory(dynamics))
-    cache = Dict(:costs     => zeros(max_cache), 
-                 :gradient      => zeros(max_cache), 
-                 :θ_max => zeros(max_cache), 
-                 :step_size     => zeros(max_cache))
-
-    μ_j = 0.0
+function solver_data()
+    max_primal_1 = 0.0
+    min_primal_1 = 0.0
+    step_size = 0.0
+    status = false
+    j = 0
+    k = 0
+    l = 0
+    wall_time = 0.0
+    μ = 0.0
     ϕ_last = 0.0
-    constr_viol_norm = 0.0
-    barrier_obj = 0.0
-    optimality_error = 0.0
+    objective = 0.0
+    primal_inf = 0.0
+    dual_inf = 0.0
+    cs_inf = 0.0
+    barrier_obj_curr = 0.0
+    primal_1_curr = 0.0
+    barrier_obj_next = 0.0
+    primal_1_next = 0.0
+    update_filter = false
+    switching = false
+    armijo_passed = false
     filter = [[0.0 , 0.0]]
 
-    SolverData(costs, gradient, θ_max, θ_min, indices_state, indices_action, step_size, [false], [0], cache, 1, 1, μ_j,
-               ϕ_last, constr_viol_norm, barrier_obj, optimality_error, filter)
+    SolverData(max_primal_1, min_primal_1, step_size, status, j, k, l, wall_time, μ, ϕ_last,
+        objective, primal_inf, dual_inf, cs_inf, 
+        barrier_obj_curr, primal_1_curr, barrier_obj_next, primal_1_next, 
+        update_filter, switching, armijo_passed, filter)
 end
 
 function reset!(data::SolverData) 
-    fill!(data.costs, 0.0) 
-    fill!(data.gradient, 0.0)
-    fill!(data.cache[:costs], 0.0) 
-    fill!(data.cache[:gradient], 0.0) 
-    fill!(data.cache[:step_size], 0.0) 
-    data.θ_max = Inf
-    data.θ_min = 0.0
-    data.status[1] = false
-    data.iterations[1] = 0
-    data.step_size[1] = 0.0
-    data.j = 1
-    data.k = 1
-    data.μ_j = 0.0
+    data.max_primal_1 = 0.0
+    data.min_primal_1 = 0.0
+    data.step_size = 0.0
+    data.status = false
+    data.j = 0
+    data.k = 0
+    data.l = 0
+    data.wall_time = 0.0
+    data.μ = 0.0
     data.ϕ_last = 0.0
-    data.constr_viol_norm = 0.0
-    data.barrier_obj = 0.0
-    data.optimality_error = 0.0
+    data.objective = 0.0
+    data.primal_inf = 0.0
+    data.dual_inf = 0.0
+    data.cs_inf = 0.0
+    data.barrier_obj_curr = 0.0
+    data.primal_1_curr = 0.0
+    data.barrier_obj_next = 0.0
+    data.primal_1_next = 0.0
+    data.update_filter = false
+    data.switching = false
+    data.armijo_passed = false
     data.filter = [[0.0 , 0.0]]
-end
-
-# TODO: fix iter
-function cache!(data::SolverData)
-    iter = 1 #data.cache[:iter] 
-    # (iter > length(data[:costs])) && (@warn "solver data cache exceeded")
-    data.cache[:costs][iter] = data.costs[1]
-    data.cache[:gradient][iter] = data.gradient
-    data.cache[:step_size][iter] = data.step_size
-    data.cache[:j][iter] = data.j
-    data.cache[:k][iter] = data.k
-    data.cache[:μ_j][iter] = data.μ_j
-    data.cache[:ϕ_last][iter] = data.ϕ_last
-    data.cache[:constr_viol_norm][iter] = data.constr_viol_norm
-    data.cache[:barrier_obj][iter] = data.barrier_obj
-    data.cache[:optimality_error][iter] = data.optimality_error
-    data.cache[:filter][iter] = data.filter
-    return nothing
 end

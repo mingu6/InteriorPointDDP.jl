@@ -52,7 +52,7 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
     α = options.feasible ? -1.0 : 1.0
     
     while ϕ <= options.ϕ_max
-        data.status[1] = true
+        data.status = true
         Vxx[H] .= qxx[H]
         Vx[H] .= qx[H]
         
@@ -101,7 +101,7 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             end
             
             # S * r for infeasible and feasible, see for example RHS of (9)
-            fill!(policy.s_tmp[t], data.μ_j)
+            fill!(policy.s_tmp[t], data.μ)
             policy.s_tmp[t] ./= s[t]
             policy.s_tmp[t] .+= c[t]
             
@@ -140,7 +140,7 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
                 else
                     ϕ = (data.ϕ_last == 0.0) ? ϕ * options.ψ_p_1 : ϕ * options.ψ_p_2
                 end
-                data.status[1] = false
+                data.status = false
                 break
             end
             # see block inverse formula https://en.wikipedia.org/wiki/Block_matrix (D and complement of D is invertible case)
@@ -183,9 +183,9 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             Vx[t] .= Qx[t]
             mul!(Vx[t], transpose(Ku[t]), Qu[t], 1.0, 1.0)
         end
-        data.status[1] && break
+        data.status && break
     end
     data.ϕ_last = ϕ
-    !data.status[1] && (verbose && (@warn "Backward pass failure, unable to find positive definite iteration matrix."))
+    !data.status && (verbose && (@warn "Backward pass failure, unable to find positive definite iteration matrix."))
 end
 

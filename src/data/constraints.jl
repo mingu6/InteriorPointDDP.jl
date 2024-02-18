@@ -46,55 +46,18 @@ function constraint!(constraint_data::ConstraintsData, x, u, w)
     constraint!(constraint_data.violations, constraint_data.inequalities, constraint_data.constraints, x, u, w)
 end
 
-function constraint_violation(constraint_data::ConstraintsData)  # TODO: needed????
-    constraints = constraint_data.constraints
-    H = length(constraints)
-    max_violation = 0.0
-    for t = 1:H
-        num_constraint = constraints[t].num_constraint 
-        ineq = constraints[t].indices_inequality
-        for i = 1:num_constraint 
-            c = constraint_data.violations[t][i]
-            cti = (i in ineq) ? max(0.0, c) : abs(c)
-            max_violation = max(max_violation, cti)
-        end
-    end
-    return max_violation
-end
-
-function constraint_violation(constraint_data::ConstraintsData, x, u, w; 
-    norm_type=Inf)
-    constraint!(constraint_data, x, u, w)
-    constraint_violation(constraint_data, norm_type=norm_type)
-end
-
-function constraint_violation_1norm(constr_data::ConstraintsData)
-    c = constr_data.inequalities
-    y = constr_data.slacks
-    H = length(c)
-    
-    constr_violation = 0.
-    for t = 1:H
-        num_constraint = constr_data.constraints[t].num_inequality
-        for i = 1:num_constraint
-            constr_violation += abs(c[t][i] + y[t][i])
-        end
-    end
-    return constr_violation
-end
-
 function reset!(data::ConstraintsData, κ_1::Float64, κ_2::Float64) 
-    H = length(data.constraints)
-    for t = 1:H
-        fill!(data.violations[t], 0.0)
-        fill!(data.jacobian_state[t], 0.0)
-        t < H && fill!(data.jacobian_action[t], 0.0)
-        fill!(data.inequalities[t], 0.0)
-        fill!(data.nominal_inequalities[t], 0.0)
-        fill!(data.duals[t], 0.0) 
-        fill!(data.ineq_duals[t], κ_1) 
-        fill!(data.nominal_ineq_duals[t], κ_1) 
-        fill!(data.slacks[t], κ_2) 
-        fill!(data.nominal_slacks[t], κ_2)
+    N = length(data.constraints)
+    for k = 1:N
+        fill!(data.violations[k], 0.0)
+        fill!(data.jacobian_state[k], 0.0)
+        k < N && fill!(data.jacobian_action[k], 0.0)
+        fill!(data.inequalities[k], 0.0)
+        fill!(data.nominal_inequalities[k], 0.0)
+        fill!(data.duals[k], 0.0)
+        fill!(data.ineq_duals[k], κ_1) 
+        fill!(data.nominal_ineq_duals[k], κ_1) 
+        fill!(data.slacks[k], κ_2) 
+        fill!(data.nominal_slacks[k], κ_2)
     end 
 end

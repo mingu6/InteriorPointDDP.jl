@@ -18,7 +18,7 @@ function Solver(dynamics::Vector{Dynamics{T}}, costs::Costs{T}, constraints::Con
     problem = problem_data(dynamics, costs, constraints, options, parameters=parameters)
 
     # allocate solver data
-    data = solver_data(dynamics)
+    data = solver_data()
 
 	Solver(problem, policy, data, options)
 end
@@ -36,7 +36,7 @@ function Solver(dynamics::Vector{Dynamics{T}}, costs::Costs{T};
     problem = problem_data(dynamics, costs, constraints, options, parameters=parameters)
 
     # allocate solver data
-    data = solver_data(dynamics)
+    data = solver_data()
 
 	Solver(problem, policy, data, options)
 end

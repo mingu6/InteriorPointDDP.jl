@@ -10,53 +10,58 @@ end
 
 function cost!(data::SolverData, problem::ProblemData; mode=:nominal)
 	if mode == :nominal
-		data.costs[1] = cost(problem.costs.costs, problem.nominal_states, problem.nominal_actions, problem.parameters)
+		data.objective = cost(problem.costs.costs, problem.nominal_states, problem.nominal_actions, problem.parameters)
 	elseif mode == :current
-		data.costs[1] = cost(problem.costs.costs, problem.states, problem.actions, problem.parameters)
+		data.objective = cost(problem.costs.costs, problem.states, problem.actions, problem.parameters)
 	end
-	return data.costs
+	return data.objective
 end
 
 function barrier_objective!(problem::ProblemData, data::SolverData, feasible::Bool; mode=:nominal)
-    H = problem.horizon
+    N = problem.horizon
     constr_data = problem.constraints
     c = constr_data.inequalities
     y = constr_data.slacks
-
+    
     barrier_obj = 0.
-    if feasible
-        for t = 1:H
-            num_inequality = constr_data.constraints[t].num_inequality
-            for i = 1:num_inequality
-                barrier_obj -= log(-c[t][i])
-            end
-        end
-    else
-        for t = 1:H
-            num_inequality = constr_data.constraints[t].num_inequality
-            for i = 1:num_inequality
-                barrier_obj -= log(y[t][i])
-            end
+    for k = 1:N
+        for i = constr_data.constraints[k].indices_inequality
+            feasible ? barrier_obj -= log(-c[k][i]) : barrier_obj -= log(y[k][i])
         end
     end
-    barrier_obj *= data.μ_j
+    barrier_obj *= data.μ
     cost!(data, problem, mode=mode)
-    barrier_obj += data.costs[1]
+    barrier_obj += data.objective
     return barrier_obj
 end
 
+function constraint_violation_1norm(constr_data::ConstraintsData)
+    # TODO: needs to include slack for IPDDP as well as equality
+    c = constr_data.inequalities
+    y = constr_data.slacks
+    N = length(c)
+    
+    constr_violation = 0.
+    for k = 1:N
+        for i = constr_data.constraints[k].indices_inequality
+            constr_violation += abs(c[k][i] + y[k][i])
+        end
+    end
+    return constr_violation
+end
+
 function update_nominal_trajectory!(data::ProblemData, feasible::Bool) 
-    H = data.horizon
+    N = data.horizon
     constraints = data.constraints
     
-    for t = 1:H
-        data.nominal_states[t] .= data.states[t]
-        t == H && continue
-        data.nominal_actions[t] .= data.actions[t]
-        constraints.nominal_ineq_duals[t] .= constraints.ineq_duals[t]
-        constraints.nominal_inequalities[t] .= constraints.inequalities[t]
+    for k = 1:N
+        data.nominal_states[k] .= data.states[k]
+        k == N && continue
+        data.nominal_actions[k] .= data.actions[k]
+        constraints.nominal_ineq_duals[k] .= constraints.ineq_duals[k]
+        constraints.nominal_inequalities[k] .= constraints.inequalities[k]
         if !feasible
-            constraints.nominal_slacks[t] .= constraints.slacks[t]
+            constraints.nominal_slacks[k] .= constraints.slacks[k]
         end 
     end
 end
