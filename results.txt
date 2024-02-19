@@ -1,136 +1,136 @@
 ---------------------------------------------------------------------------------------------------------------
    exper   trial   feas     qn    status     du_inf       pr_inf       cs_inf       μ    iterations  wall_time 
 ---------------------------------------------------------------------------------------------------------------
-   invpend   1     true    true     true   1.0634e-08   0.0000e+00   1.0000e-08   -8.00      174      387.39 
-   invpend   2     true    true     true   1.0716e-08   0.0000e+00   1.0000e-08   -8.00      174      367.67 
-   invpend   3     true    true     true   1.0680e-08   0.0000e+00   1.0000e-08   -8.00      174      384.27 
-   invpend   1    false    true     true   1.0634e-08   1.1102e-16   1.0000e-08   -8.00      174      369.34 
-   invpend   2    false    true     true   1.0717e-08   1.6653e-16   1.0000e-08   -8.00      174      377.36 
-   invpend   3    false    true     true   1.0680e-08   1.1102e-16   1.0000e-08   -8.00      174      344.70 
-   invpend   1     true   false     true   8.7071e-08   0.0000e+00   2.2434e-08   -8.00      151      634.79 
-   invpend   2     true   false     true   8.8077e-08   0.0000e+00   2.2573e-08   -8.00      150      646.44 
-   invpend   3     true   false     true   8.7627e-08   0.0000e+00   2.2511e-08   -8.00      151      650.13 
-   invpend   1    false   false     true   8.7072e-08   1.6653e-16   2.2434e-08   -8.00      156      685.93 
-   invpend   2    false   false     true   8.8078e-08   1.1102e-16   2.2573e-08   -8.00      158      664.23 
-   invpend   3    false   false     true   8.7627e-08   1.6653e-16   2.2511e-08   -8.00      156      699.01 
+   invpend   1     true    true     true   1.0634e-08   0.0000e+00   1.0000e-08   -8.00      174      426.61 
+   invpend   2     true    true     true   1.0716e-08   0.0000e+00   1.0000e-08   -8.00      174      339.83 
+   invpend   3     true    true     true   1.0680e-08   0.0000e+00   1.0000e-08   -8.00      174      427.24 
+   invpend   1    false    true     true   1.0634e-08   1.1102e-16   1.0000e-08   -8.00      174      395.39 
+   invpend   2    false    true     true   1.0717e-08   1.6653e-16   1.0000e-08   -8.00      174      493.80 
+   invpend   3    false    true     true   1.0680e-08   1.1102e-16   1.0000e-08   -8.00      174      401.68 
+   invpend   1     true   false     true   8.7071e-08   0.0000e+00   2.2434e-08   -8.00      151      777.35 
+   invpend   2     true   false     true   8.8077e-08   0.0000e+00   2.2573e-08   -8.00      150      715.80 
+   invpend   3     true   false     true   8.7627e-08   0.0000e+00   2.2511e-08   -8.00      151      719.12 
+   invpend   1    false   false     true   8.7072e-08   1.6653e-16   2.2434e-08   -8.00      156      891.85 
+   invpend   2    false   false     true   8.8078e-08   1.1102e-16   2.2573e-08   -8.00      158      802.55 
+   invpend   3    false   false     true   8.7627e-08   1.6653e-16   2.2511e-08   -8.00      156      849.61 
 ---------------------------------------------------------------------------------------------------------------
    exper   trial   feas     qn    status     du_inf       pr_inf       cs_inf       μ    iterations  wall_time 
 ---------------------------------------------------------------------------------------------------------------
-       arm   1     true    true     true   4.8959e-09   0.0000e+00   8.0302e-08   -7.10      119      709.92 
-       arm   2     true    true     true   5.0818e-09   0.0000e+00   8.1139e-08   -7.09      117      727.17 
-       arm   3     true    true     true   5.1208e-09   0.0000e+00   8.1316e-08   -7.09      117      993.33 
-       arm   1    false    true     true   5.1662e-09   1.4144e-13   8.0301e-08   -7.10      140      950.37 
-       arm   2    false    true     true   5.3555e-09   1.4544e-13   8.1138e-08   -7.09      139      917.55 
-       arm   3    false    true     true   5.3952e-09   1.4633e-13   8.1315e-08   -7.09      139      909.79 
-       arm   1     true   false     true   7.5853e-09   0.0000e+00   9.1573e-08   -7.10       80      1365.23 
-       arm   2     true   false     true   8.0547e-09   0.0000e+00   9.2332e-08   -7.09       81      1331.45 
-       arm   3     true   false     true   8.1552e-09   0.0000e+00   9.2492e-08   -7.09       79      1391.94 
-       arm   1    false   false     true   5.7882e-09   7.5309e-09   9.1161e-08   -7.10      117      1940.29 
-       arm   2    false   false     true   6.2235e-09   7.7369e-09   9.1930e-08   -7.09      118      2037.50 
-       arm   3    false   false     true   6.3171e-09   7.7808e-09   9.2092e-08   -7.09      115      2041.25 
+       arm   1     true    true     true   4.8959e-09   0.0000e+00   8.0302e-08   -7.10      119      1263.57 
+       arm   2     true    true     true   5.0818e-09   0.0000e+00   8.1139e-08   -7.09      117      1109.51 
+       arm   3     true    true     true   5.1208e-09   0.0000e+00   8.1316e-08   -7.09      117      1400.99 
+       arm   1    false    true     true   5.1662e-09   1.4144e-13   8.0301e-08   -7.10      140      1431.48 
+       arm   2    false    true     true   5.3555e-09   1.4544e-13   8.1138e-08   -7.09      139      1455.91 
+       arm   3    false    true     true   5.3952e-09   1.4633e-13   8.1315e-08   -7.09      139      1387.34 
+       arm   1     true   false     true   7.5853e-09   0.0000e+00   9.1573e-08   -7.10       80      1315.44 
+       arm   2     true   false     true   8.0547e-09   0.0000e+00   9.2332e-08   -7.09       81      1468.40 
+       arm   3     true   false     true   8.1552e-09   0.0000e+00   9.2492e-08   -7.09       79      1449.09 
+       arm   1    false   false     true   5.7882e-09   7.5309e-09   9.1161e-08   -7.10      117      2032.56 
+       arm   2    false   false     true   6.2235e-09   7.7369e-09   9.1930e-08   -7.09      118      2181.85 
+       arm   3    false   false     true   6.3171e-09   7.7808e-09   9.2092e-08   -7.09      115      2082.10 
 ---------------------------------------------------------------------------------------------------------------
    exper   trial   feas     qn    status     du_inf       pr_inf       cs_inf       μ    iterations  wall_time 
 ---------------------------------------------------------------------------------------------------------------
-       car   1     true    true     true   8.9277e-08   0.0000e+00   4.4292e-08   -7.35      819      4720.86 
-       car   2     true    true    false   3.6306e-06   0.0000e+00   8.0675e-06   -5.09     1000      5595.56 
-       car   3     true    true    false   1.2976e-05   0.0000e+00   5.1511e-08   -7.29     1000      6017.00 
-       car   1    false    true     true   5.2515e-08   3.5527e-15   4.4292e-08   -7.35      638      4908.75 
-       car   2    false    true    false   2.5727e-06   5.3291e-15   8.0675e-06   -5.09     1000      7561.69 
-       car   3    false    true     true   9.1109e-08   1.0658e-14   5.1511e-08   -7.29      587      4220.16 
-       car   1     true   false     true   8.3325e-09   0.0000e+00   4.4455e-08   -7.35      223      4159.08 
-       car   2     true   false     true   8.5367e-09   0.0000e+00   4.6478e-08   -7.33      308      5805.71 
-       car   3     true   false     true   9.0422e-09   0.0000e+00   5.1683e-08   -7.29      323      6182.74 
-       car   1    false   false    false   1.1103e+00   8.8818e-16   2.8913e-04   -3.55       53      975.47 
-       car   2    false   false     true   8.5367e-09   7.1054e-15   4.6478e-08   -7.33      251      4121.93 
-       car   3    false   false    false   9.9238e-03   3.5527e-15   6.0641e-05   -4.22      275      5214.90 
+       car   1     true    true     true   8.9277e-08   0.0000e+00   4.4292e-08   -7.35      819      5430.35 
+       car   2     true    true    false   3.6306e-06   0.0000e+00   8.0675e-06   -5.09     1000      6636.84 
+       car   3     true    true    false   1.2976e-05   0.0000e+00   5.1511e-08   -7.29     1000      8170.16 
+       car   1    false    true     true   5.2515e-08   3.5527e-15   4.4292e-08   -7.35      638      6114.40 
+       car   2    false    true    false   2.5727e-06   5.3291e-15   8.0675e-06   -5.09     1000      8028.69 
+       car   3    false    true     true   9.1109e-08   1.0658e-14   5.1511e-08   -7.29      587      4882.19 
+       car   1     true   false     true   8.3325e-09   0.0000e+00   4.4455e-08   -7.35      223      3968.11 
+       car   2     true   false     true   8.5367e-09   0.0000e+00   4.6478e-08   -7.33      308      6117.03 
+       car   3     true   false     true   9.0422e-09   0.0000e+00   5.1683e-08   -7.29      323      6299.16 
+       car   1    false   false    false   1.1103e+00   8.8818e-16   2.8913e-04   -3.55       53      936.86 
+       car   2    false   false     true   8.5367e-09   7.1054e-15   4.6478e-08   -7.33      251      5144.39 
+       car   3    false   false    false   9.9238e-03   3.5527e-15   6.0641e-05   -4.22      275      5735.21 
 ---------------------------------------------------------------------------------------------------------------
    exper   trial   feas     qn    status     du_inf       pr_inf       cs_inf       μ    iterations  wall_time 
 ---------------------------------------------------------------------------------------------------------------
-    concar   1     true    true    false   4.2859e-06   0.0000e+00   2.2478e-07   -6.65     1000      2955.32 
-    concar   2     true    true     true   9.6962e-08   0.0000e+00   1.1002e-08   -7.96      780      2214.65 
-    concar   3     true    true    false   1.6159e-07   0.0000e+00   2.5492e-07   -6.59     1000      2788.17 
-    concar   1    false    true    false   3.0817e-06   1.4211e-14   2.2478e-07   -6.65     1000      2969.78 
-    concar   2    false    true     true   9.7656e-08   2.2737e-13   1.1002e-08   -7.96      898      2797.64 
-    concar   3    false    true    false   2.1331e-07   5.6843e-14   1.2237e-08   -7.91     1000      2886.62 
-    concar   1     true   false     true   5.7301e-10   0.0000e+00   1.0561e-08   -7.98      157      1546.82 
-    concar   2     true   false     true   4.4545e-08   0.0000e+00   1.1317e-08   -7.96      305      2440.81 
-    concar   3     true   false     true   8.8090e-08   0.0000e+00   1.2609e-08   -7.91      210      1706.92 
-    concar   1    false   false     true   6.9718e-08   2.2737e-13   1.0531e-08   -7.98      271      2357.19 
-    concar   2    false   false     true   7.0928e-08   5.6843e-14   1.1392e-08   -7.96      155      1261.27 
-    concar   3    false   false     true   9.1752e-08   8.8818e-15   1.2707e-08   -7.91      316      3205.29 
+    concar   1     true    true    false   4.2859e-06   0.0000e+00   2.2478e-07   -6.65     1000      3365.95 
+    concar   2     true    true     true   9.6962e-08   0.0000e+00   1.1002e-08   -7.96      780      2636.93 
+    concar   3     true    true    false   1.6159e-07   0.0000e+00   2.5492e-07   -6.59     1000      3208.03 
+    concar   1    false    true    false   3.0817e-06   1.4211e-14   2.2478e-07   -6.65     1000      3541.03 
+    concar   2    false    true     true   9.7656e-08   2.2737e-13   1.1002e-08   -7.96      898      3577.79 
+    concar   3    false    true    false   2.1331e-07   5.6843e-14   1.2237e-08   -7.91     1000      3630.64 
+    concar   1     true   false     true   5.7301e-10   0.0000e+00   1.0561e-08   -7.98      157      1462.30 
+    concar   2     true   false     true   4.4545e-08   0.0000e+00   1.1317e-08   -7.96      305      2296.84 
+    concar   3     true   false     true   8.8090e-08   0.0000e+00   1.2609e-08   -7.91      210      1719.79 
+    concar   1    false   false     true   6.9718e-08   2.2737e-13   1.0531e-08   -7.98      271      2128.39 
+    concar   2    false   false     true   7.0928e-08   5.6843e-14   1.1392e-08   -7.96      155      1314.67 
+    concar   3    false   false     true   9.1752e-08   8.8818e-15   1.2707e-08   -7.91      316      3170.78 
 ---------------------------------------------------------------------------------------------------------------
    exper   trial   feas     qn    status     du_inf       pr_inf       cs_inf       μ    iterations  wall_time 
 ---------------------------------------------------------------------------------------------------------------
-  unicycle   1    false    true     true   9.5637e-08   1.1693e-10   8.3950e-08   -7.08      475      1313.74 
-  unicycle   2    false    true     true   9.5451e-08   1.1646e-10   8.3950e-08   -7.08      469      1281.30 
-  unicycle   3    false    true     true   9.6194e-08   1.1824e-10   8.3950e-08   -7.08      473      1299.22 
-  unicycle   1    false    true     true   9.5637e-08   1.1693e-10   8.3950e-08   -7.08      475      1349.05 
-  unicycle   2    false    true     true   9.5451e-08   1.1646e-10   8.3950e-08   -7.08      469      1589.92 
-  unicycle   3    false    true     true   9.6194e-08   1.1824e-10   8.3950e-08   -7.08      473      1461.75 
-  unicycle   1    false   false    false   4.4807e-01   4.2323e+00   6.5120e-04   -3.40       20      129.05 
-  unicycle   2    false   false    false   4.9228e-01   4.3963e+00   6.6313e-04   -3.40       23      145.60 
-  unicycle   3    false   false    false   5.0806e-01   4.5275e+00   6.7201e-04   -3.40       22      124.97 
-  unicycle   1    false   false    false   4.4807e-01   4.2323e+00   6.5120e-04   -3.40       20      113.94 
-  unicycle   2    false   false    false   4.9228e-01   4.3963e+00   6.6313e-04   -3.40       23      122.85 
-  unicycle   3    false   false    false   5.0806e-01   4.5275e+00   6.7201e-04   -3.40       22      120.13 
+  unicycle   1    false    true     true   9.5637e-08   1.1693e-10   8.3950e-08   -7.08      475      1382.29 
+  unicycle   2    false    true     true   9.5451e-08   1.1646e-10   8.3950e-08   -7.08      469      1366.61 
+  unicycle   3    false    true     true   9.6194e-08   1.1824e-10   8.3950e-08   -7.08      473      1361.28 
+  unicycle   1    false    true     true   9.5637e-08   1.1693e-10   8.3950e-08   -7.08      475      1546.51 
+  unicycle   2    false    true     true   9.5451e-08   1.1646e-10   8.3950e-08   -7.08      469      1456.38 
+  unicycle   3    false    true     true   9.6194e-08   1.1824e-10   8.3950e-08   -7.08      473      1434.94 
+  unicycle   1    false   false    false   4.4807e-01   4.2323e+00   6.5120e-04   -3.40       20      93.17 
+  unicycle   2    false   false    false   4.9228e-01   4.3963e+00   6.6313e-04   -3.40       23      111.95 
+  unicycle   3    false   false    false   5.0806e-01   4.5275e+00   6.7201e-04   -3.40       22      110.06 
+  unicycle   1    false   false    false   4.4807e-01   4.2323e+00   6.5120e-04   -3.40       20      106.59 
+  unicycle   2    false   false    false   4.9228e-01   4.3963e+00   6.6313e-04   -3.40       23      122.10 
+  unicycle   3    false   false    false   5.0806e-01   4.5275e+00   6.7201e-04   -3.40       22      109.23 
 ---------------------------------------------------------------------------------------------------------------
    exper   trial   feas     qn    status     du_inf       pr_inf       cs_inf       μ    iterations  wall_time 
 ---------------------------------------------------------------------------------------------------------------
-  unicy_up   1    false    true    false   3.9107e+00   9.3387e+00   9.9199e-04   -3.36       10      47.78 
-  unicy_up   2    false    true    false   3.9063e+00   9.3384e+00   9.9205e-04   -3.36       10      46.38 
-  unicy_up   3    false    true    false   3.8954e+00   9.3381e+00   9.9206e-04   -3.36       10      46.75 
-  unicy_up   1    false    true    false   3.9107e+00   9.3387e+00   9.9199e-04   -3.36       10      46.18 
-  unicy_up   2    false    true    false   3.9063e+00   9.3384e+00   9.9205e-04   -3.36       10      44.14 
-  unicy_up   3    false    true    false   3.8954e+00   9.3381e+00   9.9206e-04   -3.36       10      44.93 
-  unicy_up   1    false   false    false   4.5292e+00   9.3637e+00   9.9345e-04   -3.36        9      68.64 
-  unicy_up   2    false   false    false   4.5798e+00   9.3609e+00   9.9312e-04   -3.36       10      75.52 
-  unicy_up   3    false   false    false   4.5579e+00   9.3563e+00   9.9311e-04   -3.36       10      83.53 
-  unicy_up   1    false   false    false   4.5292e+00   9.3637e+00   9.9345e-04   -3.36        9      69.60 
-  unicy_up   2    false   false    false   4.5798e+00   9.3609e+00   9.9312e-04   -3.36       10      70.39 
-  unicy_up   3    false   false    false   4.5579e+00   9.3563e+00   9.9311e-04   -3.36       10      81.71 
+  unicy_up   1    false    true    false   3.9107e+00   9.3387e+00   9.9199e-04   -3.36       10      38.90 
+  unicy_up   2    false    true    false   3.9063e+00   9.3384e+00   9.9205e-04   -3.36       10      39.36 
+  unicy_up   3    false    true    false   3.8954e+00   9.3381e+00   9.9206e-04   -3.36       10      59.24 
+  unicy_up   1    false    true    false   3.9107e+00   9.3387e+00   9.9199e-04   -3.36       10      39.41 
+  unicy_up   2    false    true    false   3.9063e+00   9.3384e+00   9.9205e-04   -3.36       10      39.22 
+  unicy_up   3    false    true    false   3.8954e+00   9.3381e+00   9.9206e-04   -3.36       10      39.29 
+  unicy_up   1    false   false    false   4.5292e+00   9.3637e+00   9.9345e-04   -3.36        9      56.83 
+  unicy_up   2    false   false    false   4.5798e+00   9.3609e+00   9.9312e-04   -3.36       10      69.45 
+  unicy_up   3    false   false    false   4.5579e+00   9.3563e+00   9.9311e-04   -3.36       10      73.59 
+  unicy_up   1    false   false    false   4.5292e+00   9.3637e+00   9.9345e-04   -3.36        9      64.97 
+  unicy_up   2    false   false    false   4.5798e+00   9.3609e+00   9.9312e-04   -3.36       10      65.06 
+  unicy_up   3    false   false    false   4.5579e+00   9.3563e+00   9.9311e-04   -3.36       10      64.19 
 ---------------------------------------------------------------------------------------------------------------
    exper   trial   feas     qn    status     du_inf       pr_inf       cs_inf       μ    iterations  wall_time 
 ---------------------------------------------------------------------------------------------------------------
-  uni_long   1    false    true     true   9.3594e-08   3.5323e-10   8.3985e-08   -7.08      492      2029.65 
-  uni_long   2    false    true     true   9.1583e-08   3.3807e-10   8.3984e-08   -7.08      494      1932.34 
-  uni_long   3    false    true     true   9.3653e-08   3.5352e-10   8.3984e-08   -7.08      470      1863.87 
-  uni_long   1    false    true     true   9.3594e-08   3.5323e-10   8.3985e-08   -7.08      492      1900.64 
-  uni_long   2    false    true     true   9.1583e-08   3.3807e-10   8.3984e-08   -7.08      494      1933.43 
-  uni_long   3    false    true     true   9.3653e-08   3.5352e-10   8.3984e-08   -7.08      470      1805.13 
-  uni_long   1    false   false    false   1.2121e+00   1.1424e+01   7.2107e-04   -3.40       19      172.66 
-  uni_long   2    false   false    false   1.2576e+00   1.1466e+01   7.2424e-04   -3.40       19      176.30 
-  uni_long   3    false   false    false   1.0431e+00   1.1436e+01   7.5042e-04   -3.40       17      164.77 
-  uni_long   1    false   false    false   1.2121e+00   1.1424e+01   7.2107e-04   -3.40       19      156.64 
-  uni_long   2    false   false    false   1.2576e+00   1.1466e+01   7.2424e-04   -3.40       19      187.95 
-  uni_long   3    false   false    false   1.0431e+00   1.1436e+01   7.5042e-04   -3.40       17      150.14 
+  uni_long   1    false    true     true   9.3594e-08   3.5323e-10   8.3985e-08   -7.08      492      1911.11 
+  uni_long   2    false    true     true   9.1583e-08   3.3807e-10   8.3984e-08   -7.08      494      1997.66 
+  uni_long   3    false    true     true   9.3653e-08   3.5352e-10   8.3984e-08   -7.08      470      1895.39 
+  uni_long   1    false    true     true   9.3594e-08   3.5323e-10   8.3985e-08   -7.08      492      2047.19 
+  uni_long   2    false    true     true   9.1583e-08   3.3807e-10   8.3984e-08   -7.08      494      2066.76 
+  uni_long   3    false    true     true   9.3653e-08   3.5352e-10   8.3984e-08   -7.08      470      1910.37 
+  uni_long   1    false   false    false   1.2121e+00   1.1424e+01   7.2107e-04   -3.40       19      152.27 
+  uni_long   2    false   false    false   1.2576e+00   1.1466e+01   7.2424e-04   -3.40       19      197.38 
+  uni_long   3    false   false    false   1.0431e+00   1.1436e+01   7.5042e-04   -3.40       17      153.31 
+  uni_long   1    false   false    false   1.2121e+00   1.1424e+01   7.2107e-04   -3.40       19      143.01 
+  uni_long   2    false   false    false   1.2576e+00   1.1466e+01   7.2424e-04   -3.40       19      154.67 
+  uni_long   3    false   false    false   1.0431e+00   1.1436e+01   7.5042e-04   -3.40       17      149.40 
 ---------------------------------------------------------------------------------------------------------------
    exper   trial   feas     qn    status     du_inf       pr_inf       cs_inf       μ    iterations  wall_time 
 ---------------------------------------------------------------------------------------------------------------
-  cartpole   1     true    true     true   9.7788e-08   0.0000e+00   5.2770e-08   -7.28      642      308.89 
-  cartpole   2     true    true     true   9.5085e-08   0.0000e+00   7.6015e-08   -7.12      585      313.65 
-  cartpole   3     true    true     true   8.6061e-08   0.0000e+00   5.4017e-08   -7.27      618      306.38 
-  cartpole   1    false    true    false   1.4433e+00   1.4211e-14   3.8660e-02   -1.41       82      41.51 
-  cartpole   2    false    true    false   7.7442e-01   1.4211e-14   4.7427e-02   -1.32       84      35.82 
-  cartpole   3    false    true    false   6.0259e-04   1.4211e-14   6.2272e-05   -4.21      313      143.11 
-  cartpole   1     true   false     true   5.4516e-09   0.0000e+00   5.9463e-08   -7.28       68      282.42 
-  cartpole   2     true   false     true   9.8625e-09   0.0000e+00   8.8121e-08   -7.12       70      287.74 
-  cartpole   3     true   false     true   5.6629e-09   0.0000e+00   6.0969e-08   -7.27       71      278.07 
-  cartpole   1    false   false     true   5.4511e-09   4.2633e-14   5.9463e-08   -7.28       75      336.51 
-  cartpole   2    false   false     true   9.8614e-09   1.4211e-14   8.8121e-08   -7.12       69      327.69 
-  cartpole   3    false   false     true   5.6628e-09   2.8422e-14   6.0969e-08   -7.27       71      323.12 
+  cartpole   1     true    true     true   9.7788e-08   0.0000e+00   5.2770e-08   -7.28      642      355.01 
+  cartpole   2     true    true     true   9.5085e-08   0.0000e+00   7.6015e-08   -7.12      585      253.49 
+  cartpole   3     true    true     true   8.6061e-08   0.0000e+00   5.4017e-08   -7.27      618      283.32 
+  cartpole   1    false    true    false   1.4433e+00   1.4211e-14   3.8660e-02   -1.41       82      50.86 
+  cartpole   2    false    true    false   7.7442e-01   1.4211e-14   4.7427e-02   -1.32       84      39.89 
+  cartpole   3    false    true    false   6.0259e-04   1.4211e-14   6.2272e-05   -4.21      313      142.96 
+  cartpole   1     true   false     true   5.4516e-09   0.0000e+00   5.9463e-08   -7.28       68      262.08 
+  cartpole   2     true   false     true   9.8625e-09   0.0000e+00   8.8121e-08   -7.12       70      267.61 
+  cartpole   3     true   false     true   5.6629e-09   0.0000e+00   6.0969e-08   -7.27       71      295.01 
+  cartpole   1    false   false     true   5.4511e-09   4.2633e-14   5.9463e-08   -7.28       75      300.06 
+  cartpole   2    false   false     true   9.8614e-09   1.4211e-14   8.8121e-08   -7.12       69      265.19 
+  cartpole   3    false   false     true   5.6628e-09   2.8422e-14   6.0969e-08   -7.27       71      268.44 
 ---------------------------------------------------------------------------------------------------------------
    exper   trial   feas     qn    status     du_inf       pr_inf       cs_inf       μ    iterations  wall_time 
 ---------------------------------------------------------------------------------------------------------------
-   acrobot   1     true    true     true   9.7382e-08   0.0000e+00   1.6716e-08   -7.78      189      408.74 
-   acrobot   2     true    true     true   1.5858e-08   0.0000e+00   1.2280e-08   -7.91       58      115.30 
-   acrobot   3     true    true     true   9.3458e-08   0.0000e+00   1.5731e-08   -7.80      188      406.82 
-   acrobot   1    false    true     true   6.1038e-08   3.5527e-15   1.6716e-08   -7.78      180      425.93 
-   acrobot   2    false    true     true   9.4186e-09   3.5527e-15   1.2280e-08   -7.91      183      380.18 
-   acrobot   3    false    true     true   4.2506e-08   3.5527e-15   1.5731e-08   -7.80      190      430.63 
-   acrobot   1     true   false     true   2.4357e-10   0.0000e+00   1.6727e-08   -7.78       33      776.32 
-   acrobot   2     true   false     true   7.8147e-11   0.0000e+00   1.2282e-08   -7.91       40      962.84 
-   acrobot   3     true   false     true   1.2248e-10   0.0000e+00   1.5733e-08   -7.80       45      1241.39 
-   acrobot   1    false   false     true   7.5392e-08   3.5527e-15   1.6734e-08   -7.78       57      1467.67 
-   acrobot   2    false   false     true   7.9517e-11   3.5527e-15   1.2282e-08   -7.91       35      820.10 
-   acrobot   3    false   false     true   6.2747e-08   3.5527e-15   1.5747e-08   -7.80       69      1774.81 
+   acrobot   1     true    true     true   9.7382e-08   0.0000e+00   1.6716e-08   -7.78      189      329.95 
+   acrobot   2     true    true     true   1.5858e-08   0.0000e+00   1.2280e-08   -7.91       58      101.35 
+   acrobot   3     true    true     true   9.3458e-08   0.0000e+00   1.5731e-08   -7.80      188      345.70 
+   acrobot   1    false    true     true   6.1038e-08   3.5527e-15   1.6716e-08   -7.78      180      330.45 
+   acrobot   2    false    true     true   9.4186e-09   3.5527e-15   1.2280e-08   -7.91      183      316.93 
+   acrobot   3    false    true     true   4.2506e-08   3.5527e-15   1.5731e-08   -7.80      190      349.13 
+   acrobot   1     true   false     true   2.4357e-10   0.0000e+00   1.6727e-08   -7.78       33      924.92 
+   acrobot   2     true   false     true   7.8147e-11   0.0000e+00   1.2282e-08   -7.91       40      1138.37 
+   acrobot   3     true   false     true   1.2248e-10   0.0000e+00   1.5733e-08   -7.80       45      1323.63 
+   acrobot   1    false   false     true   7.5392e-08   3.5527e-15   1.6734e-08   -7.78       57      1541.53 
+   acrobot   2    false   false     true   7.9517e-11   3.5527e-15   1.2282e-08   -7.91       35      985.47 
+   acrobot   3    false   false     true   6.2747e-08   3.5527e-15   1.5747e-08   -7.80       69      1959.20 
 --------------------------------------------------------------------------------------------------------------

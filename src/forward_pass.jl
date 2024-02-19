@@ -19,48 +19,38 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
             data.l += 1
             continue
         end
-        # constraint!(constr_data, problem.states, problem.actions, problem.parameters)
         constraint!(problem, mode=:current)
-
-        Δφ = expected_decrease_barrier_obj(policy, problem, data.μ, options.feasible)
-        min_step_size == -Inf && (min_step_size = estimate_min_step_size(Δφ, data, options))
         
         data.status = check_fraction_boundary(constr_data, τ, options.feasible)
         !data.status && (data.step_size *= 0.5, data.l += 1, continue)
+
+        if min_step_size == -Inf
+            Δφ = expected_decrease_barrier_obj(policy, problem, data.μ, options.feasible)
+            min_step_size = estimate_min_step_size(Δφ, data, options)
+        end
         
-        # 1-norm of constraint violation of proposed step for filter (infeasible IPDDP only)
-        θ = options.feasible ? 0. : constraint_violation_1norm(constr_data, mode=:current)  
-        θ_prev = data.primal_1_curr
-        
-        # evaluate objective function of barrier problem to assess quality of iterate
+        # used for sufficient decrease from current iterate step acceptance criterion
+        θ = options.feasible ? 0. : constraint_violation_1norm(constr_data, mode=:current)
         φ = barrier_objective!(problem, data, options.feasible, mode=:current)
+        θ_prev = data.primal_1_curr
         φ_prev = data.barrier_obj_curr
         
-        # check acceptability to filter A-5.4 IPOPT  # TODO: simplify
-        for pt in data.filter
-            if θ >= pt[1] && φ >= pt[2]  # violation should stay 0. for fesible IPDDP
-                data.status = false
-                break
-            end
-        end
+        # check acceptability to filter
+        data.status = !any(x -> all([θ, φ] .>= x), data.filter)
         !data.status && (data.step_size *= 0.5, data.l += 1, continue)  # failed, reduce step size
         
-        # additional checks for validity, e.g., switching condition + armijo or sufficient improvement w.r.t. filter
-        # NOTE: if feasible, constraint violation not considered. just check armijo condition to accept trial point
-        # TODO: separate into function
+        # check for sufficient decrease conditions for the barrier objective/constraint violation
         data.switching = (Δφ < 0.0) && 
-            ((-Δφ) ^ options.s_φ * α > options.δ * θ_prev ^ options.s_θ)  # TODO: rename primal_1_curr to θ here
-        # for armijo condition, add adjustment to account for round-off error
+            ((-Δφ) ^ options.s_φ * α > options.δ * θ_prev ^ options.s_θ)
         data.armijo_passed = φ - φ_prev - 10. * eps(Float64) * abs(φ_prev) <= options.η_φ * α * Δφ
         if (θ <= data.min_primal_1) && data.switching
-            data.status = data.armijo_passed
+            data.status = data.armijo_passed  #  sufficient decrease of barrier objective
         else
-            # sufficient progress conditions
             suff = !options.feasible ? (θ <= (1. - options.γ_θ) * θ_prev) : false
             suff = suff || (φ <= φ_prev - options.γ_φ * θ_prev)
             !suff && (data.status = false)
         end
-        !data.status && (data.step_size *= 0.5, data.l += 1, continue)  # failed, reduce step Size
+        !data.status && (data.step_size *= 0.5, data.l += 1, continue)  # failed, reduce step size
         
         data.barrier_obj_next = φ
         data.primal_1_next = θ
@@ -74,15 +64,10 @@ function check_fraction_boundary(constr_data::ConstraintsData, τ::Float64, feas
     N = length(constraints)
     c̄, s̄, ȳ = dual_trajectories(constr_data, mode=:nominal)
     c, s, y = dual_trajectories(constr_data, mode=:current)
-    # TODO: replace with any
-    for k = 1:N
-        for i = constr_data.constraints[k].indices_inequality
-            fail = s[k][i] < (1. - τ) *  s̄[k][i]
-            fail = fail || (feasible ? c[k][i] > (1. - τ) *  c̄[k][i] : y[k][i] < (1. - τ) *  ȳ[k][i])
-            fail && return false
-        end
-    end
-    return true
+    check_feasible = k -> any(s[k] .< (1. - τ) .*  s̄[k]) || any(c[k] .> (1. - τ) .*  c̄[k])
+    check_infeasible = k -> any(s[k] .< (1. - τ) .*  s̄[k]) || any(y[k] .< (1. - τ) .*  ȳ[k])
+    check_fn = feasible ? check_feasible : check_infeasible
+    return !any(check_fn, 1:N)
 end
 
 function estimate_min_step_size(Δφ::Float64, data::SolverData, options::Options)
@@ -141,8 +126,10 @@ function expected_decrease_barrier_obj(policy::PolicyData, problem::ProblemData,
             policy.x_tmp[k] .= lx[k]
             mul!(policy.x_tmp[k], fx[k]', policy.x_tmp[k+1], 1.0, 1.0)
             # TODO: infeasible needs to account for slack variables
+            policy.s_tmp[k] .= -1.0 ./ y[k]
         end
         Δφ += dot(policy.u_tmp[k], policy.ku[k])
+        # Δφ += dot(policy.s_tmp[k], policy.ky[k])
     end
     return Δφ
 end
