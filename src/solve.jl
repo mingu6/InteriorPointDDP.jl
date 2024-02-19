@@ -41,7 +41,7 @@ function ipddp_solve!(solver::Solver)
     data.min_primal_1 = !options.feasible ? 1e-4 * max(1.0, data.primal_1_curr) : 0.0
     reset_filter!(data, options)
 
-    while data.k <= options.max_iterations
+    while data.k < options.max_iterations
         iter_time = @elapsed begin
             gradients!(problem, mode=:nominal)
             
@@ -65,25 +65,7 @@ function ipddp_solve!(solver::Solver)
                 continue
             end
             
-            # logging TODO: separate into function and change things printed
-            if options.verbose && data.k % 10 == 0
-                println("")
-                println(rpad("Iteration", 15), rpad("Time (s)", 15), rpad("Perturb. (μ)", 15), rpad("Cost", 15), rpad("Constr. Viol.", 15), 
-                        rpad("Barrier Obj.", 15), rpad("Opt. Err.", 15), rpad("BP Reg.", 13), rpad("Step Size", 15))
-            end
-            if options.verbose
-                println(
-                    rpad(string(data.k), 15), 
-                    rpad(@sprintf("%.5e", data.wall_time), 15), 
-                    rpad(@sprintf("%.5e", data.μ), 15), 
-                    rpad(@sprintf("%.5e", data.objective), 15), 
-                    rpad(@sprintf("%.5e", data.primal_1_curr), 15), 
-                    rpad(@sprintf("%.5e", data.barrier_obj_curr), 15), 
-                    rpad(@sprintf("%.5e", opt_err_0), 15), 
-                    rpad(@sprintf("%.3e", data.ϕ_last), 13), 
-                    rpad(@sprintf("%.5e", data.step_size), 15)
-                )            
-            end
+            options.verbose && iteration_status(data, options)
             
             backward_pass!(policy, problem, data, options, mode=:nominal, verbose=options.verbose)
             !data.status && break
@@ -93,22 +75,7 @@ function ipddp_solve!(solver::Solver)
             
             rescale_duals!(constr_data, data.μ, options)
             update_nominal_trajectory!(problem, options.feasible)
-            
-            # check if filter should be augmented using accepted point TODO: move to function
-            if !data.armijo_passed || !data.switching
-                new_filter_pt = [(1. - options.γ_θ) * data.primal_1_curr,
-                                 data.barrier_obj_curr - options.γ_φ * data.primal_1_curr]
-                # update filter by replacing existing point or adding new point  # TODO: simplify
-                filter_sz = length(data.filter)
-                ind_replace_filter = 0
-                for i in 1:filter_sz
-                    if new_filter_pt[1] <= data.filter[i][1] && new_filter_pt[2] <= data.filter[i][2]
-                        ind_replace_filter = i
-                        break
-                    end
-                end
-                ind_replace_filter == 0 ? push!(data.filter, new_filter_pt) : data.filter[ind_replace_filter] = new_filter_pt
-            end
+            update_filter!(data, options)
             data.barrier_obj_curr = data.barrier_obj_next
             data.primal_1_curr = data.primal_1_next
         end
@@ -116,18 +83,27 @@ function ipddp_solve!(solver::Solver)
         data.k += 1
         data.wall_time += iter_time
     end
-    # print iteration if opt err reached, ie data.statu = true
-    # if max iter reached, data.status = false
-    # don't increment to max + 1 if max iters
+    
+    options.verbose && iteration_status(data, options)
+    if data.k == options.max_iterations 
+        data.status = false
+        options.verbose && @warn "Maximum solver iterations reached."
+    end
+    
     return nothing
 end
 
-function reset_filter!(data::SolverData, options::Options) 
-    if !options.feasible
-        data.filter = [[data.max_primal_1, -Inf]]
-    else
-        data.filter = [[0.0, Inf]]
+function update_filter!(data::SolverData, options::Options)
+    if !data.armijo_passed || !data.switching
+        new_filter_pt = [(1. - options.γ_θ) * data.primal_1_curr,
+                         data.barrier_obj_curr - options.γ_φ * data.primal_1_curr]
+        push!(data.filter, new_filter_pt)
     end
+end
+
+function reset_filter!(data::SolverData, options::Options)
+    empty!(data.filter)
+    options.feasible ? push!(data.filter, [0.0, Inf]) : push!(data.filter, [data.max_primal_1, -Inf])
     data.status = true
 end
 
@@ -174,8 +150,7 @@ function optimality_error(policy::PolicyData, problem::ProblemData, options::Opt
         s_norm += norm(s[k], 1)
     end
     
-    num_constraints = convert(Float64, sum([length(ct) for ct in c])) # TODO: use existing, streamline
-    scaling = max(options.s_max, s_norm / max(num_constraints, 1.0))  / options.s_max
+    scaling = max(options.s_max, s_norm / max(constr_data.num_ineq[1], 1.0))  / options.s_max
     return dual_inf / scaling, primal_inf, cs_inf / scaling
 end
 

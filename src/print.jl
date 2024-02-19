@@ -16,31 +16,19 @@ function solver_info()
 end
 
 function iteration_status(
-    total_iterations,
-    outer_iterations,
-    inner_iterations,
-    residual_violation,
-    constraint_violation,
-    penalty,
-    step_size,
-    print_frequency,
+    data::SolverData,
+    options::Options
     )
 
     # header
-    if rem(total_iterations - 1, print_frequency) == 0
-        @printf "------------------------------------------------------------------------------------------------\n"
-        @printf "total  outer  inner |residual| |constraint|   penalty   step  \n"
-        @printf "------------------------------------------------------------------------------------------------\n"
+    if rem(data.k, options.print_frequency) == 0
+        @printf "  iter   objective      pr_inf       du_inf       cs_inf     lg(μ)   lg(ϕ)    alpha     ls   wall_time \n"
     end
     
 
     # iteration information
-    @printf("%3d     %2d    %3d   %9.2e  %9.2e   %9.2e   %9.2e \n",
-        total_iterations,
-        outer_iterations,
-        inner_iterations,
-        residual_violation,
-        equality_violation,
-        penalty,
-        step_size)
+    @printf(" %5s   %.4e   %.4e   %.4e   %.4e   % 1.2f  %5s   %.4e  %2s   %5.2f \n",
+        data.k, data.objective, data.primal_inf, data.dual_inf, data.cs_inf,
+        log10(data.μ), data.ϕ_last == 0.0 ? "-" : @sprintf("% 2.2f", log10(data.ϕ_last)),
+        data.step_size, data.l, data.wall_time * 1000)
 end

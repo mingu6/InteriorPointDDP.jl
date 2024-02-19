@@ -74,6 +74,7 @@ function check_fraction_boundary(constr_data::ConstraintsData, τ::Float64, feas
     N = length(constraints)
     c̄, s̄, ȳ = dual_trajectories(constr_data, mode=:nominal)
     c, s, y = dual_trajectories(constr_data, mode=:current)
+    # TODO: replace with any
     for k = 1:N
         for i = constr_data.constraints[k].indices_inequality
             fail = s[k][i] < (1. - τ) *  s̄[k][i]
@@ -102,7 +103,7 @@ function estimate_min_step_size(Δφ::Float64, data::SolverData, options::Option
         min_step_size = γ_θ
     end
     min_step_size *= γ_α
-    min_step_size = max(min_step_size, eps(Float64))  # machine eps lower bound
+    min_step_size = max(min_step_size, eps(Float64))
     return min_step_size
 end
 

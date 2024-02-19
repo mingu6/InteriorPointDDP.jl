@@ -5,6 +5,7 @@ Base.@kwdef mutable struct Options{T}
     max_iterations::Int = 1000
     reset_cache::Bool = true
     verbose = false
+    print_frequency = 10
     
     μ_init::Float64 = 0.1                # multiplier on barrier parameter initialisation
     ineq_dual_init::Float64 = 0.1        # dual variable initialisation value TODO: change name
