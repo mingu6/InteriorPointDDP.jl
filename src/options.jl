@@ -8,7 +8,7 @@ Base.@kwdef mutable struct Options{T}
     print_frequency = 10
     
     μ_init::Float64 = 0.1                # multiplier on barrier parameter initialisation
-    ineq_dual_init::Float64 = 0.1        # dual variable initialisation value TODO: change name
+    ineq_dual_init::Float64 = 1.0        # dual variable initialisation value TODO: change name
     slack_init::Float64 = 0.01           # slack variable initialisation value
     
     reg_state::Bool = false              # apply regularisation to V̂xx instead of Q̂uu (Tassa)
@@ -25,7 +25,7 @@ Base.@kwdef mutable struct Options{T}
     τ_min::Float64 = 0.99                # lower bound on fraction-to-boundary parameter
     
     s_max::Float64 = 100.0               # scaling threshold for NLP error
-    η_φ::Float64 = 1e-8                  # relaxation factor in the armijo condition
+    η_φ::Float64 = 1e-4                  # relaxation factor in the armijo condition
     s_φ::Float64 = 2.3                   # exponent for linear barrier function model in switching rule
     δ::Float64 = 1.0                     # multiplier for constraint violation in the switching rule
     s_θ::Float64 = 1.1                   # exponent for current constraint violation in the switching rule

@@ -95,6 +95,7 @@ end
 function expected_decrease_barrier_obj(policy::PolicyData, problem::ProblemData, μ::Float64, feasible::Bool)
     Δφ = 0.0  # expected barrier cost decrease
     N = problem.horizon
+    Qu = policy.action_value.gradient_action
     
     constr_data = problem.constraints
     g = constr_data.nominal_inequalities
@@ -125,11 +126,10 @@ function expected_decrease_barrier_obj(policy::PolicyData, problem::ProblemData,
             mul!(policy.u_tmp[k], fu[k]', policy.x_tmp[k+1], 1.0, 1.0)
             policy.x_tmp[k] .= lx[k]
             mul!(policy.x_tmp[k], fx[k]', policy.x_tmp[k+1], 1.0, 1.0)
-            # TODO: infeasible needs to account for slack variables
-            policy.s_tmp[k] .= -1.0 ./ y[k]
+            policy.s_tmp[k] .= -μ ./ y[k]
+            Δφ += dot(policy.s_tmp[k], policy.ky[k])
         end
         Δφ += dot(policy.u_tmp[k], policy.ku[k])
-        # Δφ += dot(policy.s_tmp[k], policy.ky[k])
     end
     return Δφ
 end
