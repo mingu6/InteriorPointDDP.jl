@@ -1,14 +1,13 @@
 function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverData, options::Options; verbose=false)
+    constr_data = problem.constraints
+    
+    data.l = 0  # line search iteration counter
     data.status = true
     data.step_size = 1.0
-    constr_data = problem.constraints
-    l = 0  # line search iteration counter
     min_step_size = -Inf
-
+    Δφ = 0.0
     μ = data.μ
     τ = max(options.τ_min, 1.0 - μ)
-    
-    Δφ = 0.0
 
     while data.step_size >= min_step_size # check whether we still want it to be this
         α = data.step_size
@@ -17,7 +16,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         catch
             # reduces step size if NaN or Inf encountered
             data.step_size *= 0.5
-            l += 1
+            data.l += 1
             continue
         end
         # constraint!(constr_data, problem.states, problem.actions, problem.parameters)
@@ -27,7 +26,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         min_step_size == -Inf && (min_step_size = estimate_min_step_size(Δφ, data, options))
         
         data.status = check_fraction_boundary(constr_data, τ, options.feasible)
-        !data.status && (data.step_size *= 0.5, l += 1, continue)
+        !data.status && (data.step_size *= 0.5, data.l += 1, continue)
         
         # 1-norm of constraint violation of proposed step for filter (infeasible IPDDP only)
         θ = options.feasible ? 0. : constraint_violation_1norm(constr_data, mode=:current)  
@@ -44,7 +43,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
                 break
             end
         end
-        !data.status && (data.step_size *= 0.5, l += 1, continue)  # failed, reduce step size
+        !data.status && (data.step_size *= 0.5, data.l += 1, continue)  # failed, reduce step size
         
         # additional checks for validity, e.g., switching condition + armijo or sufficient improvement w.r.t. filter
         # NOTE: if feasible, constraint violation not considered. just check armijo condition to accept trial point
@@ -61,7 +60,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
             suff = suff || (φ <= φ_prev - options.γ_φ * θ_prev)
             !suff && (data.status = false)
         end
-        !data.status && (data.step_size *= 0.5, l += 1, continue)  # failed, reduce step Size
+        !data.status && (data.step_size *= 0.5, data.l += 1, continue)  # failed, reduce step Size
         
         data.barrier_obj_next = φ
         data.primal_1_next = θ
@@ -73,12 +72,8 @@ end
 function check_fraction_boundary(constr_data::ConstraintsData, τ::Float64, feasible::Bool)
     constraints = constr_data.constraints
     N = length(constraints)
-    c = constr_data.inequalities
-    s = constr_data.ineq_duals
-    y = constr_data.slacks
-    c̄ = constr_data.nominal_inequalities
-    s̄ = constr_data.nominal_ineq_duals
-    ȳ = constr_data.nominal_slacks
+    c̄, s̄, ȳ = dual_trajectories(constr_data, mode=:nominal)
+    c, s, y = dual_trajectories(constr_data, mode=:current)
     for k = 1:N
         for i = constr_data.constraints[k].indices_inequality
             fail = s[k][i] < (1. - τ) *  s̄[k][i]

@@ -32,6 +32,7 @@ function iteration_status(
         @printf "total  outer  inner |residual| |constraint|   penalty   step  \n"
         @printf "------------------------------------------------------------------------------------------------\n"
     end
+    
 
     # iteration information
     @printf("%3d     %2d    %3d   %9.2e  %9.2e   %9.2e   %9.2e \n",

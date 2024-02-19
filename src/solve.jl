@@ -50,6 +50,8 @@ function ipddp_solve!(solver::Solver)
             opt_err_0 = max(data.dual_inf, data.cs_inf)
             !options.feasible && (opt_err_0 = max(opt_err_0, data.primal_inf))
             
+            opt_err_0 <= options.optimality_tolerance && break
+            
             # check (inner) barrier problem convergence and update barrier parameter if so
             dual_inf_μ, primal_inf_μ, cs_inf_μ = optimality_error(policy, problem, options, data.μ, mode=:nominal)
             opt_err_μ = max(dual_inf_μ, cs_inf_μ)
@@ -83,8 +85,6 @@ function ipddp_solve!(solver::Solver)
                 )            
             end
             
-            opt_err_0 <= options.optimality_tolerance && break  # TODO: verbose and terminate max iters???
-            
             backward_pass!(policy, problem, data, options, mode=:nominal, verbose=options.verbose)
             !data.status && break
             
@@ -112,10 +112,13 @@ function ipddp_solve!(solver::Solver)
             data.barrier_obj_curr = data.barrier_obj_next
             data.primal_1_curr = data.primal_1_next
         end
-
+        
         data.k += 1
         data.wall_time += iter_time
     end
+    # print iteration if opt err reached, ie data.statu = true
+    # if max iter reached, data.status = false
+    # don't increment to max + 1 if max iters
     return nothing
 end
 
@@ -171,7 +174,7 @@ function optimality_error(policy::PolicyData, problem::ProblemData, options::Opt
         s_norm += norm(s[k], 1)
     end
     
-    num_constraints = convert(Float64, sum([length(ct) for ct in c]))
+    num_constraints = convert(Float64, sum([length(ct) for ct in c])) # TODO: use existing, streamline
     scaling = max(options.s_max, s_norm / max(num_constraints, 1.0))  / options.s_max
     return dual_inf / scaling, primal_inf, cs_inf / scaling
 end
