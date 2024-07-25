@@ -25,7 +25,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         !data.status && (data.step_size *= 0.5, data.l += 1, continue)
 
         if min_step_size == -Inf
-            Δφ = expected_decrease_barrier_obj(policy, problem, data.μ, options.feasible)
+            Δφ = expected_decrease_cost(policy, problem, data.step_size)
             min_step_size = estimate_min_step_size(Δφ, data, options)
         end
         
@@ -94,44 +94,15 @@ function estimate_min_step_size(Δφ::Float64, data::SolverData, options::Option
     return min_step_size
 end
 
-function expected_decrease_barrier_obj(policy::PolicyData, problem::ProblemData, μ::Float64, feasible::Bool)
+function expected_decrease_cost(policy::PolicyData, problem::ProblemData, step_size::Float64)
     Δφ = 0.0  # expected barrier cost decrease
     N = problem.horizon
     Qu = policy.action_value.gradient_action
-    
-    # constr_data = problem.constraints
-    # g = constr_data.nominal_inequalities
-    # y = constr_data.nominal_slacks
-    
-    # # Jacobians of system dynamics
-    # fx = problem.model.jacobian_state
-    # fu = problem.model.jacobian_action
-    # # Jacobian of inequality constraints 
-    # gx = constr_data.jacobian_state
-    # gu = constr_data.jacobian_action
-    # # Cost gradients
-    # lx = problem.costs.gradient_state
-    # lu = problem.costs.gradient_action
-    
-    # policy.x_tmp[N] .= lx[N]
+    Quu = policy.action_value.hessian_action_action
     
     for k = N-1:-1:1
-        # if feasible
-        #     policy.u_tmp[k] .= lu[k]
-        #     mul!(policy.u_tmp[k], gu[k]', 1.0 ./ g[k], -μ, 1.0)
-        #     mul!(policy.u_tmp[k], fu[k]', policy.x_tmp[k+1], 1.0, 1.0)
-        #     policy.x_tmp[k] .= lx[k]
-        #     mul!(policy.x_tmp[k], gx[k]', 1.0 ./ g[k], -μ, 1.0)
-        #     mul!(policy.x_tmp[k], fx[k]', policy.x_tmp[k+1], 1.0, 1.0)
-        # else
-        #     policy.u_tmp[k] .= lu[k]
-        #     mul!(policy.u_tmp[k], fu[k]', policy.x_tmp[k+1], 1.0, 1.0)
-        #     policy.x_tmp[k] .= lx[k]
-        #     mul!(policy.x_tmp[k], fx[k]', policy.x_tmp[k+1], 1.0, 1.0)
-        #     policy.s_tmp[k] .= -μ ./ y[k]
-        #     # Δφ += dot(policy.s_tmp[k], policy.ky[k])
-        # end
         Δφ += dot(Qu[k], policy.ku[k])
+        Δφ += step_size * dot(policy.ku[k], Quu[k], policy.ku[k])
     end
     return Δφ
 end
