@@ -25,8 +25,9 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         !data.status && (data.step_size *= 0.5, data.l += 1, continue)
 
         if min_step_size == -Inf
-            Δφ = expected_decrease_cost(policy, problem, data.step_size)
-            min_step_size = estimate_min_step_size(Δφ, data, options)
+            Δφ_L, Δφ_Q = expected_decrease_cost(policy, problem, data.step_size)
+            min_step_size = estimate_min_step_size(Δφ_L, data, options)
+            Δφ = Δφ_L + Δφ_Q
         end
         
         # used for sufficient decrease from current iterate step acceptance criterion
@@ -70,40 +71,39 @@ function check_fraction_boundary(constr_data::ConstraintsData, τ::Float64, feas
     return !any(check_fn, 1:N)
 end
 
-function estimate_min_step_size(Δφ::Float64, data::SolverData, options::Options)
-    # # compute minimum step size based on linear models of step acceptance conditions
-    # TODO: uncomment and use when feasibility restoration is done
-    # θ_min = data.min_primal_1
-    # θ = data.primal_1_curr
-    # γ_θ = options.γ_θ
-    # γ_α = options.γ_α
-    # γ_φ = options.γ_φ
-    # s_θ = options.s_θ
-    # s_φ = options.s_φ
-    # δ = options.δ
-    # if Δφ < 0.0 && θ <= θ_min
-    #     min_step_size = min(γ_θ, -γ_φ * θ / Δφ, δ * θ ^ s_θ / (-Δφ) ^ s_φ)
-    # elseif Δφ < 0.0 && θ > θ_min
-    #     min_step_size = min(γ_θ, -γ_φ * θ / Δφ)
-    # else
-    #     min_step_size = γ_θ
-    # end
-    # min_step_size *= γ_α
-    # min_step_size = max(min_step_size, eps(Float64))
-    min_step_size = eps(Float64)
+function estimate_min_step_size(Δφ_L::Float64, data::SolverData, options::Options)
+    # compute minimum step size based on linear models of step acceptance conditions
+    θ_min = data.min_primal_1
+    θ = data.primal_1_curr
+    γ_θ = options.γ_θ
+    γ_α = options.γ_α
+    γ_φ = options.γ_φ
+    s_θ = options.s_θ
+    s_φ = options.s_φ
+    δ = options.δ
+    if Δφ_L < 0.0 && θ <= θ_min
+        min_step_size = min(γ_θ, -γ_φ * θ / Δφ_L, δ * θ ^ s_θ / (-Δφ_L) ^ s_φ)
+    elseif Δφ_L < 0.0 && θ > θ_min
+        min_step_size = min(γ_θ, -γ_φ * θ / Δφ_L)
+    else
+        min_step_size = γ_θ
+    end
+    min_step_size *= γ_α
+    min_step_size = max(min_step_size, eps(Float64))
     return min_step_size
 end
 
 function expected_decrease_cost(policy::PolicyData, problem::ProblemData, step_size::Float64)
-    Δφ = 0.0  # expected barrier cost decrease
+    Δφ_L = 0.0
+    Δφ_Q = 0.0
     N = problem.horizon
     Qu = policy.action_value.gradient_action
     Quu = policy.action_value.hessian_action_action
     
     for k = N-1:-1:1
-        Δφ += dot(Qu[k], policy.ku[k])
-        Δφ += step_size * 0.5 * dot(policy.ku[k], Quu[k], policy.ku[k])
+        Δφ_L += dot(Qu[k], policy.ku[k])
+        Δφ_Q += 0.5 * dot(policy.ku[k], Quu[k], policy.ku[k])
     end
-    return Δφ * step_size
+    return Δφ_L * step_size, Δφ_Q * step_size^2
 end
 
