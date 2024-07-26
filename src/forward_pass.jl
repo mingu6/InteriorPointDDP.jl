@@ -41,8 +41,8 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         
         # check for sufficient decrease conditions for the barrier objective/constraint violation
         data.switching = (Δφ < 0.0) && 
-            ((-Δφ) ^ options.s_φ * α > options.δ * θ_prev ^ options.s_θ)
-        data.armijo_passed = φ - φ_prev - 10. * eps(Float64) * abs(φ_prev) <= options.η_φ * α * Δφ
+            ((-Δφ) ^ options.s_φ * α^(1-options.s_φ)  > options.δ * θ_prev ^ options.s_θ)
+        data.armijo_passed = φ - φ_prev - 10. * eps(Float64) * abs(φ_prev) <= options.η_φ * Δφ
         if (θ <= data.min_primal_1) && data.switching
             data.status = data.armijo_passed  #  sufficient decrease of barrier objective
         else
@@ -102,8 +102,8 @@ function expected_decrease_cost(policy::PolicyData, problem::ProblemData, step_s
     
     for k = N-1:-1:1
         Δφ += dot(Qu[k], policy.ku[k])
-        Δφ += step_size * dot(policy.ku[k], Quu[k], policy.ku[k])
+        Δφ += step_size * 0.5 * dot(policy.ku[k], Quu[k], policy.ku[k])
     end
-    return Δφ
+    return Δφ * step_size
 end
 

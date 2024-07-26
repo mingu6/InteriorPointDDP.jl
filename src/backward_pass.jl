@@ -170,14 +170,20 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
                 mul!(Ky[t], Qsu[t], Ku[t], -1.0, -1.0)
             end
             
-            # Update quadratic value function approx. V(x) using (12) from Pavlov et al.
-            # Vxx = Q̂xx + Q̂ux' * Ku
-            Vxx[t] .= Qxx[t]
-            mul!(Vxx[t], transpose(Qux[t]), Ku[t], 1.0, 1.0)
+            # Update return function approx. for next timestep 
+            # Vxx = Q̂xx + Q̂ux' * Ku + Ku * Q̂ux' + Ku' Q̂ux' * Ku
+            mul!(policy.ux_tmp[t], Quu[t], Ku[t])
+            
+            mul!(Vxx[t], transpose(Ku[t]), Qux[t])
+            Vxx[t] .+= transpose(Vxx[t])
+            Vxx[t] .+= Qxx[t]
+            mul!(Vxx[t], transpose(Ku[t]), policy.ux_tmp[t], 1.0, 1.0)
         
-            # Vx = Q̂x + Ku' * Q̂u
-            Vx[t] .= Qx[t]
+            # Vx = Q̂x + Ku' * Q̂u + [Q̂uu Ku + Q̂ux]^T ku
+            policy.ux_tmp[t] .+= Qux[t]
+            mul!(Vx[t], transpose(policy.ux_tmp[t]), ku[t])
             mul!(Vx[t], transpose(Ku[t]), Qu[t], 1.0, 1.0)
+            Vx[t] .+= Qx[t]
         end
         data.status && break
     end
