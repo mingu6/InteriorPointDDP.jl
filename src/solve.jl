@@ -126,18 +126,12 @@ function optimality_error(policy::PolicyData, problem::ProblemData, options::Opt
     # Cost gradients
     lx = problem.costs.gradient_state
     lu = problem.costs.gradient_action
+    Qu = policy.action_value.gradient_action
     
     policy.x_tmp[N] .= lx[N]
     
     for k = N-1:-1:1
-        # TODO: document. Basically forget x and unroll derivative w.r.t. u recrusively
-        policy.u_tmp[k] .= lu[k]
-        mul!(policy.u_tmp[k], gu[k]', s[k], 1.0, 1.0)
-        mul!(policy.u_tmp[k], fu[k]', policy.x_tmp[k+1], 1.0, 1.0)
-        dual_inf = max(dual_inf, norm(policy.u_tmp[k], Inf))
-        policy.x_tmp[k] .= lx[k]
-        mul!(policy.x_tmp[k], gx[k]', s[k], 1.0, 1.0)
-        mul!(policy.x_tmp[k], fx[k]', policy.x_tmp[k+1], 1.0, 1.0)
+        dual_inf = max(dual_inf, norm(Qu[k], Inf))
         
         for i = constr_data.constraints[k].indices_inequality
             if options.feasible
@@ -150,6 +144,7 @@ function optimality_error(policy::PolicyData, problem::ProblemData, options::Opt
         s_norm += norm(s[k], 1)
     end
     
+    # TODO: update for equality constraints
     scaling = max(options.s_max, s_norm / max(constr_data.num_ineq[1], 1.0))  / options.s_max
     return dual_inf / scaling, primal_inf, cs_inf / scaling
 end
