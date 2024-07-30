@@ -9,15 +9,15 @@ Base.@kwdef mutable struct Options{T}
     
     μ_init::Float64 = 0.1                # multiplier on barrier parameter initialisation
     ineq_dual_init::Float64 = 1.0        # dual variable initialisation value TODO: change name
-    slack_init::Float64 = 0.01           # slack variable initialisation value
     
-    reg_state::Bool = false              # apply regularisation to V̂xx instead of Q̂uu (Tassa)
-    ϕ_1::Float64 = 1e-4
-    ϕ_min::Float64 = 1e-20
-    ϕ_max::Float64 = 1e40
-    ψ_p_1::Float64 = 100.0
-    ψ_p_2::Float64 = 8.0
-    ψ_m::Float64 = 1.0 / 3.0
+    reg_1::Float64 = 1e-4
+    reg_min::Float64 = 1e-20
+    reg_max::Float64 = 1e40
+    κ_̄w_p::Float64 = 100.0
+    κ_w_p::Float64 = 8.0
+    κ_w_m::Float64 = 1.0 / 3.0
+    κ_c::Float64 = 0.25
+    δ_c::Float64 = 1e-8
 
     κ_ϵ::Float64 = 0.2                   # tolerance factor for lowering barrier parameter
     κ_μ::Float64 = 0.2                   # linear decrease factor for barrier parameter
@@ -26,7 +26,7 @@ Base.@kwdef mutable struct Options{T}
     
     s_max::Float64 = 100.0               # scaling threshold for NLP error
     η_φ::Float64 = 1e-4                  # relaxation factor in the armijo condition
-    s_φ::Float64 = 2.3                   # exponent for linear barrier function model in switching rule
+    s_φ::Float64 = 1.0                   # exponent for linear barrier function model in switching rule
     δ::Float64 = 1.0                     # multiplier for constraint violation in the switching rule
     s_θ::Float64 = 1.1                   # exponent for current constraint violation in the switching rule
     γ_α::Float64 = 0.05                  # safety factor for minimum step size (in (0, 1))

@@ -8,7 +8,6 @@ struct Dynamics{T}
     num_next_state::Int
     num_state::Int
     num_action::Int
-    num_parameter::Int
     evaluate_cache::Vector{T}
     jacobian_state_cache::Matrix{T}
     jacobian_action_cache::Matrix{T}
@@ -19,29 +18,27 @@ end
 
 Model{T} = Vector{Dynamics{T}} where T
 
-function Dynamics(f::Function, num_state::Int, num_action::Int; num_parameter::Int=0, quasi_newton::Bool=false)
+function Dynamics(f::Function, num_state::Int, num_action::Int; quasi_newton::Bool=false)
     #TODO: option to load/save methods
     x = Symbolics.variables(:x, 1:num_state)
     u = Symbolics.variables(:u, 1:num_action)
-    w = Symbolics.variables(:w, 1:num_parameter)
-    # @variables x[1:num_state], u[1:num_action], w[1:num_parameter]
 
-    y = num_parameter > 0 ? f(x, u, w) : f(x, u)
+    y = f(x, u)
     num_next_state = length(y)
     vx = Symbolics.variables(:vx, 1:num_next_state)  # vector variables for Hessian vector products
     
     jacobian_state = Symbolics.jacobian(y, x)
     jacobian_action = Symbolics.jacobian(y, u)
-    evaluate_func = eval(Symbolics.build_function(y, x, u, w)[2])
-    jacobian_state_func = eval(Symbolics.build_function(jacobian_state, x, u, w)[2])
-    jacobian_action_func = eval(Symbolics.build_function(jacobian_action, x, u, w)[2])
+    evaluate_func = eval(Symbolics.build_function(y, x, u)[2])
+    jacobian_state_func = eval(Symbolics.build_function(jacobian_state, x, u)[2])
+    jacobian_action_func = eval(Symbolics.build_function(jacobian_action, x, u)[2])
     if !quasi_newton
         hessian_prod_state_state = sum([vx[t] .* Symbolics.hessian(y[t], x) for t in 1:num_next_state])
         hessian_prod_action_state = sum([vx[t] .* Symbolics.jacobian(Symbolics.gradient(y[t], u), x) for t in 1:num_next_state])
         hessian_prod_action_action = sum([vx[t] .* Symbolics.hessian(y[t], u) for t in 1:num_next_state])
-        hessian_prod_state_state_func = eval(Symbolics.build_function(hessian_prod_state_state, x, u, w, vx)[2])
-        hessian_prod_action_state_func = eval(Symbolics.build_function(hessian_prod_action_state, x, u, w, vx)[2])
-        hessian_prod_action_action_func = eval(Symbolics.build_function(hessian_prod_action_action, x, u, w, vx)[2])
+        hessian_prod_state_state_func = eval(Symbolics.build_function(hessian_prod_state_state, x, u, vx)[2])
+        hessian_prod_action_state_func = eval(Symbolics.build_function(hessian_prod_action_state, x, u, vx)[2])
+        hessian_prod_action_action_func = eval(Symbolics.build_function(hessian_prod_action_action, x, u, vx)[2])
     else
         hessian_prod_state_state_func = nothing
         hessian_prod_action_state_func = nothing
@@ -49,20 +46,20 @@ function Dynamics(f::Function, num_state::Int, num_action::Int; num_parameter::I
     end
 
     return Dynamics(evaluate_func, jacobian_state_func, jacobian_action_func, hessian_prod_state_state_func,
-                    hessian_prod_action_state_func, hessian_prod_action_action_func, num_next_state, num_state, num_action, num_parameter,
+                    hessian_prod_action_state_func, hessian_prod_action_action_func, num_next_state, num_state, num_action,
                     zeros(num_next_state), zeros(num_next_state, num_state), zeros(num_next_state, num_action),
                     zeros(num_state, num_state), zeros(num_action, num_state), zeros(num_action, num_action))
 end
 
-function dynamics!(d::Dynamics, state, action, parameter)
-    d.evaluate(d.evaluate_cache, state, action, parameter)
+function dynamics!(d::Dynamics, state, action)
+    d.evaluate(d.evaluate_cache, state, action)
     return d.evaluate_cache
 end
 
-function jacobian!(jacobian_states, jacobian_actions, dynamics::Vector{Dynamics{T}}, states, actions, parameters) where T
+function jacobian!(jacobian_states, jacobian_actions, dynamics::Vector{Dynamics{T}}, states, actions) where T
     for (t, d) in enumerate(dynamics)
-        d.jacobian_state(d.jacobian_state_cache, states[t], actions[t], parameters[t])
-        d.jacobian_action(d.jacobian_action_cache, states[t], actions[t], parameters[t])
+        d.jacobian_state(d.jacobian_state_cache, states[t], actions[t])
+        d.jacobian_action(d.jacobian_action_cache, states[t], actions[t])
         @views jacobian_states[t] .= d.jacobian_state_cache
         @views jacobian_actions[t] .= d.jacobian_action_cache
     end
@@ -82,9 +79,9 @@ num_trajectory(dynamics::Vector{Dynamics{T}}) where T = sum([d.num_state + d.num
 
 # user-provided dynamics and gradients
 function Dynamics(f::Function, fx::Function, fu::Function, num_next_state::Int, num_state::Int, num_action::Int,
-    num_parameter::Int=0, fxx_prod::Function=nothing, fux_prod::Function=nothing, fuu_prod::Function=nothing)
+    ;fxx_prod::Function=nothing, fux_prod::Function=nothing, fuu_prod::Function=nothing)
     return Dynamics(f, fx, fu, fxx_prod, fux_prod, fuu_prod,
-                    num_next_state, num_state, num_action, num_parameter,
+                    num_next_state, num_state, num_action,
                     zeros(num_next_state), zeros(num_next_state, num_state), zeros(num_next_state, num_action),
                     zeros(num_state, num_state), zeros(num_action, num_state), zeros(num_action, num_action))
 end

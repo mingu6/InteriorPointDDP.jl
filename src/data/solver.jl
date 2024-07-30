@@ -11,7 +11,7 @@ mutable struct SolverData{T}
     l::Int                        # line search iteration counter
     wall_time::T                  # elapsed wall clock time
     μ::T                          # current subproblem perturbation value
-    ϕ_last::T                     # regularisation in backward pass
+    reg_last::T                   # regularisation in backward pass
     objective::T                  # objective function value of current iterate
     primal_inf::T                 # ∞-norm of constraint violation (primal infeasibility)
     dual_inf::T                   # ∞-norm of gradient of Lagrangian (dual infeasibility)
@@ -36,7 +36,7 @@ function solver_data()
     l = 0
     wall_time = 0.0
     μ = 0.0
-    ϕ_last = 0.0
+    reg_last = 0.0
     objective = 0.0
     primal_inf = 0.0
     dual_inf = 0.0
@@ -50,7 +50,7 @@ function solver_data()
     armijo_passed = false
     filter = [[0.0 , 0.0]]
 
-    SolverData(max_primal_1, min_primal_1, step_size, status, j, k, l, wall_time, μ, ϕ_last,
+    SolverData(max_primal_1, min_primal_1, step_size, status, j, k, l, wall_time, μ, reg_last,
         objective, primal_inf, dual_inf, cs_inf, 
         barrier_obj_curr, primal_1_curr, barrier_obj_next, primal_1_next, 
         update_filter, switching, armijo_passed, filter)
@@ -66,7 +66,7 @@ function reset!(data::SolverData)
     data.l = 0
     data.wall_time = 0.0
     data.μ = 0.0
-    data.ϕ_last = 0.0
+    data.reg_last = 0.0
     data.objective = 0.0
     data.primal_inf = 0.0
     data.dual_inf = 0.0

@@ -29,6 +29,6 @@ function iteration_status(
     # iteration information
     @printf(" %5s   %.4e   %.4e   %.4e   %.4e   % 1.2f  %5s   %.4e  %2s   %5.2f \n",
         data.k, data.objective, data.primal_inf, data.dual_inf, data.cs_inf,
-        log10(data.μ), data.ϕ_last == 0.0 ? "-" : @sprintf("% 2.2f", log10(data.ϕ_last)),
+        log10(data.μ), data.reg_last == 0.0 ? "-" : @sprintf("% 2.2f", log10(data.reg_last)),
         data.step_size, data.l, data.wall_time * 1000)
 end

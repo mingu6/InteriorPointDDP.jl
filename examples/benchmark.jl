@@ -61,7 +61,7 @@ end
 function solve_problem(problem::BenchmarkProblem; seed::Int=0, multiplier::Float64=0.02, options=Options())
     N = problem.horizon
     rng = Xoshiro(seed)
-    ū = [multiplier .* (rand(rng, problem.num_action) .- 1 / 2) for k = 1:N-1]
+    ū = [multiplier .* (rand(rng, problem.constraints[k].num_action) .- 1 / 2) for k = 1:N-1]
     x̄ = Base.invokelatest(rollout, problem.dynamics, problem.x1, ū)
     solver = Solver(problem.dynamics, problem.objective, problem.constraints, options=options)
     Base.invokelatest(solve!, solver, x̄, ū)
@@ -71,15 +71,15 @@ end
 function benchmark_ipddp_all()
     num_trials = 3
     oc_problems = [
-        ("invpend", "invpend", Dict(), Dict()),
-        ("arm", "arm", Dict(), Dict()),
-        ("car", "car", Dict(), Dict()),
-        ("concar", "concar", Dict(), Dict()),
-        ("unicycle", "unicycle", Dict(), Dict()),
-        ("unicy_up", "unicycle", Dict(:x1 => [-10.0; 0.0; 0.2]), Dict()),
-        ("uni_long", "unicycle", Dict(:x1 => [-10.0; 0.0; 0.0], :horizon => 601), Dict()),
+        # ("invpend", "invpend", Dict(), Dict()),
+        # ("arm", "arm", Dict(), Dict()),
+        # ("car", "car", Dict(), Dict()),
+        # ("concar", "concar", Dict(), Dict()),
+        # ("unicycle", "unicycle", Dict(), Dict()),
+        # ("unicy_up", "unicycle", Dict(:x1 => [-10.0; 0.0; 0.2]), Dict()),
+        # ("uni_long", "unicycle", Dict(:x1 => [-10.0; 0.0; 0.0], :horizon => 601), Dict()),
         ("cartpole", "cartpole", Dict(), Dict(:multiplier => 1.0)),
-        ("acrobot", "acrobot", Dict(), Dict(:multiplier => 1.0)),
+        # ("acrobot", "acrobot", Dict(), Dict(:multiplier => 1.0)),
     ]
     
     open("results.txt", "w") do file
@@ -91,7 +91,7 @@ function benchmark_ipddp_all()
             problem = setup_problem(env; kwargs_prob...)
             for qn in [true, false]
                 for feasible in [true false]
-                    options = Options(feasible=feasible, quasi_newton=qn, reset_cache=true)
+                    options = Options(feasible=feasible, quasi_newton=qn, reset_cache=true, optimality_tolerance=1e-3)
                     solver, _, _ = solve_problem(problem; options=options, seed=0, kwargs_sol...)  # burn in compilation time
                     for trial in 1:num_trials
                         solver, _, _ = solve_problem(problem; options=options, seed=trial, kwargs_sol...)

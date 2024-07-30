@@ -2,63 +2,53 @@
     Constraints Data
 """
 
-struct ConstraintsData{T,C,CX,CU}
+struct ConstraintsData{T,C,CX,CU,XX,UX,UU}
     constraints::Constraints{T}
-    num_ineq::Vector{Int}
-    violations::Vector{C} # the current value of each constraint (includes equality and ineq.)
+    num_constraints::Vector{Int}
+    num_ineq_lower::Vector{Int}
+    num_ineq_upper::Vector{Int}
+    residuals::Vector{C}
+    ineq_lower::Vector{C}
+    ineq_upper::Vector{C}
     jacobian_state::Vector{CX} 
     jacobian_action::Vector{CU}
-    inequalities::Vector{Vector{T}} # inequality constraints only
-    nominal_inequalities::Vector{Vector{T}}
-    duals::Vector{Vector{T}} # duals (both eq and ineq) for each timestep # consider removing
-    ineq_duals::Vector{Vector{T}} # only ineq duals for each timestep
-    nominal_ineq_duals:: Vector{Vector{T}}
-    slacks::Vector{Vector{T}}
-    nominal_slacks::Vector{Vector{T}}
+    hessian_prod_state_state::Vector{XX}
+    hessian_prod_action_state::Vector{UX}
+    hessian_prod_action_action::Vector{UU}
 end
 
-function constraint_data(model::Model, constraints::Constraints, ineq_dual_init::Float64, slack_init::Float64)
-    N = length(constraints)
-    c = [zeros(constraints[k].num_constraint) for k = 1:N]
-    ineqs = [zeros(constraints[k].num_inequality) for k = 1:N]
-    nominal_ineqs = [zeros(constraints[k].num_inequality) for k = 1:N]
-    num_ineq = [mapreduce(x -> x.num_inequality, +, constraints)]
-
-    # take inequalities and package them together
-    for k = 1:N
-        @views c[k] .= constraints[k].evaluate_cache
-        @views ineqs[k] .= constraints[k].evaluate_cache[constraints[k].indices_inequality] # cool indexing trick
-    end
+function constraint_data(constraints::Constraints)
+    num_constraints = [mapreduce(x -> x.num_constraint, +, constraints)]
+    num_ineq_lower = [mapreduce(x -> x.num_ineq_lower, +, constraints)]
+    num_ineq_upper = [mapreduce(x -> x.num_ineq_upper, +, constraints)]
     
-    cx = [zeros(constraints[k].num_constraint, model[k].num_state) for k = 1:N-1]
-    push!(cx, zeros(constraints[N].num_constraint, model[N-1].num_next_state))
-    cu = [zeros(constraints[k].num_constraint, model[k].num_action) for k = 1:N-1]
+    residuals = [zeros(h.num_constraint) for h in constraints]
+    ineq_lower = [zeros(h.num_action) for h in constraints]
+    ineq_upper = [zeros(h.num_action) for h in constraints]
+    jac_x = [zeros(h.num_constraint, h.num_state) for h in constraints]
+    jac_u = [zeros(h.num_constraint, h.num_action) for h in constraints]
+    hessian_prod_state_state = [zeros(h.num_state, h.num_state) for h in constraints]
+	hessian_prod_action_state = [zeros(h.num_action, h.num_state) for h in constraints]
+	hessian_prod_action_action = [zeros(h.num_action, h.num_action) for h in constraints]
     
-    constraint_duals = [zeros(constraints[k].num_constraint) for k = 1:N]
-    
-    ineq_duals = [ineq_dual_init .* ones(constraints[k].num_inequality) for k = 1:N]
-    nominal_ineq_duals = [ineq_dual_init .* ones(constraints[k].num_inequality) for k = 1:N]
-
-    slacks = [slack_init .* ones(constraints[k].num_inequality) for k = 1:N]
-    nominal_slacks = [slack_init .* ones(constraints[k].num_inequality) for k = 1:N]
-
-    return ConstraintsData(constraints, num_ineq, c, cx, cu, ineqs, nominal_ineqs,
-        constraint_duals, ineq_duals, nominal_ineq_duals, slacks, nominal_slacks)
+    return ConstraintsData(constraints, num_constraints, num_ineq_lower, num_ineq_upper,
+            residuals, ineq_lower, ineq_upper, jac_x, jac_u,
+            hessian_prod_state_state, hessian_prod_action_state, hessian_prod_action_action)
 end
 
-function reset!(data::ConstraintsData, κ_1::Float64, κ_2::Float64) 
-    N = length(data.constraints)
-    data.num_ineq[1] = mapreduce(x -> x.num_inequality, +, data.constraints)
-    for k = 1:N
-        fill!(data.violations[k], 0.0)
+function reset!(data::ConstraintsData) 
+    H = length(data.constraints) + 1
+    data.num_constraints[1] = mapreduce(x -> x.num_constraint, +, data.constraints)
+    data.num_ineq_lower[1] = mapreduce(x -> x.num_ineq_lower, +, data.constraints)
+    data.num_ineq_upper[1] = mapreduce(x -> x.num_ineq_upper, +, data.constraints)
+    for k = 1:H-1
+        fill!(data.residuals[k], 0.0)
+        fill!(data.ineq_lower[k], 0.0)
+        fill!(data.ineq_upper[k], 0.0)
         fill!(data.jacobian_state[k], 0.0)
-        k < N && fill!(data.jacobian_action[k], 0.0)
-        fill!(data.inequalities[k], 0.0)
-        fill!(data.nominal_inequalities[k], 0.0)
-        fill!(data.duals[k], 0.0)
-        fill!(data.ineq_duals[k], κ_1) 
-        fill!(data.nominal_ineq_duals[k], κ_1) 
-        fill!(data.slacks[k], κ_2) 
-        fill!(data.nominal_slacks[k], κ_2)
-    end 
+        fill!(data.jacobian_action[k], 0.0)
+        fill!(data.hessian_prod_state_state[k], 0.0)
+        fill!(data.hessian_prod_action_state[k], 0.0)
+        fill!(data.hessian_prod_action_action[k], 0.0)
+    end
 end

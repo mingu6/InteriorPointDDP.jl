@@ -1,21 +1,20 @@
 """
     Problem Data
 """
-mutable struct Solver{T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX,C,CX,CU}
-    problem::ProblemData{T,X,U,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX,C,CX,CU}
-	policy::PolicyData{N,M,NN,MM,MN,NNN,MNN}
+mutable struct Solver{T}#,N,M,NN,MM,MN,NNN,MNN,X,U,H,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX,C,CX,CU}
+    problem::ProblemData#{T,X,U,H,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX,C,CX,CU}
+	policy::PolicyData#{N,M,NN,MM,MN,NNN,MNN}
 	data::SolverData{T}
     options::Options{T}
 end
 
-function Solver(dynamics::Vector{Dynamics{T}}, costs::Costs{T}, constraints::Constraints{T};
-    parameters=[[zeros(d.num_parameter) for d in dynamics]..., zeros(0)], options=Options{T}()) where T
+function Solver(dynamics::Vector{Dynamics{T}}, costs::Costs{T}, constraints::Constraints{T}; options=Options{T}()) where T
 
     # allocate policy data  
     policy = policy_data(dynamics, constraints)
 
     # allocate model data
-    problem = problem_data(dynamics, costs, constraints, options, parameters=parameters)
+    problem = problem_data(dynamics, costs, constraints)
 
     # allocate solver data
     data = solver_data()
@@ -23,17 +22,16 @@ function Solver(dynamics::Vector{Dynamics{T}}, costs::Costs{T}, constraints::Con
 	Solver(problem, policy, data, options)
 end
 
-function Solver(dynamics::Vector{Dynamics{T}}, costs::Costs{T};
-    parameters=[[zeros(d.num_parameter) for d in dynamics]..., zeros(0)], options=Options{T}()) where T
+function Solver(dynamics::Vector{Dynamics{T}}, costs::Costs{T}) where T
     H = length(costs)
     constraint = Constraint()
-    constraints = [constraint for t = 1:H]
+    constraints = [constraint for t = 1:H-1]
     
     # allocate policy data  
     policy = policy_data(dynamics, constraints)
 
     # allocate model data
-    problem = problem_data(dynamics, costs, constraints, options, parameters=parameters)
+    problem = problem_data(dynamics, costs, constraints)
 
     # allocate solver data
     data = solver_data()
@@ -60,3 +58,5 @@ function initialize_states!(solver::Solver, states)
         solver.problem.nominal_states[t] .= xt
     end
 end
+
+# TODO: initialize_duals

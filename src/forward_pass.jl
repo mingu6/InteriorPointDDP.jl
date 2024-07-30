@@ -9,46 +9,57 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     μ = data.μ
     τ = max(options.τ_min, 1.0 - μ)
 
+    if min_step_size == -Inf
+        Δφ_L, _ = expected_decrease_cost(policy, problem, data.step_size)
+        min_step_size = estimate_min_step_size(Δφ_L, data, options)
+    end
+
     while data.step_size >= min_step_size # check whether we still want it to be this
         α = data.step_size
         try
-            rollout!(policy, problem, options.feasible, step_size=α)
+            rollout!(policy, problem, step_size=α)
         catch
             # reduces step size if NaN or Inf encountered
             data.step_size *= 0.5
-            data.l += 1
+            # data.l += 1
             continue
         end
         constraint!(problem, mode=:current)
         
-        data.status = check_fraction_boundary(constr_data, τ, options.feasible)
-        !data.status && (data.step_size *= 0.5, data.l += 1, continue)
+        data.status = check_fraction_boundary(problem, τ)
+        # if data.k == 1
+        #     println("frac ", data.k, " ", data.l, " ", data.status, " ", τ, " ", data.min_primal_1)
+        # end
+        # !data.status && (data.step_size *= 0.5, data.l += 1, continue)
+        !data.status && (data.step_size *= 0.5, continue)
 
-        if min_step_size == -Inf
-            Δφ_L, Δφ_Q = expected_decrease_cost(policy, problem, data.step_size)
-            min_step_size = estimate_min_step_size(Δφ_L, data, options)
-            Δφ = Δφ_L + Δφ_Q
-        end
+        Δφ_L, Δφ_Q = expected_decrease_cost(policy, problem, α)
+        Δφ = Δφ_L + Δφ_Q
+
+        # println("exp ", data.k, " ", data.l, " ", α, " ", Δφ, " ", μ)
         
         # used for sufficient decrease from current iterate step acceptance criterion
-        θ = options.feasible ? 0. : constraint_violation_1norm(constr_data, mode=:current)
-        φ = barrier_objective!(problem, data, options.feasible, mode=:current)
+        θ = constraint_violation_1norm(problem, mode=:current)
+        φ = barrier_objective!(problem, data, mode=:current)
         θ_prev = data.primal_1_curr
         φ_prev = data.barrier_obj_curr
         
         # check acceptability to filter
         data.status = !any(x -> all([θ, φ] .>= x), data.filter)
+        # println("filter ", data.k, " ", data.status, " ", α, " ", θ, " ", φ, " ", data.filter)
         !data.status && (data.step_size *= 0.5, data.l += 1, continue)  # failed, reduce step size
         
         # check for sufficient decrease conditions for the barrier objective/constraint violation
         data.switching = (Δφ < 0.0) && 
             ((-Δφ) ^ options.s_φ * α^(1-options.s_φ)  > options.δ * θ_prev ^ options.s_θ)
+        # println("switch ", data.switching, " ", θ_prev, " ", -Δφ)
         data.armijo_passed = φ - φ_prev - 10. * eps(Float64) * abs(φ_prev) <= options.η_φ * Δφ
+        # println("armijo ", data.armijo_passed, " ", θ <= data.min_primal_1, " ", φ - φ_prev, " ", Δφ)
         if (θ <= data.min_primal_1) && data.switching
             data.status = data.armijo_passed  #  sufficient decrease of barrier objective
         else
-            suff = !options.feasible ? (θ <= (1. - options.γ_θ) * θ_prev) : false
-            suff = suff || (φ <= φ_prev - options.γ_φ * θ_prev)
+            suff = (θ <= (1. - options.γ_θ) * θ_prev) || (φ <= φ_prev - options.γ_φ * θ_prev)
+            # println("suff ", θ, " ", (1. - options.γ_θ) * θ_prev, " ", φ, " ", φ_prev - options.γ_φ * θ_prev)
             !suff && (data.status = false)
         end
         !data.status && (data.step_size *= 0.5, data.l += 1, continue)  # failed, reduce step size
@@ -57,18 +68,20 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         data.primal_1_next = θ
         break
     end
+    # println(data.l, " ", data.step_size, " ", min_step_size)
+    data.step_size < min_step_size && (data.status = false)
     !data.status && (verbose && (@warn "Line search failed to find a suitable iterate"))
 end
 
-function check_fraction_boundary(constr_data::ConstraintsData, τ::Float64, feasible::Bool)
-    constraints = constr_data.constraints
-    N = length(constraints)
-    c̄, s̄, ȳ = dual_trajectories(constr_data, mode=:nominal)
-    c, s, y = dual_trajectories(constr_data, mode=:current)
-    check_feasible = k -> any(s[k] .< (1. - τ) .*  s̄[k]) || any(c[k] .> (1. - τ) .*  c̄[k])
-    check_infeasible = k -> any(s[k] .< (1. - τ) .*  s̄[k]) || any(y[k] .< (1. - τ) .*  ȳ[k])
-    check_fn = feasible ? check_feasible : check_infeasible
-    return !any(check_fn, 1:N)
+function check_fraction_boundary(problem::ProblemData, τ::Float64)
+    N = problem.horizon
+    _, _, _, il, iu = primal_trajectories(problem, mode=:current)
+    _, vl, vu = dual_trajectories(problem, mode=:current)
+    _, _, _, il̄, iū = primal_trajectories(problem, mode=:nominal)
+    _, vl̄, vū = dual_trajectories(problem, mode=:nominal)
+
+    check_fn = k -> any(il[k] .< (1. - τ) .*  il̄[k]) || any(iu[k] .< (1. - τ) .*  iū[k]) || any(vl[k] .< (1. - τ) .*  vl̄[k]) || any(vu[k] .< (1. - τ) .*  vū[k])
+    return !any(check_fn, 1:N-1)
 end
 
 function estimate_min_step_size(Δφ_L::Float64, data::SolverData, options::Options)
