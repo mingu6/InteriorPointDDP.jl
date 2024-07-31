@@ -66,6 +66,8 @@ struct PolicyData#{N,M,NN,MM,MN,NNN,MNN,H,HN,HM}
     rhs_x
     rhs_x_t
     rhs_x_b
+
+    lhs_bk
 end
 
 function policy_data(dynamics::Vector{Dynamics{T}}, constraints::Constraints{T}) where T
@@ -128,8 +130,10 @@ function policy_data(dynamics::Vector{Dynamics{T}}, constraints::Constraints{T})
     rhs_x_t = [@views rhs_x[t][1:dynamics[t].num_action, :] for t = 1:H-1]
     rhs_x_b = [@views rhs_x[t][dynamics[t].num_action+1:end, :] for t = 1:H-1]
 
+    lhs_bk = [bunchkaufman(L, true; check=false) for L in lhs]
+
     PolicyData(Kuϕ, kuϕ, Ku, ku, Kϕ, kϕ, Kvl, kvl, Kvu, kvu,
         value, action_value,
         x_tmp, u_tmp, h_tmp, uu_tmp, ux_tmp, xx_tmp, hu_tmp, hx_tmp,
-        lhs, lhs_tl, lhs_tr, lhs_bl, lhs_br, rhs, rhs_t, rhs_b, rhs_x, rhs_x_t, rhs_x_b)
+        lhs, lhs_tl, lhs_tr, lhs_bl, lhs_br, rhs, rhs_t, rhs_b, rhs_x, rhs_x_t, rhs_x_b, lhs_bk)
 end

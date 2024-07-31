@@ -62,6 +62,9 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
         Vx[N] .= lx[N]
         
         for t = N-1:-1:1
+            num_actions = length(lu[t])
+            num_constr = length(h[t])
+
             # Qx = lx + fx' * Vx
             Qx[t] .= lx[t]
             mul!(Qx[t], transpose(fx[t]), Vx[t+1], 1.0, 1.0)
@@ -97,7 +100,6 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
                 hessian_vector_prod!(hxx[t], hux[t], huu[t], constr_data.constraints[t], x[t], u[t], ϕ[t])
             end
             # display(Vx[t+1])
-            
             # setup linear system in backward pass
             policy.lhs_tl[t] .= Quu[t]
             policy.lhs_tr[t] .= transpose(hu[t])
@@ -117,40 +119,13 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
 
             policy.lhs_tl[t][diagind(policy.lhs_tl[t])] .+= reg
             policy.lhs_br[t][diagind(policy.lhs_br[t])] .-= δ_c
-            try
-                S = bunchkaufman!(policy.lhs[t])
-            catch
-                if iszero(δ_c)
-                    δ_c = options.δ_c * μ^options.κ_c
-                end
-                if iszero(reg) # initial setting of regularisation
-                    reg = (data.reg_last == 0.0) ? options.reg_1 : max(options.reg_min, options.κ_w_m * data.reg_last)
-                else
-                    reg = (data.reg_last == 0.0) ? options.κ_̄w_p * reg : options.κ_w_p * reg
-                end
-                data.status = false
-                break
-            end
-            np, nn, nz = inertia(S.D)
-            # np, nn, nz = inertia(S) # TODO: julia 1.11.0-rc2 has inertia built in!!!
-            num_constr = length(h[t])
-            num_actions = length(u[t])
-            if np != num_actions || nn != num_constr
-                if nz > 0 && iszero(δ_c)
-                    δ_c = options.δ_c * μ^options.κ_c
-                end
-                if iszero(reg) # initial setting of regularisation
-                    reg = (data.reg_last == 0.0) ? options.reg_1 : max(options.reg_min, options.κ_w_m * data.reg_last)
-                else
-                    reg = (data.reg_last == 0.0) ? options.κ_̄w_p * reg : options.κ_w_p * reg
-                end
-                data.status = false
-                break
-            end
-            
-            # update gains for controls and eq. duals
-            kuϕ[t] .= S \ policy.rhs[t]
-            Kuϕ[t] .= S \ policy.rhs_x[t]
+
+            policy.lhs_bk[t], data.status, reg, δ_c = inertia_correction!(policy.lhs[t], num_actions,
+                        num_constr, μ, δ_c, reg, data.reg_last, options; rook=true)
+            !data.status && break
+
+            kuϕ[t] .= policy.lhs_bk[t] \ policy.rhs[t]
+            Kuϕ[t] .= policy.lhs_bk[t] \ policy.rhs_x[t]
 
             # update gains for ineq. duals
             gains_ineq!(kvl[t], Kvl[t], il[t], vl[t], ku[t], Ku[t], μ)
@@ -213,31 +188,31 @@ function add_barrier_hess!(Quu, ineq_lower, ineq_upper, μ)
     end
 end
 
-# function inertia(D; tol=1e-12)
-#     n::Int = size(D)[1]
-#     i::Int = 1
-#     pos::Int = 0
-#     neg::Int = 0
-#     zr::Int = 0
-#     while i <= n
-#         if i < n && abs(D[i+1, i]) > tol
-#             pos += 1
-#             neg += 1
-#             i += 2
-#         elseif abs(D[i, i]) > tol
-#             if D[i, i] > 0
-#                 pos += 1
-#             else
-#                 neg += 1
-#             end
-#             i += 1
-#         else
-#             zr += 1
-#             i += 1
-#         end
-#     end
-#     return pos, neg, zr
-# end
+function inertia(D; tol=1e-12)
+    n::Int = size(D)[1]
+    i::Int = 1
+    pos::Int = 0
+    neg::Int = 0
+    zr::Int = 0
+    while i <= n
+        if i < n && abs(D[i+1, i]) > tol
+            pos += 1
+            neg += 1
+            i += 2
+        elseif abs(D[i, i]) > tol
+            if D[i, i] > 0
+                pos += 1
+            else
+                neg += 1
+            end
+            i += 1
+        else
+            zr += 1
+            i += 1
+        end
+    end
+    return pos, neg, zr
+end
 
 function gains_ineq!(k, K, ineq, duals, ku, Ku, μ)
     m = length(ineq)
