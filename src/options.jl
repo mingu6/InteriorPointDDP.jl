@@ -1,5 +1,4 @@
 Base.@kwdef mutable struct Options{T}
-    feasible::Bool = true
     quasi_newton::Bool = true
     optimality_tolerance::T = 1.0e-7
     max_iterations::Int = 1000
@@ -9,6 +8,8 @@ Base.@kwdef mutable struct Options{T}
     
     μ_init::Float64 = 0.1                # multiplier on barrier parameter initialisation
     ineq_dual_init::Float64 = 1.0        # dual variable initialisation value TODO: change name
+    κ_1::Float64 = 0.01                  # fraction-to-boundary initialization for controls
+    κ_2::Float64 = 0.01                  # fraction-to-boundary initialization for controls
     
     reg_1::Float64 = 1e-4
     reg_min::Float64 = 1e-20

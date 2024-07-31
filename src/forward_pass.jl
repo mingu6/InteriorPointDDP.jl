@@ -17,7 +17,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     while data.step_size >= min_step_size # check whether we still want it to be this
         α = data.step_size
         try
-            rollout!(policy, problem, step_size=α)
+            rollout!(policy, problem, τ, step_size=α)
         catch
             # reduces step size if NaN or Inf encountered
             data.step_size *= 0.5
@@ -30,8 +30,8 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         # if data.k == 1
         #     println("frac ", data.k, " ", data.l, " ", data.status, " ", τ, " ", data.min_primal_1)
         # end
-        # !data.status && (data.step_size *= 0.5, data.l += 1, continue)
-        !data.status && (data.step_size *= 0.5, continue)
+        !data.status && (data.step_size *= 0.5, data.l += 1, continue)
+        # !data.status && (data.step_size *= 0.5, continue)
 
         Δφ_L, Δφ_Q = expected_decrease_cost(policy, problem, α)
         Δφ = Δφ_L + Δφ_Q
@@ -75,12 +75,34 @@ end
 
 function check_fraction_boundary(problem::ProblemData, τ::Float64)
     N = problem.horizon
-    _, _, _, il, iu = primal_trajectories(problem, mode=:current)
+    x, u, _, il, iu = primal_trajectories(problem, mode=:current)
     _, vl, vu = dual_trajectories(problem, mode=:current)
-    _, _, _, il̄, iū = primal_trajectories(problem, mode=:nominal)
+    x̄, ū, _, il̄, iū = primal_trajectories(problem, mode=:nominal)
     _, vl̄, vū = dual_trajectories(problem, mode=:nominal)
 
-    check_fn = k -> any(il[k] .< (1. - τ) .*  il̄[k]) || any(iu[k] .< (1. - τ) .*  iū[k]) || any(vl[k] .< (1. - τ) .*  vl̄[k]) || any(vu[k] .< (1. - τ) .*  vū[k])
+    # check_fn = k -> any(il[k] .< (1. - τ) .*  il̄[k]) || any(iu[k] .< (1. - τ) .*  iū[k]) || any(vl[k] .< (1. - τ) .*  vl̄[k]) || any(vu[k] .< (1. - τ) .*  vū[k])
+    # println(" ")
+    # println(" ")
+    status = true
+    for k = 1:N-1
+        if any((il[k] .< (1. - τ) .*  il̄[k]) .* .!isinf.(il̄[k]))
+            status = false
+            # println("il: ", k, " ", il[k], " ", il̄[k], " ", u[k], " ", ū[k], " ", x[k], " ", x̄[k])
+        elseif any((iu[k] .< (1. - τ) .*  iū[k]) .* .!isinf.(iū[k]))
+            # println("iu: ", k, " ", iu[k], " ", iū[k])
+            status = false
+            # break
+        elseif any((vl[k] .< (1. - τ) .*  vl̄[k]) .* .!isinf.(vl̄[k]))
+            # println("vl: ", k, " ", vl[k], " ", vl̄[k])
+            status = false
+            # break
+        elseif any((vu[k] .< (1. - τ) .*  vū[k]) .* .!isinf.(vū[k]))
+            # println("vu: ", k, " ", vu[k], " ", vū[k])
+            status = false
+            # break
+        end
+    end
+    return status
     return !any(check_fn, 1:N-1)
 end
 

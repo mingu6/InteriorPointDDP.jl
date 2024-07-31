@@ -8,9 +8,9 @@ end
 
 # TODO: remove ipddp_solve and just have solve!
 
-function ipddp_solve!(solver::Solver, states, actions; kwargs...)
-    initialize_controls!(solver, actions)
-    initialize_states!(solver, states)
+function ipddp_solve!(solver::Solver, x1, actions; kwargs...)
+    initialize_trajectory!(solver, actions, x1)
+    # initialize_states!(solver, states)
     ipddp_solve!(solver; kwargs...)
 end
 
@@ -191,3 +191,4 @@ function reset_duals!(problem::ProblemData)
         end
     end
 end
+

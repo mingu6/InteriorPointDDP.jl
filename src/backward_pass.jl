@@ -132,6 +132,7 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
                 break
             end
             np, nn, nz = inertia(S.D)
+            # np, nn, nz = inertia(S) # TODO: julia 1.11.0-rc2 has inertia built in!!!
             num_constr = length(h[t])
             num_actions = length(u[t])
             if np != num_actions || nn != num_constr
@@ -157,7 +158,6 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             
             # Update return function approx. for next timestep 
             # Vxx = Q̂xx + Q̂ux' * Ku + Ku * Q̂ux' + Ku' Q̂uu' * Ku
-            # add_barrier_hess!(Quu[t], il[t], iu[t], μ)
             mul!(policy.ux_tmp[t], Quu[t], Ku[t])
             
             mul!(Vxx[t], transpose(Ku[t]), Qux[t])
@@ -213,31 +213,31 @@ function add_barrier_hess!(Quu, ineq_lower, ineq_upper, μ)
     end
 end
 
-function inertia(D; tol=1e-12)
-    n::Int = size(D)[1]
-    i::Int = 1
-    pos::Int = 0
-    neg::Int = 0
-    zr::Int = 0
-    while i <= n
-        if i < n && abs(D[i+1, i]) > tol
-            pos += 1
-            neg += 1
-            i += 2
-        elseif abs(D[i, i]) > tol
-            if D[i, i] > 0
-                pos += 1
-            else
-                neg += 1
-            end
-            i += 1
-        else
-            zr += 1
-            i += 1
-        end
-    end
-    return pos, neg, zr
-end
+# function inertia(D; tol=1e-12)
+#     n::Int = size(D)[1]
+#     i::Int = 1
+#     pos::Int = 0
+#     neg::Int = 0
+#     zr::Int = 0
+#     while i <= n
+#         if i < n && abs(D[i+1, i]) > tol
+#             pos += 1
+#             neg += 1
+#             i += 2
+#         elseif abs(D[i, i]) > tol
+#             if D[i, i] > 0
+#                 pos += 1
+#             else
+#                 neg += 1
+#             end
+#             i += 1
+#         else
+#             zr += 1
+#             i += 1
+#         end
+#     end
+#     return pos, neg, zr
+# end
 
 function gains_ineq!(k, K, ineq, duals, ku, Ku, μ)
     m = length(ineq)
@@ -247,10 +247,10 @@ function gains_ineq!(k, K, ineq, duals, ku, Ku, μ)
         else
             k[i] = 0.
         end
-        if !isinf(ineq[i])
-            K[i, :] = duals[i] / ineq[i] * Ku[i, :]
-        else
-            fill!(K[i, :], 0.0)
-        end
+        # if !isinf(ineq[i])
+        #     K[i, :] = duals[i] / ineq[i] * Ku[i, :]
+        # else
+        #     fill!(K[i, :], 0.0)
+        # end
     end
 end
