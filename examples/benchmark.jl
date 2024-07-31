@@ -24,6 +24,7 @@ include("car.jl")
 include("concar.jl")
 include("unicycle.jl")
 include("arm.jl")
+include("blockmove.jl")
 
 function display_solve_results(trial, exper_name, solver, file)
     data = solver.data
@@ -52,6 +53,8 @@ function setup_problem(env_name::String; kwargs...)
         problem = setup_unicycle(; kwargs...)
     elseif env_name == "arm"
         problem = setup_arm(; kwargs...)
+    elseif env_name == "blockmove"
+        problem = setup_blockmove(; kwargs...)
     else
         throw(DomainError("invalid environment name " * env_name))
     end
@@ -62,9 +65,10 @@ function solve_problem(problem::BenchmarkProblem; seed::Int=0, multiplier::Float
     N = problem.horizon
     rng = Xoshiro(seed)
     ū = [multiplier .* (rand(rng, problem.constraints[k].num_action) .- 1 / 2) for k = 1:N-1]
+    # ū = [[2.0, 0.0, 0.0] for k = 1:N-1] # blockmove
     x̄ = Base.invokelatest(rollout, problem.dynamics, problem.x1, ū)
     solver = Solver(problem.dynamics, problem.objective, problem.constraints, options=options)
-    Base.invokelatest(solve!, solver, x̄, ū)
+    Base.invokelatest(solve!, solver, problem.x1, ū)
     return solver, x̄, ū
 end
 
