@@ -31,10 +31,10 @@ struct PolicyData#{N,M,NN,MM,MN,NNN,MNN,H,HN,HM}
     Kϕ#::Vector{HN}
     kϕ#::Vector{H}
 
-    Kvl#::Vector{MN}
+    # Kvl#::Vector{MN}
     kvl#::Vector{M}
 
-    Kvu#::Vector{MN}
+    # Kvu#::Vector{MN}
     kvu#::Vector{M}
 
     # value function approximation
@@ -132,7 +132,8 @@ function policy_data(dynamics::Vector{Dynamics{T}}, constraints::Constraints{T})
 
     lhs_bk = [bunchkaufman(L, true; check=false) for L in lhs]
 
-    PolicyData(Kuϕ, kuϕ, Ku, ku, Kϕ, kϕ, Kvl, kvl, Kvu, kvu,
+    # PolicyData(Kuϕ, kuϕ, Ku, ku, Kϕ, kϕ, Kvl, kvl, Kvu, kvu,
+    PolicyData(Kuϕ, kuϕ, Ku, ku, Kϕ, kϕ, kvl, kvu,
         value, action_value,
         x_tmp, u_tmp, h_tmp, uu_tmp, ux_tmp, xx_tmp, hu_tmp, hx_tmp,
         lhs, lhs_tl, lhs_tr, lhs_bl, lhs_br, rhs, rhs_t, rhs_b, rhs_x, rhs_x_t, rhs_x_b, lhs_bk)

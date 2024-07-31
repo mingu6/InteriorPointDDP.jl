@@ -1,18 +1,13 @@
 function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverData, options::Options; verbose=false)
-    constr_data = problem.constraints
-    
     data.l = 0  # line search iteration counter
     data.status = true
     data.step_size = 1.0
-    min_step_size = -Inf
     Δφ = 0.0
     μ = data.μ
     τ = max(options.τ_min, 1.0 - μ)
 
-    if min_step_size == -Inf
-        Δφ_L, _ = expected_decrease_cost(policy, problem, data.step_size)
-        min_step_size = estimate_min_step_size(Δφ_L, data, options)
-    end
+    Δφ_L, _ = expected_decrease_cost(policy, problem, data.step_size)
+    min_step_size = estimate_min_step_size(Δφ_L, data, options)
 
     while data.step_size >= min_step_size # check whether we still want it to be this
         α = data.step_size
@@ -21,22 +16,16 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         catch
             # reduces step size if NaN or Inf encountered
             data.step_size *= 0.5
-            # data.l += 1
             continue
         end
         constraint!(problem, mode=:current)
         
         data.status = check_fraction_boundary(problem, τ)
-        # if data.k == 1
-        #     println("frac ", data.k, " ", data.l, " ", data.status, " ", τ, " ", data.min_primal_1)
-        # end
         !data.status && (data.step_size *= 0.5, data.l += 1, continue)
         # !data.status && (data.step_size *= 0.5, continue)
 
         Δφ_L, Δφ_Q = expected_decrease_cost(policy, problem, α)
         Δφ = Δφ_L + Δφ_Q
-
-        # println("exp ", data.k, " ", data.l, " ", α, " ", Δφ, " ", μ)
         
         # used for sufficient decrease from current iterate step acceptance criterion
         θ = constraint_violation_1norm(problem, mode=:current)
@@ -68,7 +57,6 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         data.primal_1_next = θ
         break
     end
-    # println(data.l, " ", data.step_size, " ", min_step_size)
     data.step_size < min_step_size && (data.status = false)
     !data.status && (verbose && (@warn "Line search failed to find a suitable iterate"))
 end
@@ -80,30 +68,22 @@ function check_fraction_boundary(problem::ProblemData, τ::Float64)
     x̄, ū, _, il̄, iū = primal_trajectories(problem, mode=:nominal)
     _, vl̄, vū = dual_trajectories(problem, mode=:nominal)
 
-    # check_fn = k -> any(il[k] .< (1. - τ) .*  il̄[k]) || any(iu[k] .< (1. - τ) .*  iū[k]) || any(vl[k] .< (1. - τ) .*  vl̄[k]) || any(vu[k] .< (1. - τ) .*  vū[k])
-    # println(" ")
-    # println(" ")
     status = true
     for k = 1:N-1
         if any((il[k] .< (1. - τ) .*  il̄[k]) .* .!isinf.(il̄[k]))
             status = false
-            # println("il: ", k, " ", il[k], " ", il̄[k], " ", u[k], " ", ū[k], " ", x[k], " ", x̄[k])
         elseif any((iu[k] .< (1. - τ) .*  iū[k]) .* .!isinf.(iū[k]))
-            # println("iu: ", k, " ", iu[k], " ", iū[k])
             status = false
-            # break
+            break
         elseif any((vl[k] .< (1. - τ) .*  vl̄[k]) .* .!isinf.(vl̄[k]))
-            # println("vl: ", k, " ", vl[k], " ", vl̄[k])
             status = false
-            # break
+            break
         elseif any((vu[k] .< (1. - τ) .*  vū[k]) .* .!isinf.(vū[k]))
-            # println("vu: ", k, " ", vu[k], " ", vū[k])
             status = false
-            # break
+            break
         end
     end
     return status
-    return !any(check_fn, 1:N-1)
 end
 
 function estimate_min_step_size(Δφ_L::Float64, data::SolverData, options::Options)

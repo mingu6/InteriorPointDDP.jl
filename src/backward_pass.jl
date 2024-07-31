@@ -4,7 +4,6 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
     N = length(problem.states)
     constr_data = problem.constr_data
     reg::Float64 = 0.0
-    code = 0
 
     # Jacobians of system dynamics
     fx = problem.model.jacobian_state
@@ -38,11 +37,7 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
     kuϕ = policy.kuϕ
     Ku = policy.Ku
     ku = policy.ku
-    Kϕ = policy.Kϕ
-    kϕ = policy.kϕ
-    Kvl = policy.Kvl
     kvl = policy.kvl
-    Kvu = policy.Kvu
     kvu = policy.kvu
     # Value function
     Vx = policy.value.gradient
@@ -53,8 +48,6 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
 
     μ = data.μ
     δ_c = 0.
-
-    S = nothing
     
     while reg <= options.reg_max
         data.status = true
@@ -121,15 +114,15 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             policy.lhs_br[t][diagind(policy.lhs_br[t])] .-= δ_c
 
             policy.lhs_bk[t], data.status, reg, δ_c = inertia_correction!(policy.lhs[t], num_actions,
-                        num_constr, μ, δ_c, reg, data.reg_last, options; rook=true)
+                        num_constr, μ, reg, data.reg_last, options; rook=true)
             !data.status && break
 
             kuϕ[t] .= policy.lhs_bk[t] \ policy.rhs[t]
             Kuϕ[t] .= policy.lhs_bk[t] \ policy.rhs_x[t]
 
             # update gains for ineq. duals
-            gains_ineq!(kvl[t], Kvl[t], il[t], vl[t], ku[t], Ku[t], μ)
-            gains_ineq!(kvu[t], Kvu[t], iu[t], vu[t], ku[t], Ku[t], μ)
+            gains_ineq!(kvl[t], il[t], vl[t], ku[t], μ)
+            gains_ineq!(kvu[t], iu[t], vu[t], ku[t], μ)
             
             # Update return function approx. for next timestep 
             # Vxx = Q̂xx + Q̂ux' * Ku + Ku * Q̂ux' + Ku' Q̂uu' * Ku
@@ -176,56 +169,9 @@ function add_barrier_grad!(Qu, ineq_lower, ineq_upper, μ)
     end
 end
 
-function add_barrier_hess!(Quu, ineq_lower, ineq_upper, μ)
-    m = length(ineq_lower)
-    for i = 1:m
-        if !isinf(ineq_lower[i])
-            Quu[i, i] -= μ / ineq_lower[i] ^ 2
-        end
-        if !isinf(ineq_upper[i])
-            Quu[i, i] -= μ / ineq_upper[i] ^ 2
-        end
-    end
-end
-
-function inertia(D; tol=1e-12)
-    n::Int = size(D)[1]
-    i::Int = 1
-    pos::Int = 0
-    neg::Int = 0
-    zr::Int = 0
-    while i <= n
-        if i < n && abs(D[i+1, i]) > tol
-            pos += 1
-            neg += 1
-            i += 2
-        elseif abs(D[i, i]) > tol
-            if D[i, i] > 0
-                pos += 1
-            else
-                neg += 1
-            end
-            i += 1
-        else
-            zr += 1
-            i += 1
-        end
-    end
-    return pos, neg, zr
-end
-
-function gains_ineq!(k, K, ineq, duals, ku, Ku, μ)
+function gains_ineq!(k, ineq, duals, ku, μ)
     m = length(ineq)
     for i = 1:m
-        if !isinf(ineq[i])
-            k[i] = μ / ineq[i] - duals[i] - duals[i] / ineq[i] * ku[i]
-        else
-            k[i] = 0.
-        end
-        # if !isinf(ineq[i])
-        #     K[i, :] = duals[i] / ineq[i] * Ku[i, :]
-        # else
-        #     fill!(K[i, :], 0.0)
-        # end
+        k[i] = isinf(ineq[i]) ? 0.0 : μ / ineq[i] - duals[i] - duals[i] / ineq[i] * ku[i]
     end
 end

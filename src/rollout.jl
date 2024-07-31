@@ -9,7 +9,7 @@ function rollout!(policy::PolicyData, problem::ProblemData, τ::Float64; step_si
     x[1] .= x̄[1]
 
     ku, kϕ, kvl, kvu = policy.ku, policy.kϕ, policy.kvl, policy.kvu
-    Ku, Kϕ, Kvl, Kvu = policy.Ku, policy.Kϕ, policy.Kvl, policy.Kvu
+    Ku, Kϕ = policy.Ku, policy.Kϕ
 
     step_dual = 1.0
 
