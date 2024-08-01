@@ -18,24 +18,26 @@ struct ActionValue{N,M,NN,MM,MN}
 end
 
 """
+    Store all gains
+"""
+struct Gains
+    kuϕ
+    Kuϕ
+    ku
+    Ku
+    kϕ
+    Kϕ
+    kvl
+    kvu
+end
+
+"""
     Policy Data
 """
 struct PolicyData#{N,M,NN,MM,MN,NNN,MNN,H,HN,HM} 
     # policy u = ū + K * (x - x̄) + k
-    Kuϕ
-    kuϕ
-
-    Ku#::Vector{MN} # β
-    ku#::Vector{M}  # α
-
-    Kϕ#::Vector{HN}
-    kϕ#::Vector{H}
-
-    # Kvl#::Vector{MN}
-    kvl#::Vector{M}
-
-    # Kvu#::Vector{MN}
-    kvu#::Vector{M}
+    gains_main
+    gains_soc
 
     # value function approximation
     value#::Value{N,NN}
@@ -70,7 +72,7 @@ struct PolicyData#{N,M,NN,MM,MN,NNN,MNN,H,HN,HM}
     lhs_bk
 end
 
-function policy_data(dynamics::Vector{Dynamics{T}}, constraints::Constraints{T}) where T
+function gains_data(dynamics::Vector{Dynamics{T}}, constraints::Constraints{T}) where T
     H = length(dynamics) + 1
 
     Kuϕ = [zeros(dynamics[t].num_action + constraints[t].num_constraint, dynamics[t].num_state)
@@ -83,11 +85,17 @@ function policy_data(dynamics::Vector{Dynamics{T}}, constraints::Constraints{T})
 	Kϕ = [@views Kuϕ[t][dynamics[t].num_action+1:end, :] for t = 1:H-1]
     kϕ = [@views kuϕ[t][dynamics[t].num_action+1:end] for t = 1:H-1]
 
-	Kvl = [zeros(d.num_action, d.num_state) for d in dynamics]
     kvl = [zeros(d.num_action) for d in dynamics]
 
-    Kvu = [zeros(d.num_action, d.num_state) for d in dynamics]
     kvu = [zeros(d.num_action) for d in dynamics]
+    return Gains(kuϕ, Kuϕ, ku, Ku, kϕ, Kϕ, kvl, kvu)
+end
+
+function policy_data(dynamics::Vector{Dynamics{T}}, constraints::Constraints{T}) where T
+    H = length(dynamics) + 1
+
+    gains_main = gains_data(dynamics, constraints)
+    gains_soc = gains_data(dynamics, constraints)
 
     # value function approximation
     P = [[zeros(d.num_state, d.num_state) for d in dynamics]..., 
@@ -132,8 +140,7 @@ function policy_data(dynamics::Vector{Dynamics{T}}, constraints::Constraints{T})
 
     lhs_bk = [bunchkaufman(L, true; check=false) for L in lhs]
 
-    # PolicyData(Kuϕ, kuϕ, Ku, ku, Kϕ, kϕ, Kvl, kvl, Kvu, kvu,
-    PolicyData(Kuϕ, kuϕ, Ku, ku, Kϕ, kϕ, kvl, kvu,
+    PolicyData(gains_main, gains_soc,
         value, action_value,
         x_tmp, u_tmp, h_tmp, uu_tmp, ux_tmp, xx_tmp, hu_tmp, hx_tmp,
         lhs, lhs_tl, lhs_tr, lhs_bl, lhs_br, rhs, rhs_t, rhs_b, rhs_x, rhs_x_t, rhs_x_b, lhs_bk)

@@ -109,16 +109,17 @@ function estimate_min_step_size(Δφ_L::Float64, data::SolverData, options::Opti
     return min_step_size
 end
 
-function expected_decrease_cost(policy::PolicyData, problem::ProblemData, step_size::Float64)
+function expected_decrease_cost(policy::PolicyData, problem::ProblemData, step_size::Float64, mode=:main)
     Δφ_L = 0.0
     Δφ_Q = 0.0
     N = problem.horizon
     Qu = policy.action_value.gradient_action
     Quu = policy.action_value.hessian_action_action
+    gains = mode == :main ? policy.gains_main : policy.gains_soc
     
     for k = N-1:-1:1
-        Δφ_L += dot(Qu[k], policy.ku[k])
-        Δφ_Q += 0.5 * dot(policy.ku[k], Quu[k], policy.ku[k])
+        Δφ_L += dot(Qu[k], gains.ku[k])
+        Δφ_Q += 0.5 * dot(gains.ku[k], Quu[k], gains.ku[k])
     end
     return Δφ_L * step_size, Δφ_Q * step_size^2
 end

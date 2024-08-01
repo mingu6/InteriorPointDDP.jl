@@ -1,4 +1,4 @@
-function rollout!(policy::PolicyData, problem::ProblemData, τ::Float64; step_size=1.0)
+function rollout!(policy::PolicyData, problem::ProblemData, τ::Float64; step_size=1.0, mode=:main)
     dynamics = problem.model.dynamics
     
     x, u, h, il, iu = primal_trajectories(problem, mode=:current)
@@ -8,8 +8,9 @@ function rollout!(policy::PolicyData, problem::ProblemData, τ::Float64; step_si
     
     x[1] .= x̄[1]
 
-    ku, kϕ, kvl, kvu = policy.ku, policy.kϕ, policy.kvl, policy.kvu
-    Ku, Kϕ = policy.Ku, policy.Kϕ
+    gains = mode == :main ? policy.gains_main : policy.gains_soc
+    ku, kϕ, kvl, kvu = gains.ku, gains.kϕ, gains.kvl, gains.kvu
+    Ku, Kϕ = gains.Ku, gains.Kϕ
 
     step_dual = 1.0
 

@@ -33,12 +33,12 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
     Quu = policy.action_value.hessian_action_action
     Qux = policy.action_value.hessian_action_state
     # Feedback gains (linear feedback policy)
-    Kuϕ = policy.Kuϕ
-    kuϕ = policy.kuϕ
-    Ku = policy.Ku
-    ku = policy.ku
-    kvl = policy.kvl
-    kvu = policy.kvu
+    Kuϕ = policy.gains_main.Kuϕ
+    kuϕ = policy.gains_main.kuϕ
+    Ku = policy.gains_main.Ku
+    ku = policy.gains_main.ku
+    kvl = policy.gains_main.kvl
+    kvu = policy.gains_main.kvu
     # Value function
     Vx = policy.value.gradient
     Vxx = policy.value.hessian
