@@ -9,6 +9,7 @@ mutable struct SolverData{T}
     j::Int                        # outer iteration counter (i.e., j-th barrier subproblem)
     k::Int                        # overall iteration counter
     l::Int                        # line search iteration counter
+    p::Int                        # second-order corrections counter
     wall_time::T                  # elapsed wall clock time
     μ::T                          # current subproblem perturbation value
     reg_last::T                   # regularisation in backward pass
@@ -34,6 +35,7 @@ function solver_data()
     j = 0
     k = 0
     l = 0
+    p = 0
     wall_time = 0.0
     μ = 0.0
     reg_last = 0.0
@@ -50,7 +52,7 @@ function solver_data()
     armijo_passed = false
     filter = [[0.0 , 0.0]]
 
-    SolverData(max_primal_1, min_primal_1, step_size, status, j, k, l, wall_time, μ, reg_last,
+    SolverData(max_primal_1, min_primal_1, step_size, status, j, k, l, p, wall_time, μ, reg_last,
         objective, primal_inf, dual_inf, cs_inf, 
         barrier_obj_curr, primal_1_curr, barrier_obj_next, primal_1_next, 
         update_filter, switching, armijo_passed, filter)
@@ -64,6 +66,7 @@ function reset!(data::SolverData)
     data.j = 0
     data.k = 0
     data.l = 0
+    data.p = 0
     data.wall_time = 0.0
     data.μ = 0.0
     data.reg_last = 0.0

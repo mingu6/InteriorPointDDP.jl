@@ -1,7 +1,7 @@
 using LinearAlgebra
 
 function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverData, options::Options; mode=:nominal, verbose::Bool=false)
-    N = length(problem.states)
+    N = problem.horizon
     constr_data = problem.constr_data
     reg::Float64 = 0.0
 
@@ -64,7 +64,17 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             # Qu = lu + fu' * Vx
             Qu[t] .= lu[t]
             mul!(Qu[t], transpose(fu[t]), Vx[t+1], 1.0, 1.0)
+            # if t == N-1
+            #     println("backwards")
+            #     display(Qu[t])
+            #     display(fu[t])
+            # end
             add_barrier_grad!(Qu[t], il[t], iu[t], μ)
+            # if t == N-1
+            #     display(Qu[t])
+            #     display(ϕ[t])
+            #     display(hu[t])
+            # end
             
             # Qxx = lxx + fx' * Vxx * fx
             mul!(policy.xx_tmp[t], transpose(fx[t]), Vxx[t+1])
@@ -104,6 +114,13 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             mul!(policy.rhs_t[t], transpose(hu[t]), ϕ[t], -1.0, 1.0)
             policy.rhs_b[t] .= -h[t]
 
+            # if t == N-1
+            #     display(il[t])
+            #     display(vl[t])
+            #     display(policy.lhs[t])
+            #     display(policy.rhs[t])
+            # end
+
             policy.rhs_x_t[t] .= -Qux[t]
             policy.rhs_x_b[t] .= -hx[t]
             policy.rhs_x_t[t] .-= hux[t]
@@ -119,6 +136,11 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
 
             kuϕ[t] .= policy.lhs_bk[t] \ policy.rhs[t]
             Kuϕ[t] .= policy.lhs_bk[t] \ policy.rhs_x[t]
+
+            # if t == N-1
+                # display(kuϕ[t])
+                # display(Kuϕ[t])
+            # end
 
             # update gains for ineq. duals
             gains_ineq!(kvl[t], il[t], vl[t], ku[t], μ)
@@ -142,6 +164,8 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
         data.status && break
     end
     data.reg_last = reg
+    # println("backwards")
+    # display(hu[1])
     !data.status && (verbose && (@warn "Backward pass failure, unable to find positive definite iteration matrix."))
 end
 

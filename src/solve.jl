@@ -46,6 +46,10 @@ function ipddp_solve!(solver::Solver)
 
     while data.k < options.max_iterations
         iter_time = @elapsed begin
+            # display(problem.actions)
+            # display(problem.states)
+            # display(problem.constraints)
+            # display(problem.nominal_ineq_duals_lo[15])
             gradients!(problem, mode=:nominal)
             
             backward_pass!(policy, problem, data, options, mode=:nominal, verbose=options.verbose)
@@ -70,6 +74,7 @@ function ipddp_solve!(solver::Solver)
             end
             
             options.verbose && iteration_status(data, options)
+            data.p = 0
             
             forward_pass!(policy, problem, data, options, verbose=options.verbose)
             !data.status && break

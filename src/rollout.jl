@@ -9,8 +9,9 @@ function rollout!(policy::PolicyData, problem::ProblemData, τ::Float64; step_si
     x[1] .= x̄[1]
 
     gains = mode == :main ? policy.gains_main : policy.gains_soc
-    ku, kϕ, kvl, kvu = gains.ku, gains.kϕ, gains.kvl, gains.kvu
-    Ku, Kϕ = gains.Ku, gains.Kϕ
+    ku, kϕ = gains.ku, gains.kϕ
+    kvl, kvu = policy.gains_main.kvl, policy.gains_main.kvu # only feedforward primal relevant for SOC
+    Ku, Kϕ = policy.gains_main.Ku, policy.gains_main.Kϕ  # only feedforward primal relevant for SOC
 
     step_dual = 1.0
 
@@ -33,12 +34,14 @@ function rollout!(policy::PolicyData, problem::ProblemData, τ::Float64; step_si
         mul!(ϕ[k], Kϕ[k], x̄[k], -1.0, 1.0)
         
         # take independent steps for duals using max step length
-        step_vl = max_step_dual(vl[k], kvl[k], τ)
-        step_vu = max_step_dual(vu[k], kvu[k], τ)
+        step_vl = max_step_dual(vl̄[k], kvl[k], τ)
+        step_vu = max_step_dual(vū[k], kvu[k], τ)
         step_dual = min(step_dual, step_vl, step_vu)
         
         x[k+1] .= dynamics!(d, x[k], u[k])
     end
+
+    step_dual = max(step_dual - 1e-6, 0.0) 
 
     for k = 1:N-1
         vl[k] .= kvl[k]
@@ -68,7 +71,7 @@ function max_step_dual(v::Vector{T}, kv::Vector{T}, τ::T) where T
         if iszero(kv[i])
             continue
         else
-            a = -τ * v[i] ./ kv[i]
+            a = -τ * v[i] / kv[i]
             step_size = a < 0 ? min(step_size, 1.0) : min(step_size, min(a, 1.0))
         end
     end

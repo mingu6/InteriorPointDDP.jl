@@ -10,6 +10,9 @@ Base.@kwdef mutable struct Options{T}
     ineq_dual_init::Float64 = 1.0        # dual variable initialisation value TODO: change name
     κ_1::Float64 = 0.01                  # fraction-to-boundary initialization for controls
     κ_2::Float64 = 0.01                  # fraction-to-boundary initialization for controls
+
+    n_soc_max::Int64 = 4                 # maximum number of second-order correction steps
+    κ_soc::Float64 = 0.99        # sufficient decrease in constraint violation condition SOC
     
     reg_1::Float64 = 1e-4
     reg_min::Float64 = 1e-20
@@ -35,4 +38,4 @@ Base.@kwdef mutable struct Options{T}
     γ_φ::Float64 = 1e-5                  # relaxation factor in the filter margin for barrier function (in (0, 1))
 
     κ_Σ::Float64 = 1e10                  # dual variable rescaling threshold param.
-end 
+end
