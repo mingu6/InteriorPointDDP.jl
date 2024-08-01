@@ -20,14 +20,14 @@ function setup_blockmove(; horizon::Int=25, dt::Float64=0.04, x1::Vector{Float64
         u[2] - u[3] - u[1] * x[2]
     ], 
     2, 3, 
-    bounds_lower=[-10.0, -Inf, -Inf], bounds_upper=[10.0, 0.0, 0.0])
+    bounds_lower=[-10.0, 0.0, 0.0], bounds_upper=[10.0, Inf, Inf])
 
     term_constr = Constraint((x, u) -> [
         dot(blockmove_discrete(x, u), xN) - dot(xN, xN),
         u[2] - u[3] - u[1] * x[2]
     ], 
     2, 3, 
-    bounds_lower=[-10.0, -Inf, -Inf], bounds_upper=[10.0, 0.0, 0.0])
+    bounds_lower=[-10.0, 0.0, 0.0], bounds_upper=[10.0, Inf, Inf])
 
     constraints = [
     [stage_constr for k = 1:horizon-2]..., 

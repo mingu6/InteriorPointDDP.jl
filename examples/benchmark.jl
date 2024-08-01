@@ -29,8 +29,8 @@ include("blockmove.jl")
 function display_solve_results(trial, exper_name, solver, file)
     data = solver.data
     options = solver.options
-    @printf(file, "%10s %3d    %5s   %5s   %6s   %.4e   %.4e   %.4e   % 1.2f  %7i      %5.2f \n",
-        exper_name, trial, options.feasible, options.quasi_newton, data.status,
+    @printf(file, "%10s %3d    %5s   %6s   %.4e   %.4e   %.4e   % 1.2f  %7i      %5.2f \n",
+        exper_name, trial, options.quasi_newton, data.status,
         data.dual_inf, data.primal_inf, data.cs_inf,
         log10(data.μ), data.k, data.wall_time * 1000)
     flush(file)
@@ -65,7 +65,7 @@ function solve_problem(problem::BenchmarkProblem; seed::Int=0, multiplier::Float
     N = problem.horizon
     rng = Xoshiro(seed)
     ū = [multiplier .* (rand(rng, problem.constraints[k].num_action) .- 1 / 2) for k = 1:N-1]
-    # ū = [[2.0, 0.0, 0.0] for k = 1:N-1] # blockmove
+    # ū = [[[8.0, 0.0, 0.0] for k = 1:5] ; [[0.0, 0.0, 0.0] for k = 6:N-7]; [[-12.0, 0.0, 0.0] for k = N-6:N-1]] # blockmove
     x̄ = Base.invokelatest(rollout, problem.dynamics, problem.x1, ū)
     solver = Solver(problem.dynamics, problem.objective, problem.constraints, options=options)
     Base.invokelatest(solve!, solver, problem.x1, ū)
@@ -82,29 +82,28 @@ function benchmark_ipddp_all()
         # ("unicycle", "unicycle", Dict(), Dict()),
         # ("unicy_up", "unicycle", Dict(:x1 => [-10.0; 0.0; 0.2]), Dict()),
         # ("uni_long", "unicycle", Dict(:x1 => [-10.0; 0.0; 0.0], :horizon => 601), Dict()),
-        ("cartpole", "cartpole", Dict(), Dict(:multiplier => 1.0)),
+        ("cartpole", "cartpole", Dict(), Dict(:multiplier => 0.1)),
+        ("blockmove", "blockmove", Dict(), Dict(:multiplier => 0.2)),
         # ("acrobot", "acrobot", Dict(), Dict(:multiplier => 1.0)),
     ]
     
     open("results.txt", "w") do file
-        header = "---------------------------------------------------------------------------------------------------------------\n" *
-                 "   exper   trial   feas     qn    status     du_inf       pr_inf       cs_inf       μ    iterations  wall_time \n" *
-                 "---------------------------------------------------------------------------------------------------------------\n"
+        header = "------------------------------------------------------------------------------------------------------\n" *
+                 "   exper   trial   qn    status     du_inf       pr_inf       cs_inf       μ    iterations  wall_time \n" *
+                 "------------------------------------------------------------------------------------------------------\n"
         for (name, env, kwargs_prob, kwargs_sol) in oc_problems
             write(file, header)
             problem = setup_problem(env; kwargs_prob...)
             for qn in [true, false]
-                for feasible in [true false]
-                    options = Options(feasible=feasible, quasi_newton=qn, reset_cache=true, optimality_tolerance=1e-3)
-                    solver, _, _ = solve_problem(problem; options=options, seed=0, kwargs_sol...)  # burn in compilation time
-                    for trial in 1:num_trials
-                        solver, _, _ = solve_problem(problem; options=options, seed=trial, kwargs_sol...)
-                        display_solve_results(trial, name, solver, file)
-                    end
+                options = Options(quasi_newton=qn, reset_cache=true, optimality_tolerance=1e-8)
+                solver, _, _ = solve_problem(problem; options=options, seed=0, kwargs_sol...)  # burn in compilation time
+                for trial in 1:num_trials
+                    solver, _, _ = solve_problem(problem; options=options, seed=trial, kwargs_sol...)
+                    display_solve_results(trial, name, solver, file)
                 end
             end
         end
-        @printf(file, "--------------------------------------------------------------------------------------------------------------\n")
+        @printf(file, "-------------------------------------------------------------------------------------------------\n")
     end
 end
 
