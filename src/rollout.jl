@@ -10,8 +10,9 @@ function rollout!(policy::PolicyData, problem::ProblemData, τ::Float64; step_si
 
     gains = mode == :main ? policy.gains_main : policy.gains_soc
     ku, kϕ = gains.ku, gains.kϕ
-    kvl, kvu = policy.gains_main.kvl, policy.gains_main.kvu # only feedforward primal relevant for SOC
-    Ku, Kϕ = policy.gains_main.Ku, policy.gains_main.Kϕ  # only feedforward primal relevant for SOC
+    kvl, kvu = gains.kvl, gains.kvu
+    Kvl, Kvu = policy.gains_main.Kvl, policy.gains_main.Kvu
+    Ku, Kϕ = policy.gains_main.Ku, policy.gains_main.Kϕ
 
     step_dual = 1.0
 
@@ -33,25 +34,37 @@ function rollout!(policy::PolicyData, problem::ProblemData, τ::Float64; step_si
         mul!(ϕ[k], Kϕ[k], x[k], 1.0, 1.0)
         mul!(ϕ[k], Kϕ[k], x̄[k], -1.0, 1.0)
         
-        # take independent steps for duals using max step length
-        step_vl = max_step_dual(vl̄[k], kvl[k], τ)
-        step_vu = max_step_dual(vū[k], kvu[k], τ)
-        step_dual = min(step_dual, step_vl, step_vu)
+        # # take independent steps for duals using max step length
+        # step_vl = max_step_dual(vl̄[k], kvl[k], τ)
+        # step_vu = max_step_dual(vū[k], kvu[k], τ)
+        # step_dual = min(step_dual, step_vl, step_vu)
+
+        vl[k] .= kvl[k]
+        vl[k] .*= step_size
+        vl[k] .+= vl̄[k]
+        mul!(vl[k], Kvl[k], x[k], 1.0, 1.0)
+        mul!(vl[k], Kvl[k], x̄[k], -1.0, 1.0)
+
+        vu[k] .= kvu[k]
+        vu[k] .*= step_size
+        vu[k] .+= vū[k]
+        mul!(vu[k], Kvu[k], x[k], 1.0, 1.0)
+        mul!(vu[k], Kvu[k], x̄[k], -1.0, 1.0)
         
         x[k+1] .= dynamics!(d, x[k], u[k])
     end
 
-    step_dual = max(step_dual - 1e-6, 0.0) 
+    # step_dual = max(step_dual - 1e-6, 0.0) 
 
-    for k = 1:N-1
-        vl[k] .= kvl[k]
-        vl[k] .*= step_dual
-        vl[k] .+= vl̄[k]
+    # for k = 1:N-1
+    #     vl[k] .= kvl[k]
+    #     vl[k] .*= step_dual
+    #     vl[k] .+= vl̄[k]
 
-        vu[k] .= kvu[k]
-        vu[k] .*= step_dual
-        vu[k] .+= vū[k]
-    end
+    #     vu[k] .= kvu[k]
+    #     vu[k] .*= step_dual
+    #     vu[k] .+= vū[k]
+    # end
 end
 
     

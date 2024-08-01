@@ -2,8 +2,11 @@ function second_order_correction!(policy::PolicyData, problem::ProblemData, data
                                   τ::Float64)
     data.step_size *= 2.0 # bit dirty, step size should not be decremented before SOC step so this is here
     N = problem.horizon
-    h = problem.constraints
-    h̄ = problem.nominal_constraints
+
+    x, u, h, il, iu = primal_trajectories(problem, mode=:current)
+    ϕ, vl, vu = dual_trajectories(problem, mode=:current)
+    x̄, ū, h̄, il̄, iū = primal_trajectories(problem, mode=:nominal)
+    ϕb, vl̄, vū = dual_trajectories(problem, mode=:nominal)
 
     lhs_bk = policy.lhs_bk
     gains = policy.gains_soc
@@ -13,6 +16,7 @@ function second_order_correction!(policy::PolicyData, problem::ProblemData, data
 
     θ_prev = data.primal_1_curr
     φ_prev = data.barrier_obj_curr
+    μ = data.μ
 
     status = false
     p = 1
@@ -28,6 +32,8 @@ function second_order_correction!(policy::PolicyData, problem::ProblemData, data
             policy.rhs_b[k] .+= h[k]
 
             gains.kuϕ[k] .= lhs_bk[k] \ policy.rhs[k]
+            gains_ineq!(gains.kvl[k], gains.Kvl[k], il̄[k], vl̄[k], gains.ku[k], policy.gains_main.Ku[k], μ)
+            gains_ineq!(gains.kvu[k], gains.Kvu[k], iū[k], vū[k], gains.ku[k], policy.gains_main.Ku[k], μ)
         end
         # forward pass
         α_soc = 1.0  # set high and find max

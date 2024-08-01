@@ -39,6 +39,8 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
     ku = policy.gains_main.ku
     kvl = policy.gains_main.kvl
     kvu = policy.gains_main.kvu
+    Kvl = policy.gains_main.Kvl
+    Kvu = policy.gains_main.Kvu
     # Value function
     Vx = policy.value.gradient
     Vxx = policy.value.hessian
@@ -143,8 +145,8 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             # end
 
             # update gains for ineq. duals
-            gains_ineq!(kvl[t], il[t], vl[t], ku[t], μ)
-            gains_ineq!(kvu[t], iu[t], vu[t], ku[t], μ)
+            gains_ineq!(kvl[t], Kvl[t], il[t], vl[t], ku[t], Ku[t], μ)
+            gains_ineq!(kvu[t], Kvu[t], iu[t], vu[t], ku[t], Ku[t], μ)
             
             # Update return function approx. for next timestep 
             # Vxx = Q̂xx + Q̂ux' * Ku + Ku * Q̂ux' + Ku' Q̂uu' * Ku
@@ -193,9 +195,10 @@ function add_barrier_grad!(Qu, ineq_lower, ineq_upper, μ)
     end
 end
 
-function gains_ineq!(k, ineq, duals, ku, μ)
+function gains_ineq!(k, K, ineq, duals, ku, Ku, μ)
     m = length(ineq)
     for i = 1:m
         k[i] = isinf(ineq[i]) ? 0.0 : μ / ineq[i] - duals[i] - duals[i] / ineq[i] * ku[i]
+        K[i, :] .= isinf(ineq[i]) ? 0.0 : duals[i] / ineq[i] * Ku[i, :]
     end
 end

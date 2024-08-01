@@ -28,7 +28,9 @@ struct Gains
     kϕ
     Kϕ
     kvl
+    Kvl
     kvu
+    Kvu
 end
 
 """
@@ -86,9 +88,11 @@ function gains_data(dynamics::Vector{Dynamics{T}}, constraints::Constraints{T}) 
     kϕ = [@views kuϕ[t][dynamics[t].num_action+1:end] for t = 1:H-1]
 
     kvl = [zeros(d.num_action) for d in dynamics]
+    Kvl = [zeros(d.num_action, d.num_state) for d in dynamics]
 
     kvu = [zeros(d.num_action) for d in dynamics]
-    return Gains(kuϕ, Kuϕ, ku, Ku, kϕ, Kϕ, kvl, kvu)
+    Kvu = [zeros(d.num_action, d.num_state) for d in dynamics]
+    return Gains(kuϕ, Kuϕ, ku, Ku, kϕ, Kϕ, kvl, Kvl, kvu, Kvu)
 end
 
 function policy_data(dynamics::Vector{Dynamics{T}}, constraints::Constraints{T}) where T
