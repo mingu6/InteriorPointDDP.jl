@@ -26,7 +26,8 @@ function rollout!(policy::PolicyData, problem::ProblemData, τ::Float64; step_si
         # for ϕ, note we use ϕ^+ instead of δϕ for update hence different formula
         ϕ[k] .= kϕ[k]
         ϕ[k] .*= step_size
-        ϕ[k] .+= (1. - step_size) * ϕb[k]
+        # ϕ[k] .+= (1. - step_size) * ϕb[k]
+        ϕ[k] .+= ϕb[k]
         mul!(ϕ[k], Kϕ[k], x[k], 1.0, 1.0)
         mul!(ϕ[k], Kϕ[k], x̄[k], -1.0, 1.0)
         

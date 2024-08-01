@@ -56,7 +56,6 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
         
         for t = N-1:-1:1
             num_actions = length(lu[t])
-            num_constr = length(h[t])
 
             # Qx = lx + fx' * Vx
             Qx[t] .= lx[t]
@@ -102,6 +101,7 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             policy.lhs_tl[t] .+= huu[t]
 
             policy.rhs_t[t] .= -Qu[t]
+            mul!(policy.rhs_t[t], transpose(hu[t]), ϕ[t], -1.0, 1.0)
             policy.rhs_b[t] .= -h[t]
 
             policy.rhs_x_t[t] .= -Qux[t]
@@ -114,7 +114,7 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             policy.lhs_br[t][diagind(policy.lhs_br[t])] .-= δ_c
 
             policy.lhs_bk[t], data.status, reg, δ_c = inertia_correction!(policy.lhs[t], num_actions,
-                        num_constr, μ, reg, data.reg_last, options; rook=true)
+                        μ, reg, data.reg_last, options; rook=true)
             !data.status && break
 
             kuϕ[t] .= policy.lhs_bk[t] \ policy.rhs[t]

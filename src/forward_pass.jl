@@ -72,6 +72,7 @@ function check_fraction_boundary(problem::ProblemData, τ::Float64)
     for k = 1:N-1
         if any((il[k] .< (1. - τ) .*  il̄[k]) .* .!isinf.(il̄[k]))
             status = false
+            break
         elseif any((iu[k] .< (1. - τ) .*  iū[k]) .* .!isinf.(iū[k]))
             status = false
             break

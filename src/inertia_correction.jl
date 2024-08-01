@@ -204,11 +204,11 @@ function inertia(B::BunchKaufman{TS};
     return np, nn, nz
 end
 
-function inertia_correction!(mat::Matrix{T}, num_actions::Int64, num_constr::Int64, μ::Float64, 
+function inertia_correction!(mat::Matrix{T}, num_actions::Int64, μ::Float64, 
                 reg::Float64, reg_last::Float64, options::Options; rook::Bool=false) where T
     status = true
     bk = bunchkaufman!(mat, rook; check=false)
-    np, nn, nz = inertia(bk)
+    np, nn, nz = inertia(bk; atol=1e-12)
     δ_c = 0.0
     if nz > 0 || np != num_actions
         δ_c = nz > 0 ? options.δ_c * μ^options.κ_c : 0.0
