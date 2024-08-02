@@ -26,12 +26,13 @@ function setup_cartpole(; horizon::Int=26, dt::Float64=0.08, x1::Vector{Float64}
     xN = [1.0; π; 0.0; 0.0]
     
     cartpole_discrete = (x, u) -> x + dt * cartpole_continuous(x + 0.5 * dt * cartpole_continuous(x, u), u)
+    # cartpole_discrete = (x, u) -> x + dt * cartpole_continuous(x, u)
     cartpole_dyn = Dynamics(cartpole_discrete, num_state, num_action)
     dynamics = [[cartpole_dyn for k = 1:N-2]..., Dynamics(cartpole_discrete, num_state, num_action-1)]
 
     stage = Cost((x, u) -> dot(u[1], u[1]), num_state, num_action)
     objective = [
-        [stage for k = 1:N-2]..., Cost((x, u) -> dot(u[1], u[1]), num_state, num_action-1),
+        [stage for k = 1:N-2]..., Cost((x, u) -> dt * dot(u[1], u[1]), num_state, num_action-1),
         Cost((x, u) -> 0.0, num_state, 0),
     ] 
     
@@ -41,12 +42,10 @@ function setup_cartpole(; horizon::Int=26, dt::Float64=0.08, x1::Vector{Float64}
     num_state, num_action, 
     bounds_lower=[-20., -2.], bounds_upper=[20., 2.])
 
-    # term_constr = Constraint((x, u) -> [cartpole_discrete(x, u)[2] - xN[2]],
-    # num_state, num_action - 1, 
-    # bounds_lower=[-20.], bounds_upper=[20.])
-    term_constr = Constraint((x, u) -> [dot(xN, cartpole_discrete(x, u)) - dot(xN, xN)],
-    num_state, num_action - 1, 
-    bounds_lower=[-20.], bounds_upper=[20.])
+    term_constr = Constraint((x, u) -> [dot(cartpole_discrete(x, u) - xN, cartpole_discrete(x, u) - xN)],
+        num_state, num_action - 1, 
+        bounds_lower=[-20.], bounds_upper=[20.]
+    )
     
     constraints = [
     [stage_constr for k = 1:N-2]..., 
