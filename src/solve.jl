@@ -46,10 +46,6 @@ function ipddp_solve!(solver::Solver)
 
     while data.k < options.max_iterations
         iter_time = @elapsed begin
-            # display(problem.actions)
-            # display(problem.states)
-            # display(problem.constraints)
-            # display(problem.nominal_ineq_duals_lo[15])
             gradients!(problem, mode=:nominal)
             
             backward_pass!(policy, problem, data, options, mode=:nominal, verbose=options.verbose)
@@ -95,6 +91,7 @@ function ipddp_solve!(solver::Solver)
         data.status = false
         options.verbose && @warn "Maximum solver iterations reached."
     end
+    display(problem.states)
     
     return nothing
 end

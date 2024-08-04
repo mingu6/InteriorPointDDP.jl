@@ -14,8 +14,6 @@ function rollout!(policy::PolicyData, problem::ProblemData, τ::Float64; step_si
     Kvl, Kvu = policy.gains_main.Kvl, policy.gains_main.Kvu
     Ku, Kϕ = policy.gains_main.Ku, policy.gains_main.Kϕ
 
-    step_dual = 1.0
-
     N = length(dynamics) + 1
 
     for (k, d) in enumerate(dynamics)
@@ -29,15 +27,9 @@ function rollout!(policy::PolicyData, problem::ProblemData, τ::Float64; step_si
         # for ϕ, note we use ϕ^+ instead of δϕ for update hence different formula
         ϕ[k] .= kϕ[k]
         ϕ[k] .*= step_size
-        # ϕ[k] .+= (1. - step_size) * ϕb[k]
         ϕ[k] .+= ϕb[k]
         mul!(ϕ[k], Kϕ[k], x[k], 1.0, 1.0)
         mul!(ϕ[k], Kϕ[k], x̄[k], -1.0, 1.0)
-        
-        # # take independent steps for duals using max step length
-        # step_vl = max_step_dual(vl̄[k], kvl[k], τ)
-        # step_vu = max_step_dual(vū[k], kvu[k], τ)
-        # step_dual = min(step_dual, step_vl, step_vu)
 
         vl[k] .= kvl[k]
         vl[k] .*= step_size
@@ -53,18 +45,6 @@ function rollout!(policy::PolicyData, problem::ProblemData, τ::Float64; step_si
         
         x[k+1] .= dynamics!(d, x[k], u[k])
     end
-
-    # step_dual = max(step_dual - 1e-6, 0.0) 
-
-    # for k = 1:N-1
-    #     vl[k] .= kvl[k]
-    #     vl[k] .*= step_dual
-    #     vl[k] .+= vl̄[k]
-
-    #     vu[k] .= kvu[k]
-    #     vu[k] .*= step_dual
-    #     vu[k] .+= vū[k]
-    # end
 end
 
     
