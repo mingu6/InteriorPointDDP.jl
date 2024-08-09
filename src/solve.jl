@@ -10,7 +10,6 @@ end
 
 function ipddp_solve!(solver::Solver, x1, actions; kwargs...)
     initialize_trajectory!(solver, actions, x1)
-    # initialize_states!(solver, states)
     ipddp_solve!(solver; kwargs...)
 end
 
@@ -52,13 +51,13 @@ function ipddp_solve!(solver::Solver)
             !data.status && break
             # check (outer) overall problem convergence
 
-            data.dual_inf, data.primal_inf, data.cs_inf = optimality_error(policy, problem, options, 0.0, mode=:nominal)
+            data.dual_inf, data.primal_inf, data.cs_inf = optimality_error(policy, problem, data, options, 0.0, mode=:nominal)
             opt_err_0 = max(data.dual_inf, data.cs_inf, data.primal_inf)
             
             opt_err_0 <= options.optimality_tolerance && break
             
             # check (inner) barrier problem convergence and update barrier parameter if so
-            dual_inf_μ, primal_inf_μ, cs_inf_μ = optimality_error(policy, problem, options, data.μ, mode=:nominal)
+            dual_inf_μ, primal_inf_μ, cs_inf_μ = optimality_error(policy, problem, data, options, data.μ, mode=:nominal)
             opt_err_μ = max(dual_inf_μ, cs_inf_μ, primal_inf_μ)          
             if opt_err_μ <= options.κ_ϵ * data.μ
                 data.μ = max(options.optimality_tolerance / 10.0, min(options.κ_μ * data.μ, data.μ ^ options.θ_μ))
@@ -73,11 +72,20 @@ function ipddp_solve!(solver::Solver)
             data.p = 0
             
             forward_pass!(policy, problem, data, options, verbose=options.verbose)
-            !data.status && break
+            if !data.status
+                update_filter!(data, options)
+                display(problem.nominal_states)
+                display(problem.nominal_actions)
+                data.status = feasibility_restoration(problem, policy, data, options)
+            end
+            if !data.status
+                options.verbose && (@warn "Feasibility restoration phase failed, local minimiser of constraint violation returned.")
+                break
+            end
             
             rescale_duals!(problem, data.μ, options)
             update_nominal_trajectory!(problem)
-            update_filter!(data, options)
+            !data.FR && (!data.armijo_passed || !data.switching) && update_filter!(data, options)
             data.barrier_obj_curr = data.barrier_obj_next
             data.primal_1_curr = data.primal_1_next
         end
@@ -85,23 +93,20 @@ function ipddp_solve!(solver::Solver)
         data.k += 1
         data.wall_time += iter_time
     end
+    display(problem.nominal_states)
     
     options.verbose && iteration_status(data, options)
     if data.k == options.max_iterations 
         data.status = false
         options.verbose && @warn "Maximum solver iterations reached."
     end
-    display(problem.states)
-    
     return nothing
 end
 
 function update_filter!(data::SolverData, options::Options)
-    if !data.armijo_passed || !data.switching
-        new_filter_pt = [(1. - options.γ_θ) * data.primal_1_curr,
-                         data.barrier_obj_curr - options.γ_φ * data.primal_1_curr]
-        push!(data.filter, new_filter_pt)
-    end
+    new_filter_pt = [(1. - options.γ_θ) * data.primal_1_curr,
+                        data.barrier_obj_curr - options.γ_φ * data.primal_1_curr]
+    push!(data.filter, new_filter_pt)
 end
 
 function reset_filter!(data::SolverData)
@@ -110,7 +115,7 @@ function reset_filter!(data::SolverData)
     data.status = true
 end
 
-function optimality_error(policy::PolicyData, problem::ProblemData, options::Options, μ::Float64; mode=:nominal)
+function optimality_error(policy::PolicyData, problem::ProblemData, solver::SolverData, options::Options, μ::Float64; mode=:nominal)
     dual_inf::Float64 = 0     # dual infeasibility (stationarity of Lagrangian)
     primal_inf::Float64 = 0   # constraint violation (primal infeasibility)
     cs_inf::Float64 = 0       # complementary slackness violation
@@ -121,6 +126,10 @@ function optimality_error(policy::PolicyData, problem::ProblemData, options::Opt
     constr_data = problem.constr_data
     _, _, h, il, iu = primal_trajectories(problem, mode=mode)
     ϕ, vl, vu = dual_trajectories(problem, mode=mode)
+    p = mode == :nominal ? problem.nominal_p : problem.p
+    n = mode == :nominal ? problem.nominal_n : problem.n
+    zp = mode == :nominal ? problem.nominal_zp : problem.zp
+    zn = mode == :nominal ? problem.nominal_zn : problem.zn
     
     Qu = policy.action_value.gradient_action
     hu = constr_data.jacobian_action
@@ -147,6 +156,10 @@ function optimality_error(policy::PolicyData, problem::ProblemData, options::Opt
             if !isinf(iu[k][i])
                 cs_inf = max(cs_inf, iu[k][i] * vu[k][i])
                 v_norm += vu[k][i]
+            end
+            if solver.FR
+                cs_inf = max(cs_inf, max(p[k] .* zp[k]))
+                cs_inf = max(cs_inf, max(n[k] .* zn[k]))
             end
         end
     end

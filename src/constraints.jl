@@ -43,8 +43,8 @@ function Constraint(f::Function, num_state::Int, num_action::Int; bounds_lower::
     num_ineq_upper = sum(isfinite, bounds_upper)
     
     v = Symbolics.variables(:v, 1:num_constraint)  # vector variables for Hessian vector products
-    
-    if !quasi_newton
+
+    if !quasi_newton && num_constraint > 0
         hessian_prod_state_state = sum([v[k] .* Symbolics.hessian(evaluate[k], x) for k in 1:num_constraint])
         hessian_prod_action_state = sum([v[k] .* Symbolics.jacobian(Symbolics.gradient(evaluate[k], u), x) for k in 1:num_constraint])
         hessian_prod_action_action = sum([v[k] .* Symbolics.hessian(evaluate[k], u) for k in 1:num_constraint])
@@ -112,10 +112,12 @@ end
 
 function hessian_vector_prod!(hessian_prod_state_state, hessian_prod_action_state, hessian_prod_action_action,
     constraint::Union{Dynamics{T}, Constraint{T}}, states, actions, lhs_vector) where T
-    constraint.hessian_prod_state_state(constraint.hessian_prod_state_state_cache, states, actions, lhs_vector)
-    constraint.hessian_prod_action_state(constraint.hessian_prod_action_state_cache, states, actions, lhs_vector)
-    constraint.hessian_prod_action_action(constraint.hessian_prod_action_action_cache, states, actions, lhs_vector)
-    @views hessian_prod_state_state .= constraint.hessian_prod_state_state_cache
-    @views hessian_prod_action_state .= constraint.hessian_prod_action_state_cache
-    @views hessian_prod_action_action .= constraint.hessian_prod_action_action_cache
+    if !isnothing(constraint.hessian_prod_state_state)
+        constraint.hessian_prod_state_state(constraint.hessian_prod_state_state_cache, states, actions, lhs_vector)
+        constraint.hessian_prod_action_state(constraint.hessian_prod_action_state_cache, states, actions, lhs_vector)
+        constraint.hessian_prod_action_action(constraint.hessian_prod_action_action_cache, states, actions, lhs_vector)
+        @views hessian_prod_state_state .= constraint.hessian_prod_state_state_cache
+        @views hessian_prod_action_state .= constraint.hessian_prod_action_state_cache
+        @views hessian_prod_action_action .= constraint.hessian_prod_action_action_cache
+    end
 end

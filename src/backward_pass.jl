@@ -66,17 +66,7 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             # Qu = lu + fu' * Vx
             Qu[t] .= lu[t]
             mul!(Qu[t], transpose(fu[t]), Vx[t+1], 1.0, 1.0)
-            # if t == N-1
-            #     println("backwards")
-            #     display(Qu[t])
-            #     display(fu[t])
-            # end
             add_barrier_grad!(Qu[t], il[t], iu[t], μ)
-            # if t == N-1
-            #     display(Qu[t])
-            #     display(ϕ[t])
-            #     display(hu[t])
-            # end
             
             # Qxx = lxx + fx' * Vxx * fx
             mul!(policy.xx_tmp[t], transpose(fx[t]), Vxx[t+1])
@@ -87,6 +77,7 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             mul!(policy.ux_tmp[t], transpose(fu[t]), Vxx[t+1])
             mul!(Quu[t], policy.ux_tmp[t], fu[t])
             Quu[t] .+= luu[t]
+            add_primal_dual!(Quu[t], il[t], iu[t], vl[t], vu[t])
     
             # Qux = lux + fu' * Vxx * fx
             mul!(policy.ux_tmp[t], transpose(fu[t]), Vxx[t+1])
@@ -96,36 +87,29 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             # apply second order terms to Q for full DDP, i.e., Vx * fxx, Vx * fuu, Vx * fxu
             if !options.quasi_newton
                 hessian_vector_prod!(fxx[t], fux[t], fuu[t], problem.model.dynamics[t], x[t], u[t], Vx[t+1])
-                # display(fxx[t])
                 Qxx[t] .+= fxx[t]
                 Qux[t] .+= fux[t]
                 Quu[t] .+= fuu[t]
-                
                 hessian_vector_prod!(hxx[t], hux[t], huu[t], constr_data.constraints[t], x[t], u[t], ϕ[t])
             end
-            # display(Vx[t+1])
             # setup linear system in backward pass
             policy.lhs_tl[t] .= Quu[t]
             policy.lhs_tr[t] .= transpose(hu[t])
             policy.lhs_bl[t] .= hu[t]
             fill!(policy.lhs_br[t], 0.0)
-            add_primal_dual!(policy.lhs_tl[t], il[t], iu[t], vl[t], vu[t])
-            policy.lhs_tl[t] .+= huu[t]
+            if !options.quasi_newton
+                policy.lhs_tl[t] .+= huu[t]
+            end
 
             policy.rhs_t[t] .= -Qu[t]
             mul!(policy.rhs_t[t], transpose(hu[t]), ϕ[t], -1.0, 1.0)
             policy.rhs_b[t] .= -h[t]
 
-            # if t == N-1
-            #     display(il[t])
-            #     display(vl[t])
-            #     display(policy.lhs[t])
-            #     display(policy.rhs[t])
-            # end
-
             policy.rhs_x_t[t] .= -Qux[t]
             policy.rhs_x_b[t] .= -hx[t]
-            policy.rhs_x_t[t] .-= hux[t]
+            if !options.quasi_newton
+                policy.rhs_x_t[t] .-= hux[t]
+            end
 
             # inertia calculation and correction
 
@@ -139,24 +123,19 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             kuϕ[t] .= policy.lhs_bk[t] \ policy.rhs[t]
             Kuϕ[t] .= policy.lhs_bk[t] \ policy.rhs_x[t]
 
-            # if t == N-1
-                # display(kuϕ[t])
-                # display(Kuϕ[t])
-            # end
-
             # update gains for ineq. duals
-            gains_ineq!(kvl[t], Kvl[t], il[t], vl[t], ku[t], Ku[t], μ)
-            gains_ineq!(kvu[t], Kvu[t], iu[t], vu[t], ku[t], Ku[t], μ)
-            
+            gains_ineq!(kvl[t], Kvl[t], il[t], vl[t], ku[t], -Ku[t], μ)
+            gains_ineq!(kvu[t], Kvu[t], iu[t], vu[t], -ku[t], Ku[t], μ)
+
             # Update return function approx. for next timestep 
             # Vxx = Q̂xx + Q̂ux' * Ku + Ku * Q̂ux' + Ku' Q̂uu' * Ku
             mul!(policy.ux_tmp[t], Quu[t], Ku[t])
-            
             mul!(Vxx[t], transpose(Ku[t]), Qux[t])
+
             Vxx[t] .+= transpose(Vxx[t])
             Vxx[t] .+= Qxx[t]
             mul!(Vxx[t], transpose(Ku[t]), policy.ux_tmp[t], 1.0, 1.0)
-        
+
             # Vx = Q̂x + Ku' * Q̂u + [Q̂uu Ku + Q̂ux]^T ku
             policy.ux_tmp[t] .+= Qux[t]
             mul!(Vx[t], transpose(policy.ux_tmp[t]), ku[t])

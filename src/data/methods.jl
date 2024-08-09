@@ -50,7 +50,8 @@ end
 function barrier_objective!(problem::ProblemData, data::SolverData; mode=:nominal)
     N = problem.horizon
     constr_data = problem.constr_data
-    _, _, _, il, iu = primal_trajectories(problem, mode=mode)
+    _, _, h, il, iu = primal_trajectories(problem, mode=mode)
+    ϕ = mode == :nominal ? problem.nominal_eq_duals : problem.eq_duals
     
     barrier_obj = 0.
     for k = 1:N-1
@@ -72,7 +73,7 @@ function barrier_objective!(problem::ProblemData, data::SolverData; mode=:nomina
 end
 
 function constraint_violation_1norm(problem::ProblemData; mode=:nominal)
-    _, _, h = primal_trajectories(problem, mode=mode)
+    _, _, h, _, _ = primal_trajectories(problem, mode=mode)
     constr_violation = 0.
     for hk in h
         constr_violation += norm(hk, 1)
