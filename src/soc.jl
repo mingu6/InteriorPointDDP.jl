@@ -9,7 +9,14 @@ function second_order_correction!(policy::PolicyData, problem::ProblemData, data
     ϕb, vl̄, vū = dual_trajectories(problem, mode=:nominal)
 
     lhs_bk = policy.lhs_bk
-    gains = policy.gains_soc
+
+    kuϕ = policy.gains_soc.kuϕ
+    Ku = policy.gains_main.Ku
+    ku = policy.gains_soc.ku
+    kvl = policy.gains_soc.kvl
+    kvu = policy.gains_soc.kvu
+    Kvl = policy.gains_soc.Kvl
+    Kvu = policy.gains_soc.Kvu
 
     α_soc = data.step_size
     θ_soc_old = data.primal_1_curr
@@ -31,9 +38,8 @@ function second_order_correction!(policy::PolicyData, problem::ProblemData, data
             policy.rhs_b[k] .*= α_soc
             policy.rhs_b[k] .+= h[k]
 
-            gains.kuϕ[k] .= lhs_bk[k] \ policy.rhs[k]
-            gains_ineq!(gains.kvl[k], gains.Kvl[k], il̄[k], vl̄[k], gains.ku[k], policy.gains_main.Ku[k], μ)
-            gains_ineq!(gains.kvu[k], gains.Kvu[k], iū[k], vū[k], gains.ku[k], policy.gains_main.Ku[k], μ)
+            kuϕ[k] .= lhs_bk[k] \ policy.rhs[k]
+            gains_ineq!(kvl[k], kvu[k], Kvl[k], Kvu[k], il̄[k], iū[k], vl̄[k], vū[k], ku[k], Ku[k], μ)
         end
         # forward pass
         α_soc = 1.0  # set high and find max
@@ -69,13 +75,10 @@ function second_order_correction!(policy::PolicyData, problem::ProblemData, data
         data.armijo_passed = φ_soc - φ_prev - 10. * eps(Float64) * abs(φ_prev) <= options.η_φ * Δφ
         if (θ_prev <= data.min_primal_1) && data.switching
             status = data.armijo_passed  #  sufficient decrease of barrier objective
-            # println("arm ", status)
         else
             suff = (θ_soc <= (1. - options.γ_θ) * θ_prev) || (φ_soc <= φ_prev - options.γ_φ * θ_prev)
             !suff && (status = false)
-            # println("filter ", status)
         end
-        # println(status, " ", α_soc, " ", data.step_size)
         if status
             data.step_size = α_soc
             data.barrier_obj_next = φ_soc
@@ -83,7 +86,6 @@ function second_order_correction!(policy::PolicyData, problem::ProblemData, data
             data.p = p
             break
         end
-        # println("exit? ", θ_soc > options.κ_soc * θ_soc_old)
         (θ_soc > options.κ_soc * θ_soc_old) && break
         θ_soc_old = θ_soc
     end

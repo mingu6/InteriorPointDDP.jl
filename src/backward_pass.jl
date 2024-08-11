@@ -112,7 +112,6 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             end
 
             # inertia calculation and correction
-
             policy.lhs_tl[t][diagind(policy.lhs_tl[t])] .+= reg
             policy.lhs_br[t][diagind(policy.lhs_br[t])] .-= δ_c
 
@@ -124,8 +123,7 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             Kuϕ[t] .= policy.lhs_bk[t] \ policy.rhs_x[t]
 
             # update gains for ineq. duals
-            gains_ineq!(kvl[t], Kvl[t], il[t], vl[t], ku[t], -Ku[t], μ)
-            gains_ineq!(kvu[t], Kvu[t], iu[t], vu[t], -ku[t], Ku[t], μ)
+            gains_ineq!(kvl[t], kvu[t], Kvl[t], Kvu[t], il[t], iu[t], vl[t], vu[t], ku[t], Ku[t], μ)
 
             # Update return function approx. for next timestep 
             # Vxx = Q̂xx + Q̂ux' * Ku + Ku * Q̂ux' + Ku' Q̂uu' * Ku
@@ -145,8 +143,6 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
         data.status && break
     end
     data.reg_last = reg
-    # println("backwards")
-    # display(hu[1])
     !data.status && (verbose && (@warn "Backward pass failure, unable to find positive definite iteration matrix."))
 end
 
@@ -174,10 +170,14 @@ function add_barrier_grad!(Qu, ineq_lower, ineq_upper, μ)
     end
 end
 
-function gains_ineq!(k, K, ineq, duals, ku, Ku, μ)
-    m = length(ineq)
+function gains_ineq!(kvl, kvu, Kvl, Kvu, il, iu, vl, vu, ku, Ku, μ)
+    m = length(il)
     for i = 1:m
-        k[i] = isinf(ineq[i]) ? 0.0 : μ / ineq[i] - duals[i] - duals[i] / ineq[i] * ku[i]
-        K[i, :] .= isinf(ineq[i]) ? 0.0 : duals[i] / ineq[i] * Ku[i, :]
+        σ_l = vl[i] / il[i]
+        σ_u = vu[i] / iu[i]
+        kvl[i] = isinf(il[i]) ? 0.0 : μ / il[i] - vl[i] - σ_l * ku[i]
+        kvu[i] = isinf(iu[i]) ? 0.0 : μ / iu[i] - vu[i] + σ_u * ku[i]
+        Kvl[i, :] .= isinf(il[i]) ? 0.0 : -σ_l * Ku[i, :]
+        Kvu[i, :] .= isinf(iu[i]) ? 0.0 : σ_u * Ku[i, :]
     end
 end
