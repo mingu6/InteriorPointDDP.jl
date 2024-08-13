@@ -81,7 +81,7 @@ function constraint_violation_1norm(problem::ProblemData; mode=:nominal)
     return constr_violation
 end
 
-function update_nominal_trajectory!(data::ProblemData) 
+function update_nominal_trajectory!(data::ProblemData; resto=false) 
     N = data.horizon
     for k = 1:N
         data.nominal_states[k] .= data.states[k]
@@ -93,6 +93,12 @@ function update_nominal_trajectory!(data::ProblemData)
         data.nominal_eq_duals[k] .= data.eq_duals[k]
         data.nominal_ineq_duals_lo[k] .= data.ineq_duals_lo[k]
         data.nominal_ineq_duals_up[k] .= data.ineq_duals_up[k]
+        if resto
+            data.nominal_p[k] .= data.p[k]
+            data.nominal_n[k] .= data.n[k]
+            data.nominal_vp[k] .= data.vp[k]
+            data.nominal_vn[k] .= data.vn[k]
+        end
     end
 end
 
@@ -110,4 +116,12 @@ function dual_trajectories(problem::ProblemData; mode=:nominal)
     vl = mode == :nominal ? problem.nominal_ineq_duals_lo : problem.ineq_duals_lo
     vu = mode == :nominal ? problem.nominal_ineq_duals_up : problem.ineq_duals_up
     return ϕ, vl, vu
+end
+
+function fr_trajectories(problem::ProblemData; mode=:nominal)
+    p = mode == :nominal ? problem.nominal_p : problem.p
+    n = mode == :nominal ? problem.nominal_n : problem.n
+    vp = mode == :nominal ? problem.nominal_vp : problem.vp
+    vn = mode == :nominal ? problem.nominal_vn : problem.vn
+    return p, n, vp, vn
 end

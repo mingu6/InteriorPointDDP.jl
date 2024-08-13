@@ -1,10 +1,12 @@
-function rollout!(policy::PolicyData, problem::ProblemData, τ::Float64; step_size=1.0, mode=:main)
+function rollout!(policy::PolicyData, problem::ProblemData, τ::Float64; step_size=1.0, mode=:main, resto=false)
     dynamics = problem.model.dynamics
     
     x, u, h, il, iu = primal_trajectories(problem, mode=:current)
     ϕ, vl, vu = dual_trajectories(problem, mode=:current)
+    p, n, vp, vn = fr_trajectories(problem, mode=:current)
     x̄, ū, h̄, il̄, iū = primal_trajectories(problem, mode=:nominal)
     ϕb, vl̄, vū = dual_trajectories(problem, mode=:nominal)
+    p̄, n̄, vp̄, vn̄ = fr_trajectories(problem, mode=:nominal)
     
     x[1] .= x̄[1]
 
@@ -13,6 +15,14 @@ function rollout!(policy::PolicyData, problem::ProblemData, τ::Float64; step_si
     kvl, kvu = gains.kvl, gains.kvu
     Kvl, Kvu = policy.gains_main.Kvl, policy.gains_main.Kvu
     Ku, Kϕ = policy.gains_main.Ku, policy.gains_main.Kϕ
+    kp = policy.kp
+    kn = policy.kn
+    Kp = policy.Kp
+    Kn = policy.Kn
+    kvp = policy.kvp
+    kvn = policy.kvn
+    Kvp = policy.Kvp
+    Kvn = policy.Kvn
 
     N = length(dynamics) + 1
 
@@ -42,6 +52,32 @@ function rollout!(policy::PolicyData, problem::ProblemData, τ::Float64; step_si
         vu[k] .+= vū[k]
         mul!(vu[k], Kvu[k], x[k], 1.0, 1.0)
         mul!(vu[k], Kvu[k], x̄[k], -1.0, 1.0)
+
+        if resto
+            p[k] .= kp[k]
+            p[k] .*= step_size
+            p[k] .+= p̄[k]
+            mul!(p[k], Kp[k], x[k], 1.0, 1.0)
+            mul!(p[k], Kp[k], x̄[k], -1.0, 1.0)
+
+            n[k] .= kn[k]
+            n[k] .*= step_size
+            n[k] .+= n̄[k]
+            mul!(n[k], Kn[k], x[k], 1.0, 1.0)
+            mul!(n[k], Kn[k], x̄[k], -1.0, 1.0)
+
+            vp[k] .= kvp[k]
+            vp[k] .*= step_size
+            vp[k] .+= vp̄[k]
+            mul!(vp[k], Kvp[k], x[k], 1.0, 1.0)
+            mul!(vp[k], Kvp[k], x̄[k], -1.0, 1.0)
+
+            vn[k] .= kvn[k]
+            vn[k] .*= step_size
+            vn[k] .+= vn̄[k]
+            mul!(vn[k], Kvn[k], x[k], 1.0, 1.0)
+            mul!(vn[k], Kvn[k], x̄[k], -1.0, 1.0)
+        end
         
         x[k+1] .= dynamics!(d, x[k], u[k])
     end

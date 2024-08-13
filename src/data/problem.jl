@@ -31,6 +31,16 @@ mutable struct ProblemData#{T,X,U,H,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX,C,CX,CU}
     # trajectory: z = (x1,..., xT, u1,..., uT-1) | Δz = (Δx1..., ΔxT, Δu1,..., ΔuT-1)
     trajectory::Vector#{T}
 
+    # restoration phase
+    nominal_p  # slack variable positive component
+    nominal_n  # slack variable negative component
+    p
+    n
+    nominal_vp
+    nominal_vn
+    vp
+    vn
+
     horizon::Int
 end
 
@@ -65,9 +75,19 @@ function problem_data(dynamics::Model{T}, costs::Costs{T}, constraints::Constrai
     trajectory = zeros(num_trajectory(dynamics))
     
     horizon = length(costs)
+
+    nominal_p = [zeros(h.num_constraint) for h in constraints]
+    nominal_n = [zeros(h.num_constraint) for h in constraints]
+    p = [zeros(h.num_constraint) for h in constraints]
+    n = [zeros(h.num_constraint) for h in constraints]
+    nominal_vp = [zeros(h.num_constraint) for h in constraints]
+    nominal_vn = [zeros(h.num_constraint) for h in constraints]
+    vp = [zeros(h.num_constraint) for h in constraints]
+    vn = [zeros(h.num_constraint) for h in constraints]
     
     ProblemData(states, actions, constr, ineq_lower, ineq_upper, eq_duals, ineq_duals_lo, ineq_duals_up,
         nominal_states, nominal_actions, nominal_constr, nominal_ineq_lower, nominal_ineq_upper, nominal_eq_duals,
-        nominal_ineq_duals_lo, nominal_ineq_duals_up, model, costs_dat, constr_data,
-        trajectory, horizon)
+        nominal_ineq_duals_lo, nominal_ineq_duals_up, model, costs_dat, constr_data, trajectory, 
+        nominal_p, nominal_n, p, n, nominal_vp, nominal_vn, vp, vn,
+        horizon)
 end

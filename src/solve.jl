@@ -73,27 +73,43 @@ function ipddp_solve!(solver::Solver)
             
             forward_pass!(policy, problem, data, options, verbose=options.verbose)
             if !data.status
+                println("before ", data.primal_1_curr)
                 update_filter!(data, options)
-                display(problem.nominal_states)
-                display(problem.nominal_actions)
-                data.status = feasibility_restoration(problem, policy, data, options)
-            end
-            if !data.status
-                options.verbose && (@warn "Feasibility restoration phase failed, local minimiser of constraint violation returned.")
-                break
+                feasibility_restoration!(problem, policy, data, options)
+                
+                constraint!(problem, mode=:nominal)
+                data.primal_1_curr = constraint_violation_1norm(problem, mode=:nominal)
+                data.barrier_obj_curr = barrier_objective!(problem, data, mode=:nominal)
+                println("after ", data.primal_1_curr)
             end
             
-            rescale_duals!(problem, data.μ, options)
-            update_nominal_trajectory!(problem)
-            !data.FR && (!data.armijo_passed || !data.switching) && update_filter!(data, options)
+            if !data.FR
+                rescale_duals!(problem, data.μ, options)
+                update_nominal_trajectory!(problem)
+                (!data.armijo_passed || !data.switching) && update_filter!(data, options)
+            end
             data.barrier_obj_curr = data.barrier_obj_next
             data.primal_1_curr = data.primal_1_next
+            data.FR = false
         end
         
         data.k += 1
         data.wall_time += iter_time
     end
-    display(problem.nominal_states)
+    display(map(x -> x[1], problem.nominal_states)[1:14])
+    display(map(x -> x[1], problem.nominal_states)[end-14:end])
+    display(minimum(map(x -> x[1], problem.nominal_states)))
+    display(maximum(map(x -> x[1], problem.nominal_states)))
+    display(maximum(map(x -> x, problem.nominal_constraints[1:end-1])))
+    display(minimum(map(x -> x, problem.nominal_constraints[1:end-1])))
+    display(maximum(map(x -> x[2], problem.nominal_actions[1:end-2])))
+    display(minimum(map(x -> x[2], problem.nominal_actions[1:end-2])))
+    println(" ")
+    display(map(x -> x[2], problem.nominal_states)[1:14])
+    display(map(x -> x[2], problem.nominal_states)[end-14:end])
+
+    display(problem.nominal_actions[1:13])
+    display(problem.nominal_actions[end-14:end])
     
     options.verbose && iteration_status(data, options)
     if data.k == options.max_iterations 
@@ -128,8 +144,8 @@ function optimality_error(policy::PolicyData, problem::ProblemData, solver::Solv
     ϕ, vl, vu = dual_trajectories(problem, mode=mode)
     p = mode == :nominal ? problem.nominal_p : problem.p
     n = mode == :nominal ? problem.nominal_n : problem.n
-    zp = mode == :nominal ? problem.nominal_zp : problem.zp
-    zn = mode == :nominal ? problem.nominal_zn : problem.zn
+    vp = mode == :nominal ? problem.nominal_vp : problem.vp
+    vn = mode == :nominal ? problem.nominal_vn : problem.vn
     
     Qu = policy.action_value.gradient_action
     hu = constr_data.jacobian_action
@@ -157,10 +173,10 @@ function optimality_error(policy::PolicyData, problem::ProblemData, solver::Solv
                 cs_inf = max(cs_inf, iu[k][i] * vu[k][i])
                 v_norm += vu[k][i]
             end
-            if solver.FR
-                cs_inf = max(cs_inf, max(p[k] .* zp[k]))
-                cs_inf = max(cs_inf, max(n[k] .* zn[k]))
-            end
+        end
+        if solver.FR
+            cs_inf = max(cs_inf, norm(p[k] .* vp[k], Inf))
+            cs_inf = max(cs_inf, norm(n[k] .* vn[k], Inf))
         end
     end
     cs_inf -= μ

@@ -38,4 +38,7 @@ Base.@kwdef mutable struct Options{T}
     γ_φ::Float64 = 1e-5                  # relaxation factor in the filter margin for barrier function (in (0, 1))
 
     κ_Σ::Float64 = 1e10                  # dual variable rescaling threshold param.
+
+    ρ::Float64 = 1000.0                  # scaling of constraint parameter for feas. resto. phase
+    κ_resto::Float64 = 0.9               # improvement factor on current constr. viol. to terminate feas. resto. phase
 end

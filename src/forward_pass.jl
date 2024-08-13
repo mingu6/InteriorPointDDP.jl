@@ -15,7 +15,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     min_step_size = estimate_min_step_size(Δφ_L, data, options)
 
     while data.step_size >= min_step_size
-        if data.l == 1 && !data.status && θ >= θ_prev
+        if data.l == 1 && !data.status && θ >= θ_prev && !data.FR
             data.status = second_order_correction!(policy, problem, data, options, τ)
             data.status && break
 
@@ -26,15 +26,15 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
 
         α = data.step_size
         try
-            rollout!(policy, problem, τ, step_size=α; mode=:main)
+            rollout!(policy, problem, τ, step_size=α; mode=:main, resto=false)
         catch
             # reduces step size if NaN or Inf encountered
             data.step_size *= 0.5
             continue
         end
-        constraint!(problem, mode=:current)
         
-        data.status = check_fraction_boundary(problem, τ)
+        constraint!(problem, mode=:current)
+        data.status = check_fraction_boundary(problem, τ; resto=false)
         # println("boundary failed")
         !data.status && (data.step_size *= 0.5, continue)
 
@@ -73,12 +73,14 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     !data.status && (verbose && (@warn "Line search failed to find a suitable iterate"))
 end
 
-function check_fraction_boundary(problem::ProblemData, τ::Float64)
+function check_fraction_boundary(problem::ProblemData, τ::Float64; resto=false)
     N = problem.horizon
     x, u, _, il, iu = primal_trajectories(problem, mode=:current)
     _, vl, vu = dual_trajectories(problem, mode=:current)
     x̄, ū, _, il̄, iū = primal_trajectories(problem, mode=:nominal)
     _, vl̄, vū = dual_trajectories(problem, mode=:nominal)
+    p, n, vp, vn = fr_trajectories(problem, mode=:current)
+    p̄, n̄, vp̄, vn̄ = fr_trajectories(problem, mode=:nominal)
 
     status = true
     for k = 1:N-1
@@ -98,6 +100,25 @@ function check_fraction_boundary(problem::ProblemData, τ::Float64)
             status = false
             # println(k, " vu ", vu[k], " ", (1. - τ + τ) .*  vū[k])
             break
+        end
+        if resto
+            if any((p[k] .< (1. - τ) .*  p̄[k]))
+                status = false
+                # println(k, " p ", p[k], " ", p̄[k])
+                break
+            elseif any((n[k] .< (1. - τ) .*  n̄[k]))
+                status = false
+                # println(k, " n ", n[k], " ", n̄[k])
+                break
+            elseif any((vp[k] .< (1. - τ) .*  vp̄[k]))
+                status = false
+                # println(k, " vp ", vp[k], " ", vp̄[k])
+                break
+            elseif any((vn[k] .< (1. - τ) .*  vn̄[k]))
+                status = false
+                # println(k, " vn ", vn[k], " ", vn̄[k])
+                break
+            end
         end
     end
     return status

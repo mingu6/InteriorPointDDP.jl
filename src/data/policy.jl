@@ -40,6 +40,14 @@ struct PolicyData#{N,M,NN,MM,MN,NNN,MNN,H,HN,HM}
     # policy u = ū + K * (x - x̄) + k
     gains_main
     gains_soc
+    kp
+    kn
+    Kp
+    Kn
+    kvp
+    kvn
+    Kvp
+    Kvn
 
     # value function approximation
     value#::Value{N,NN}
@@ -100,13 +108,21 @@ function policy_data(dynamics::Vector{Dynamics{T}}, constraints::Constraints{T})
 
     gains_main = gains_data(dynamics, constraints)
     gains_soc = gains_data(dynamics, constraints)
+    kp = [zeros(g.num_constraint) for g in constraints]
+    kn = [zeros(g.num_constraint) for g in constraints]
+    Kp = [zeros(constraints[t].num_constraint, dynamics[t].num_state) for t = 1:H-1]
+    Kn = [zeros(constraints[t].num_constraint, dynamics[t].num_state) for t = 1:H-1]
+    kvp = [zeros(g.num_constraint) for g in constraints]
+    kvn = [zeros(g.num_constraint) for g in constraints]
+    Kvp = [zeros(constraints[t].num_constraint, dynamics[t].num_state) for t = 1:H-1]
+    Kvn = [zeros(constraints[t].num_constraint, dynamics[t].num_state) for t = 1:H-1]
 
     # value function approximation
-    P = [[zeros(d.num_state, d.num_state) for d in dynamics]..., 
+    Vxx = [[zeros(d.num_state, d.num_state) for d in dynamics]..., 
             zeros(dynamics[end].num_next_state, dynamics[end].num_next_state)]
-    p =  [[zeros(d.num_state) for d in dynamics]..., 
+    Vx =  [[zeros(d.num_state) for d in dynamics]..., 
             zeros(dynamics[end].num_next_state)]
-    value = Value(p, P)
+    value = Value(Vx, Vxx)
 
     # action-value function approximation
     Qx = [zeros(d.num_state) for d in dynamics]
@@ -144,7 +160,7 @@ function policy_data(dynamics::Vector{Dynamics{T}}, constraints::Constraints{T})
 
     lhs_bk = [bunchkaufman(L, true; check=false) for L in lhs]
 
-    PolicyData(gains_main, gains_soc,
+    PolicyData(gains_main, gains_soc, kp, kn, Kp, Kn, kvp, kvn, Kvp, Kvn,
         value, action_value,
         x_tmp, u_tmp, h_tmp, uu_tmp, ux_tmp, xx_tmp, hu_tmp, hx_tmp,
         lhs, lhs_tl, lhs_tr, lhs_bl, lhs_br, rhs, rhs_t, rhs_b, rhs_x, rhs_x_t, rhs_x_b, lhs_bk)
