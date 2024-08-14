@@ -72,20 +72,11 @@ function ipddp_solve!(solver::Solver)
             data.p = 0
             
             forward_pass!(policy, problem, data, options, verbose=options.verbose)
-            if !data.status
-                update_filter!(data, options)
-                display(problem.nominal_states)
-                display(problem.nominal_actions)
-                data.status = feasibility_restoration(problem, policy, data, options)
-            end
-            if !data.status
-                options.verbose && (@warn "Feasibility restoration phase failed, local minimiser of constraint violation returned.")
-                break
-            end
+            !data.status && break
             
             rescale_duals!(problem, data.μ, options)
             update_nominal_trajectory!(problem)
-            !data.FR && (!data.armijo_passed || !data.switching) && update_filter!(data, options)
+            (!data.armijo_passed || !data.switching) && update_filter!(data, options)
             data.barrier_obj_curr = data.barrier_obj_next
             data.primal_1_curr = data.primal_1_next
         end
@@ -126,10 +117,6 @@ function optimality_error(policy::PolicyData, problem::ProblemData, solver::Solv
     constr_data = problem.constr_data
     _, _, h, il, iu = primal_trajectories(problem, mode=mode)
     ϕ, vl, vu = dual_trajectories(problem, mode=mode)
-    p = mode == :nominal ? problem.nominal_p : problem.p
-    n = mode == :nominal ? problem.nominal_n : problem.n
-    zp = mode == :nominal ? problem.nominal_zp : problem.zp
-    zn = mode == :nominal ? problem.nominal_zn : problem.zn
     
     Qu = policy.action_value.gradient_action
     hu = constr_data.jacobian_action
@@ -156,10 +143,6 @@ function optimality_error(policy::PolicyData, problem::ProblemData, solver::Solv
             if !isinf(iu[k][i])
                 cs_inf = max(cs_inf, iu[k][i] * vu[k][i])
                 v_norm += vu[k][i]
-            end
-            if solver.FR
-                cs_inf = max(cs_inf, max(p[k] .* zp[k]))
-                cs_inf = max(cs_inf, max(n[k] .* zn[k]))
             end
         end
     end
