@@ -24,8 +24,8 @@ end
 
 Constraints{T} = Vector{Constraint{T}} where T
 
-function Constraint(f::Function, num_state::Int, num_action::Int; bounds_lower::Vector{T}=fill(num_action, -Inf),
-    bounds_upper::Vector{T}=fill(num_action, Inf), quasi_newton::Bool=false) where T
+function Constraint(f::Function, num_state::Int, num_action::Int; bounds_lower::Vector{T}=ones(num_action) * -Inf,
+    bounds_upper::Vector{T}=ones(num_action) * Inf, quasi_newton::Bool=false) where T
 
     x = Symbolics.variables(:x, 1:num_state)
     u = Symbolics.variables(:u, 1:num_action)
@@ -45,9 +45,9 @@ function Constraint(f::Function, num_state::Int, num_action::Int; bounds_lower::
     v = Symbolics.variables(:v, 1:num_constraint)  # vector variables for Hessian vector products
 
     if !quasi_newton && num_constraint > 0
-        hessian_prod_state_state = sum([v[k] .* Symbolics.hessian(evaluate[k], x) for k in 1:num_constraint])
-        hessian_prod_action_state = sum([v[k] .* Symbolics.jacobian(Symbolics.gradient(evaluate[k], u), x) for k in 1:num_constraint])
-        hessian_prod_action_action = sum([v[k] .* Symbolics.hessian(evaluate[k], u) for k in 1:num_constraint])
+        hessian_prod_state_state = sum([Symbolics.jacobian(v[k] .* jacobian_state[k, :], x) for k in 1:num_constraint])
+        hessian_prod_action_state = sum([Symbolics.jacobian(v[k] .* jacobian_action[k, :], x) for k in 1:num_constraint])
+        hessian_prod_action_action = sum([Symbolics.jacobian(v[k] .* jacobian_action[k, :], u) for k in 1:num_constraint])
         hessian_prod_state_state_func = eval(Symbolics.build_function(hessian_prod_state_state, x, u, v)[2])
         hessian_prod_action_state_func = eval(Symbolics.build_function(hessian_prod_action_state, x, u, v)[2])
         hessian_prod_action_action_func = eval(Symbolics.build_function(hessian_prod_action_action, x, u, v)[2])
@@ -80,7 +80,7 @@ function Constraint()
 end
 
 function Constraint(f::Function, fx::Function, fu::Function, num_constraint::Int, num_state::Int, num_action::Int;
-    bounds_lower::Vector{T}=fill(num_action, -Inf), bounds_upper::Vector{T}=fill(num_action, Inf),
+    bounds_lower::Vector{T}=ones(num_action) *-Inf, bounds_upper::Vector{T}=ones(num_action) * Inf,
     fxx_prod::Function=nothing, fux_prod::Function=nothing, fuu_prod::Function=nothing) where T
 
     num_ineq_lower = sum(isfinite, bounds_lower)
