@@ -8,7 +8,7 @@ using MeshCat
 h = 0.05
 N = 101
 seed = 1
-options = Options(quasi_newton=false, verbose=true, max_iterations=701, optimality_tolerance=1e-5)
+options = Options(quasi_newton=false, verbose=true, max_iterations=1500, optimality_tolerance=1e-5)
 
 include("models/acrobot_impact.jl")
 include("visualise/visualise_acrobot.jl")
@@ -63,7 +63,8 @@ objective = [
 
 stage_constr = Constraint(implicit_contact_dynamics, nx, ny,
             bounds_lower=[-Inf; -Inf * ones(nq); zeros(nc); zeros(nc)],
-            bounds_upper=[Inf; Inf * ones(nq); Inf * ones(nc); Inf * ones(nc)])
+            bounds_upper=[Inf; Inf * ones(nq); Inf * ones(nc); Inf * ones(nc)],
+			indices_compl=[5, 6])
 
 constraints = [stage_constr for k = 1:N-1]
 

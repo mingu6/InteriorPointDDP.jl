@@ -20,12 +20,13 @@ struct Constraint{T}
     hessian_prod_action_action_cache::Matrix{T}
     bounds_lower::Vector{T}
     bounds_upper::Vector{T}
+    indices_compl::Vector{Int}
 end
 
 Constraints{T} = Vector{Constraint{T}} where T
 
 function Constraint(f::Function, num_state::Int, num_action::Int; bounds_lower::Vector{T}=ones(num_action) * -Inf,
-    bounds_upper::Vector{T}=ones(num_action) * Inf, quasi_newton::Bool=false) where T
+    bounds_upper::Vector{T}=ones(num_action) * Inf, quasi_newton::Bool=false, indices_compl=nothing) where T
 
     x = Symbolics.variables(:x, 1:num_state)
     u = Symbolics.variables(:u, 1:num_action)
@@ -57,6 +58,8 @@ function Constraint(f::Function, num_state::Int, num_action::Int; bounds_lower::
         hessian_prod_action_action_func = nothing
     end
 
+    indices_compl = isnothing(indices_compl) ? Int64[] : indices_compl 
+
     return Constraint(
         evaluate_func,
         jacobian_state_func, jacobian_action_func, 
@@ -65,7 +68,7 @@ function Constraint(f::Function, num_state::Int, num_action::Int; bounds_lower::
         zeros(num_constraint), zeros(num_action), zeros(num_action),
         zeros(num_constraint, num_state), zeros(num_constraint, num_action),
         zeros(num_state, num_state), zeros(num_action, num_state), zeros(num_action, num_action),
-        bounds_lower, bounds_upper)
+        bounds_lower, bounds_upper, indices_compl)
 end
 
 function Constraint()
@@ -76,11 +79,12 @@ function Constraint()
         0, 0, 0, 0, 0,
         Float64[], Float64[], Float64[], Array{Float64}(undef, 0, 0), Array{Float64}(undef, 0, 0),
         Array{Float64}(undef, 0, 0), Array{Float64}(undef, 0, 0), Array{Float64}(undef, 0, 0),
-        Float64[], Float64[])
+        Float64[], Float64[], Int64[])
 end
 
 function Constraint(f::Function, fx::Function, fu::Function, num_constraint::Int, num_state::Int, num_action::Int;
     bounds_lower::Vector{T}=ones(num_action) *-Inf, bounds_upper::Vector{T}=ones(num_action) * Inf,
+    indices_compl=nothing,
     fxx_prod::Function=nothing, fux_prod::Function=nothing, fuu_prod::Function=nothing) where T
 
     num_ineq_lower = sum(isfinite, bounds_lower)
@@ -94,7 +98,7 @@ function Constraint(f::Function, fx::Function, fu::Function, num_constraint::Int
         zeros(num_constraint), zeros(num_action), zeros(num_action),
         zeros(num_constraint, num_state), zeros(num_constraint, num_action),
         zeros(num_state, num_state), zeros(num_action, num_state), zeros(num_action, num_action),
-        bounds_lower, bounds_upper)
+        bounds_lower, bounds_upper, indices_compl)
 end
 
 function jacobian!(jacobian_states, jacobian_actions, constraints::Constraints{T}, states, actions) where T

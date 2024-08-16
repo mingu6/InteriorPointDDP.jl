@@ -125,7 +125,7 @@ function implicit_contact_dynamics(x, u)
         dynamics_acrobot(model, a -> M_func(model, a), (a, b) -> C_func(model, a, b),
         h, q0, q1, u1, λ1, q2);
         (s1 .- ϕ_func(model, q2));
-        λ1 .* s1 .- 1e-1;
+        λ1 .* s1;
     ]
 end
 

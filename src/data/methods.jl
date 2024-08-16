@@ -17,7 +17,7 @@ function cost!(data::SolverData, problem::ProblemData; mode=:nominal)
 	return data.objective
 end
 
-function constraint!(problem::ProblemData; mode=:nominal)
+function constraint!(problem::ProblemData, μ::Float64; mode=:nominal)
     constr_data = problem.constr_data
     states, actions = primal_trajectories(problem, mode=mode)
     constr_traj = mode == :nominal ? problem.nominal_constraints : problem.constraints
@@ -27,6 +27,9 @@ function constraint!(problem::ProblemData; mode=:nominal)
         if con.num_constraint > 0
             con.evaluate(con.evaluate_cache, states[k], actions[k])
             constr_traj[k] .= con.evaluate_cache
+            for i in con.indices_compl
+                constr_traj[k][i] -= μ
+            end
         end
         evaluate_ineq_lower!(ineq_lo_traj[k], actions[k], con.bounds_lower)
         evaluate_ineq_upper!(ineq_up_traj[k], actions[k], con.bounds_upper)
