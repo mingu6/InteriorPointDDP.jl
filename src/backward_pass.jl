@@ -1,5 +1,3 @@
-using LinearAlgebra
-
 function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverData, options::Options; mode=:nominal, verbose::Bool=false)
     N = problem.horizon
     constr_data = problem.constr_data
@@ -50,6 +48,8 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
 
     μ = data.μ
     δ_c = 0.
+
+    reg = 0.0
     
     while reg <= options.reg_max
         data.status = true
@@ -87,9 +87,9 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             # apply second order terms to Q for full DDP, i.e., Vx * fxx, Vx * fuu, Vx * fxu
             if !options.quasi_newton
                 hessian_vector_prod!(fxx[t], fux[t], fuu[t], problem.model.dynamics[t], x[t], u[t], Vx[t+1])
-                Qxx[t] .+= fxx[t]
+                Qxx[t] .+= Symmetric(fxx[t])
                 Qux[t] .+= fux[t]
-                Quu[t] .+= fuu[t]
+                Quu[t] .+= Symmetric(fuu[t])
                 hessian_vector_prod!(hxx[t], hux[t], huu[t], constr_data.constraints[t], x[t], u[t], ϕ[t])
             end
             # setup linear system in backward pass
@@ -98,7 +98,7 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             policy.lhs_bl[t] .= hu[t]
             fill!(policy.lhs_br[t], 0.0)
             if !options.quasi_newton
-                policy.lhs_tl[t] .+= huu[t]
+                policy.lhs_tl[t] .+= Symmetric(huu[t])
             end
 
             policy.rhs_t[t] .= -Qu[t]
@@ -117,6 +117,7 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
 
             policy.lhs_bk[t], data.status, reg, δ_c = inertia_correction!(policy.lhs[t], num_actions,
                         μ, reg, data.reg_last, options; rook=true)
+
             !data.status && break
 
             kuϕ[t] .= policy.lhs_bk[t] \ policy.rhs[t]
@@ -130,9 +131,10 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             mul!(policy.ux_tmp[t], Quu[t], Ku[t])
             mul!(Vxx[t], transpose(Ku[t]), Qux[t])
 
-            Vxx[t] .+= transpose(Vxx[t])
+            mul!(Vxx[t], transpose(Qux[t]), Ku[t], 1.0, 1.0)
             Vxx[t] .+= Qxx[t]
             mul!(Vxx[t], transpose(Ku[t]), policy.ux_tmp[t], 1.0, 1.0)
+            Vxx[t] .= Symmetric(Vxx[t])
 
             # Vx = Q̂x + Ku' * Q̂u + [Q̂uu Ku + Q̂ux]^T ku
             policy.ux_tmp[t] .+= Qux[t]
