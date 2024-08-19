@@ -1,3 +1,5 @@
+# taken from https://github.com/thowell/optimization_dynamics/blob/main/src/models/acrobot/visuals.jl
+
 include("visualise.jl")
 
 # visualization
