@@ -1,6 +1,5 @@
 using InteriorPointDDP
 using LinearAlgebra
-using Symbolics
 using Random
 using Plots
 using MeshCat
@@ -8,9 +7,9 @@ using MeshCat
 h = 0.05
 N = 101
 seed = 1
-options = Options(quasi_newton=false, verbose=true, max_iterations=1500, optimality_tolerance=1e-5)
+options = Options(quasi_newton=false, verbose=true, max_iterations=1000000, optimality_tolerance=1e-5)
 
-include("models/acrobot_impact.jl")
+include("models/acrobot.jl")
 include("visualise/visualise_acrobot.jl")
 
 # vis = Visualizer() 
@@ -50,8 +49,8 @@ function objT(x, u)
 	q2 = x[acrobot_impact.nq .+ (1:acrobot_impact.nq)] 
 	v1 = (q2 - q1) ./ h
 
-	J += 50.0 * dot(v1, v1)
-    J += 200.0 * dot(q2 - qN, q2 - qN)
+	J += 100.0 *  (sqrt(dot(v1, v1) + 1e-12) - 1e-6)
+    J += 500.0 * (sqrt(dot(q2 - qN, q2 - qN) + 1e-12) - 1e-6)
 	return J
 end
 
@@ -72,7 +71,6 @@ Random.seed!(seed)
 sλ_init = 0.01 * ones(nc)
 q2_init = LinRange(q1, qN, N)[2:end]
 ū = [[1.0e-3 * randn(nu); q2_init[t]; deepcopy(sλ_init); deepcopy(sλ_init)] for t = 1:N-1]
-# ū = [1.0e-3 * randn(ny) for t = 1:N-1]
 solver = Solver(dynamics, objective, constraints, options=options)
 solve!(solver, x1, ū)
 

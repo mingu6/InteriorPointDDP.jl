@@ -40,7 +40,6 @@ function cartpole_continuous(model::Cartpole{T}, x, u) where T
 end
 
 cartpole_discrete = (x, u) -> x + dt * cartpole_continuous(cartpole, x + 0.5 * dt * cartpole_continuous(cartpole, x, u), u)
-# cartpole_discrete = (x, u) -> x + dt * cartpole_continuous(cartpole, x, u)
 cartpole_dyn = Dynamics(cartpole_discrete, num_state, num_action)
 dynamics = [cartpole_dyn for k = 1:N-1]
 
