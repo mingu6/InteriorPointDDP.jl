@@ -1,6 +1,6 @@
 function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverData, options::Options; verbose=false)
     data.l = 0  # line search iteration counter
-    data.status = true
+    data.status = 0
     data.step_size = 1.0
     Δφ = 0.0
     μ = data.μ
@@ -15,9 +15,10 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     min_step_size = estimate_min_step_size(Δφ_L, data, options)
 
     while data.step_size >= min_step_size
-        if data.l == 1 && !data.status && θ >= θ_prev
-            data.status = second_order_correction!(policy, problem, data, options, τ)
-            data.status && break
+        if data.l == 1 && data.status != 0 && θ >= θ_prev
+            soc_status = second_order_correction!(policy, problem, data, options, τ)
+            !soc_status && (data.status = 6)
+            data.status == 0 && break
 
             data.step_size *= 0.5
             data.l += 1
@@ -36,7 +37,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         
         data.status = check_fraction_boundary(problem, τ)
         # println("boundary failed")
-        !data.status && (data.step_size *= 0.5, continue)
+        data.status != 0 && (data.step_size *= 0.5, continue)
 
         Δφ_L, Δφ_Q = expected_decrease_cost(policy, problem, α; mode=:main)
         Δφ = Δφ_L + Δφ_Q
@@ -46,9 +47,9 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         φ = barrier_objective!(problem, data, mode=:current)
         
         # check acceptability to filter
-        data.status = !any(x -> all([θ, φ] .>= x), data.filter)
+        data.status = !any(x -> all([θ, φ] .>= x), data.filter) ? 0 : 3
         # println("filter ", data.k, " ", data.status, " ", α, " ", θ, " ", φ)
-        !data.status && (data.step_size *= 0.5, data.l += 1, continue)  # failed, reduce step size
+        data.status != 0 && (data.step_size *= 0.5, data.l += 1, continue)  # failed, reduce step size
         
         # check for sufficient decrease conditions for the barrier objective/constraint violation
         data.switching = (Δφ < 0.0) && 
@@ -57,20 +58,20 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         data.armijo_passed = φ - φ_prev - 10. * eps(Float64) * abs(φ_prev) <= options.η_φ * Δφ
         # println("armijo ", data.armijo_passed, " ", θ <= data.min_primal_1, " ", φ - φ_prev, " ", Δφ, " ", data.step_size)
         if (θ <= data.min_primal_1) && data.switching
-            data.status = data.armijo_passed  #  sufficient decrease of barrier objective
+            data.status = data.armijo_passed ? 0 : 4  #  sufficient decrease of barrier objective
         else
             suff = (θ <= (1. - options.γ_θ) * θ_prev) || (φ <= φ_prev - options.γ_φ * θ_prev)
             # println("suff ", θ <= (1. - options.γ_θ) * θ_prev, " ", φ, " ", φ_prev - options.γ_φ * θ_prev)
-            !suff && (data.status = false)
+            data.status = suff ? 0 : 5
         end
-        !data.status && (data.step_size *= 0.5, data.l += 1, continue)  # failed, reduce step size
+        data.status != 0 && (data.step_size *= 0.5, data.l += 1, continue)  # failed, reduce step size
         
         data.barrier_obj_next = φ
         data.primal_1_next = θ
         break
     end
-    data.step_size < min_step_size && (data.status = false)
-    !data.status && (verbose && (@warn "Line search failed to find a suitable iterate"))
+    data.step_size < min_step_size && (data.status = 7)
+    data.status != 0 && (verbose && (@warn "Line search failed to find a suitable iterate"))
 end
 
 function check_fraction_boundary(problem::ProblemData, τ::Float64)
@@ -81,22 +82,22 @@ function check_fraction_boundary(problem::ProblemData, τ::Float64)
     _, vl̄, vū = dual_trajectories(problem, mode=:nominal)
     constraints = problem.constr_data.constraints
 
-    status = true
+    status = 0
     for k = 1:N-1
         if any((il[k] .< (1. - τ) .*  il̄[k]) .* .!isinf.(il̄[k]))
             # println(k, " il ", il[k], " ", (1. - τ + τ) .*  il̄[k])
-            status = false
+            status = 2
             break
         elseif any((iu[k] .< (1. - τ) .*  iū[k]) .* .!isinf.(iū[k]))
             # println(k, " iu ", iu[k], " ", (1. - τ + τ) .*  iū[k])
-            status = false
+            status = 2
             break
         elseif any((vl[k] .< (1. - τ) .*  vl̄[k]) .* .!isinf.(vl̄[k]))
             # println(k, " vl ", vl[k], " ", (1. - τ + τ) .*  vl̄[k])
-            status = false
+            status = 2
             break
         elseif any((vu[k] .< (1. - τ) .*  vū[k]) .* .!isinf.(vū[k]))
-            status = false
+            status = 2
             # println(k, " vu ", vu[k], " ", (1. - τ + τ) .*  vū[k])
             break
         end

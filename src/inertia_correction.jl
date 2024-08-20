@@ -206,7 +206,7 @@ end
 
 function inertia_correction!(mat::Matrix{T}, num_actions::Int64, μ::Float64, 
                 reg::Float64, reg_last::Float64, options::Options; rook::Bool=false) where T
-    status = true
+    status = 0
     δ_c = 0.0
     bk = bunchkaufman!(mat, rook; check=false)
     if bk.info > 0
@@ -219,7 +219,7 @@ function inertia_correction!(mat::Matrix{T}, num_actions::Int64, μ::Float64,
         else
             reg = (reg_last == 0.0) ? options.κ_̄w_p * reg : options.κ_w_p * reg
         end
-        status = false
+        status = 1
     end
     return bk, status, reg, δ_c
 end

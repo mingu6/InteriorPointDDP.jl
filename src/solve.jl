@@ -46,7 +46,7 @@ function ipddp_solve!(solver::Solver)
             gradients!(problem, mode=:nominal)
             
             backward_pass!(policy, problem, data, options, mode=:nominal, verbose=options.verbose)
-            !data.status && break
+            data.status != 0 && break
             # check (outer) overall problem convergence
 
             data.dual_inf, data.primal_inf, data.cs_inf = optimality_error(policy, problem, data, options, 0.0, mode=:nominal)
@@ -70,7 +70,7 @@ function ipddp_solve!(solver::Solver)
             data.p = 0
             
             forward_pass!(policy, problem, data, options, verbose=options.verbose)
-            !data.status && break
+            data.status != 0 && break
             
             rescale_duals!(problem, data.μ, options)
             update_nominal_trajectory!(problem)
@@ -86,7 +86,7 @@ function ipddp_solve!(solver::Solver)
     
     options.verbose && iteration_status(data, options)
     if data.k == options.max_iterations 
-        data.status = false
+        data.status = 8
         options.verbose && @warn "Maximum solver iterations reached."
     end
     return nothing
@@ -101,7 +101,7 @@ end
 function reset_filter!(data::SolverData)
     empty!(data.filter)
     push!(data.filter, [data.max_primal_1, -Inf])
-    data.status = true
+    data.status = 0
 end
 
 function optimality_error(policy::PolicyData, problem::ProblemData, solver::SolverData, options::Options, μ::Float64; mode=:nominal)

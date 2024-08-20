@@ -52,7 +52,7 @@ function second_order_correction!(policy::PolicyData, problem::ProblemData, data
                 continue
             end
             constraint!(problem, μ; mode=:current)
-            status = check_fraction_boundary(problem, τ)
+            status = check_fraction_boundary(problem, τ) == 0
             if status
                 break
             else

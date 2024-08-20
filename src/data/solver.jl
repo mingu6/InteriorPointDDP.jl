@@ -1,15 +1,20 @@
 """
     Solver Data
 """
+
+# solver status 0 - OK, 1 - backward pass failed, 2 - failed frac-to-bound, 3 - filter blocked,
+#               4 - failed setep acceptance, 5 - f/w failed, 6 - failed SOC, 7 - failed forward pass line search,
+#               8 - max iterations reached
 mutable struct SolverData{T}
     max_primal_1::T               # maximum allowable 1-norm of constraint violation (IPOPT θ_max)
     min_primal_1::T               # minimum 1-norm of constraint violation (IPOPT θ_min) 
     step_size::T                  # current step size for line search
-    status::Bool                  # solver status
+    status::Int                  # solver status
     j::Int                        # outer iteration counter (i.e., j-th barrier subproblem)
     k::Int                        # overall iteration counter
     l::Int                        # line search iteration counter
     p::Int                        # second-order corrections counter
+    t::Int                        # watchdog heuristic/filter reset counter
     wall_time::T                  # elapsed wall clock time
     μ::T                          # current subproblem perturbation value
     reg_last::T                   # regularisation in backward pass
@@ -31,11 +36,12 @@ function solver_data()
     max_primal_1 = 0.0
     min_primal_1 = 0.0
     step_size = 0.0
-    status = false
+    status = 0
     j = 0
     k = 0
     l = 0
     p = 0
+    t = 0
     wall_time = 0.0
     μ = 0.0
     reg_last = 0.0
@@ -52,7 +58,7 @@ function solver_data()
     armijo_passed = false
     filter = [[0.0 , 0.0]]
 
-    SolverData(max_primal_1, min_primal_1, step_size, status, j, k, l, p, wall_time, μ, reg_last,
+    SolverData(max_primal_1, min_primal_1, step_size, status, j, k, l, p, t, wall_time, μ, reg_last,
         objective, primal_inf, dual_inf, cs_inf, 
         barrier_obj_curr, primal_1_curr, barrier_obj_next, primal_1_next, 
         update_filter, switching, armijo_passed, filter)
@@ -62,7 +68,7 @@ function reset!(data::SolverData)
     data.max_primal_1 = 0.0
     data.min_primal_1 = 0.0
     data.step_size = 0.0
-    data.status = false
+    data.status = 0
     data.j = 0
     data.k = 0
     data.l = 0

@@ -52,7 +52,7 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
     reg = 0.0
     
     while reg <= options.reg_max
-        data.status = true
+        data.status = 0
         Vxx[N] .= lxx[N]
         Vx[N] .= lx[N]
         
@@ -118,7 +118,7 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             policy.lhs_bk[t], data.status, reg, δ_c = inertia_correction!(policy.lhs[t], num_actions,
                         μ, reg, data.reg_last, options; rook=true)
 
-            !data.status && break
+            data.status != 0 && break
 
             kuϕ[t] .= policy.lhs_bk[t] \ policy.rhs[t]
             Kuϕ[t] .= policy.lhs_bk[t] \ policy.rhs_x[t]
@@ -142,10 +142,10 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             mul!(Vx[t], transpose(Ku[t]), Qu[t], 1.0, 1.0)
             Vx[t] .+= Qx[t]
         end
-        data.status && break
+        data.status == 0 && break
     end
     data.reg_last = reg
-    !data.status && (verbose && (@warn "Backward pass failure, unable to find positive definite iteration matrix."))
+    data.status != 0 && (verbose && (@warn "Backward pass failure, unable to find positive definite iteration matrix."))
 end
 
 function add_primal_dual!(Quu, ineq_lower, ineq_upper, dual_lower, dual_upper)
