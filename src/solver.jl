@@ -73,8 +73,6 @@ function initialize_trajectory!(solver::Solver, actions, x1)
                 else
                     solver.problem.nominal_actions[t][i] = ut[i]
                 end
-                # println("pL: ", t, " ", i, " ", p_L, " ", lb[i], " ", ut[i], " ", solver.problem.nominal_actions[t][i])
-                # println("pU: ", t, " ", i, " ", p_U, " ", ub[i], " ", ut[i], " ", solver.problem.nominal_actions[t][i])
             end
         end
         solver.problem.nominal_states[t+1] .= dynamics!(dynamics[t], 

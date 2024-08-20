@@ -32,7 +32,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
             data.step_size *= 0.5
             continue
         end
-        constraint!(problem, mode=:current)
+        constraint!(problem, data.μ; mode=:current)
         
         data.status = check_fraction_boundary(problem, τ)
         # println("boundary failed")
@@ -55,7 +55,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
             ((-Δφ) ^ options.s_φ * α^(1-options.s_φ)  > options.δ * θ_prev ^ options.s_θ)
         # println("switch ", data.switching, " ", θ_prev, " ", -Δφ, " ", min_step_size)
         data.armijo_passed = φ - φ_prev - 10. * eps(Float64) * abs(φ_prev) <= options.η_φ * Δφ
-        # println("armijo ", data.armijo_passed, " ", θ <= data.min_primal_1, " ", φ - φ_prev, " ", Δφ)
+        # println("armijo ", data.armijo_passed, " ", θ <= data.min_primal_1, " ", φ - φ_prev, " ", Δφ, " ", data.step_size)
         if (θ <= data.min_primal_1) && data.switching
             data.status = data.armijo_passed  #  sufficient decrease of barrier objective
         else
@@ -79,6 +79,7 @@ function check_fraction_boundary(problem::ProblemData, τ::Float64)
     _, vl, vu = dual_trajectories(problem, mode=:current)
     x̄, ū, _, il̄, iū = primal_trajectories(problem, mode=:nominal)
     _, vl̄, vū = dual_trajectories(problem, mode=:nominal)
+    constraints = problem.constr_data.constraints
 
     status = true
     for k = 1:N-1

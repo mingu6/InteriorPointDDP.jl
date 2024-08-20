@@ -165,21 +165,21 @@ function implicit_contact_dynamics(model, x, u, dt)
 	D1L2, D2L2 = lagrangian_derivatives(a -> M_func(model, a), (a, b) -> C_func(model, a, b), qm2, vm2)
 
     d = (0.5 * dt * D1L1 + D2L1 + 0.5 * dt * D1L2 - D2L2#
-            + B_func(model, qm2) * u1 * dt
-            + N * γ1[1] * dt
-            + transpose(P) * b1 * dt)
+            + B_func(model, qm2) * u1
+            + N * γ1[1]
+            + transpose(P) * b1)
     [
 	 d;
     
 	 s1 .- ϕ;
 
-	 ψ1[1] .- model.μ_surface[1] * model.mass_block * model.gravity * 0.25;
+	 ψ1[1] .- model.μ_surface[1] * model.mass_block * model.gravity * 0.25 * dt;
 
-	 ψ1[2] .- model.μ_surface[2] * model.mass_block * model.gravity * 0.25;
+	 ψ1[2] .- model.μ_surface[2] * model.mass_block * model.gravity * 0.25 * dt;
 
-	 ψ1[3] .- model.μ_surface[3] * model.mass_block * model.gravity * 0.25;
+	 ψ1[3] .- model.μ_surface[3] * model.mass_block * model.gravity * 0.25 * dt;
 
-	 ψ1[4] .- model.μ_surface[4] * model.mass_block * model.gravity * 0.25;
+	 ψ1[4] .- model.μ_surface[4] * model.mass_block * model.gravity * 0.25 * dt;
 
 	 ψ1[5] .- model.μ_pusher * γ1[1];
 

@@ -93,7 +93,7 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
                 hessian_vector_prod!(hxx[t], hux[t], huu[t], constr_data.constraints[t], x[t], u[t], ϕ[t])
             end
             # setup linear system in backward pass
-            policy.lhs_tl[t] .= Quu[t]
+            policy.lhs_tl[t] .= Symmetric(Quu[t])
             policy.lhs_tr[t] .= transpose(hu[t])
             policy.lhs_bl[t] .= hu[t]
             fill!(policy.lhs_br[t], 0.0)
@@ -132,7 +132,7 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             mul!(Vxx[t], transpose(Ku[t]), Qux[t])
 
             mul!(Vxx[t], transpose(Qux[t]), Ku[t], 1.0, 1.0)
-            Vxx[t] .+= Qxx[t]
+            Vxx[t] .+= Symmetric(Qxx[t])
             mul!(Vxx[t], transpose(Ku[t]), policy.ux_tmp[t], 1.0, 1.0)
             Vxx[t] .= Symmetric(Vxx[t])
 

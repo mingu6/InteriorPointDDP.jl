@@ -7,7 +7,7 @@ using MeshCat
 dt = 0.1
 N = 26
 seed = 1
-options = Options(quasi_newton=true, verbose=true, max_iterations=12, optimality_tolerance=1e-5)
+options = Options(quasi_newton=true, verbose=true, max_iterations=10000, optimality_tolerance=1e-5)
 
 include("models/planar_push.jl")
 include("visualise/visualise_pp.jl")
@@ -17,7 +17,7 @@ include("visualise/visualise_pp.jl")
 
 # ## mode
 MODE = :translate
-# MODE = :rotate 
+MODE = :rotate 
 
 nq = planarpush.nq
 nc = planarpush.nc
@@ -77,8 +77,8 @@ function objT(x, u)
 	q2 = x[planarpush.nq .+ (1:planarpush.nq)] 
 	v1 = (q2 - q1) ./ dt
 
-	J += 5.0 * 0.5 * transpose(v1) * Diagonal([1.0, 1.0, 1.0, 0.1, 0.1]) * v1
-	J += 10.0 * 0.5 * transpose(x - xT) * Diagonal([1.0, 1.0, 1.0, 0.1, 0.1, 1.0, 1.0, 1.0, 0.1, 0.1]) * (x - xT)
+	J += 20.0 * 0.5 * (sqrt(transpose(v1) * Diagonal([1.0, 1.0, 1.0, 0.1, 0.1]) * v1 + 1e-12) - 1e-6)
+	J += 40.0 * 0.5 * (sqrt(transpose(x - xT) * Diagonal([1.0, 1.0, 1.0, 0.1, 0.1, 1.0, 1.0, 1.0, 0.1, 0.1]) * (x - xT) + 1e-12) - 1e-6)
 
 	return J
 end
@@ -90,10 +90,12 @@ objective = [
     Cost(objT, nx, 0),
 ]
 
+cone_inds = [[10, 15, 16], [11, 17, 18], [12, 19, 20], [13, 21, 22], [14, 23],
+			 [24, 29, 30], [25, 31, 32], [26, 33, 34], [27, 35, 36], [28, 37]]
 stage_constr = Constraint((x, u) -> implicit_contact_dynamics(planarpush, x, u, dt), nx, ny,
             bounds_lower=[-10.0; -10.0; -Inf * ones(nq); zeros(2 * nc_impact); -Inf * ones(5); -Inf * ones(9); -Inf * ones(5); -Inf * ones(9)],
             bounds_upper=[10.0; 10.0; Inf * ones(nq); Inf * ones(2 * nc_impact); Inf * ones(5); Inf * ones(9); Inf * ones(5); Inf * ones(9)],
-			indices_compl=[21, 22, 25, 28, 31, 34])
+			indices_compl=[21, 22, 25, 28, 31, 34], cone_inds=cone_inds)
 
 constraints = [stage_constr for k = 1:N-1]
 

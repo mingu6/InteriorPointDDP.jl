@@ -21,12 +21,13 @@ struct Constraint{T}
     bounds_lower::Vector{T}
     bounds_upper::Vector{T}
     indices_compl::Vector{Int}
+    cone_indices::Vector{Vector{Int}}
 end
 
 Constraints{T} = Vector{Constraint{T}} where T
 
 function Constraint(f::Function, num_state::Int, num_action::Int; bounds_lower::Vector{T}=ones(num_action) * -Inf,
-    bounds_upper::Vector{T}=ones(num_action) * Inf, quasi_newton::Bool=false, indices_compl=nothing) where T
+    bounds_upper::Vector{T}=ones(num_action) * Inf, quasi_newton::Bool=false, indices_compl=nothing, cone_inds=nothing) where T
 
     x = Symbolics.variables(:x, 1:num_state)
     u = Symbolics.variables(:u, 1:num_action)
@@ -42,6 +43,10 @@ function Constraint(f::Function, num_state::Int, num_action::Int; bounds_lower::
     num_constraint = length(evaluate)
     num_ineq_lower = sum(isfinite, bounds_lower)
     num_ineq_upper = sum(isfinite, bounds_upper)
+
+    if length(bounds_lower) != num_action || length(bounds_upper) != num_action
+        error("Bounds provided do not match dimension of actions.")
+    end
     
     v = Symbolics.variables(:v, 1:num_constraint)  # vector variables for Hessian vector products
 
@@ -59,6 +64,7 @@ function Constraint(f::Function, num_state::Int, num_action::Int; bounds_lower::
     end
 
     indices_compl = isnothing(indices_compl) ? Int64[] : indices_compl 
+    cone_inds = isnothing(cone_inds) ? [Int64[]] : cone_inds
 
     return Constraint(
         evaluate_func,
@@ -68,7 +74,7 @@ function Constraint(f::Function, num_state::Int, num_action::Int; bounds_lower::
         zeros(num_constraint), zeros(num_action), zeros(num_action),
         zeros(num_constraint, num_state), zeros(num_constraint, num_action),
         zeros(num_state, num_state), zeros(num_action, num_state), zeros(num_action, num_action),
-        bounds_lower, bounds_upper, indices_compl)
+        bounds_lower, bounds_upper, indices_compl, cone_inds)
 end
 
 function Constraint()
@@ -79,12 +85,12 @@ function Constraint()
         0, 0, 0, 0, 0,
         Float64[], Float64[], Float64[], Array{Float64}(undef, 0, 0), Array{Float64}(undef, 0, 0),
         Array{Float64}(undef, 0, 0), Array{Float64}(undef, 0, 0), Array{Float64}(undef, 0, 0),
-        Float64[], Float64[], Int64[])
+        Float64[], Float64[], Int64[], [Int64[]])
 end
 
 function Constraint(f::Function, fx::Function, fu::Function, num_constraint::Int, num_state::Int, num_action::Int;
     bounds_lower::Vector{T}=ones(num_action) *-Inf, bounds_upper::Vector{T}=ones(num_action) * Inf,
-    indices_compl=nothing,
+    indices_compl=nothing, cone_inds=nothing,
     fxx_prod::Function=nothing, fux_prod::Function=nothing, fuu_prod::Function=nothing) where T
 
     num_ineq_lower = sum(isfinite, bounds_lower)
@@ -98,7 +104,7 @@ function Constraint(f::Function, fx::Function, fu::Function, num_constraint::Int
         zeros(num_constraint), zeros(num_action), zeros(num_action),
         zeros(num_constraint, num_state), zeros(num_constraint, num_action),
         zeros(num_state, num_state), zeros(num_action, num_state), zeros(num_action, num_action),
-        bounds_lower, bounds_upper, indices_compl)
+        bounds_lower, bounds_upper, indices_compl, cone_inds)
 end
 
 function jacobian!(jacobian_states, jacobian_actions, constraints::Constraints{T}, states, actions) where T

@@ -20,19 +20,17 @@ function ipddp_solve!(solver::Solver)
     problem = solver.problem
     options = solver.options
 	data = solver.data
-    constr_data = problem.constr_data
     
     reset!(problem.model)
     reset!(problem.cost_data)
     reset_duals!(problem)  # TODO: initialize better, wrap up with initialization of problem data
-
-    constraint!(problem, mode=:nominal)
     
     # automatically select initial perturbation. loosely based on bound of CS condition (duality) for LPs
-    # TODO: fix value just like IPOPT?
     cost!(data, problem, mode=:nominal)
-    data.μ = (data.μ == 0.0) ? options.μ_init * data.objective / max(constr_data.num_constraints[1], 1.0) : data.μ
+    # data.μ = (data.μ == 0.0) ? options.μ_init * data.objective / max(problem.constr_data.num_constraints[1], 1.0) : data.μ
     data.μ = 0.1
+
+    constraint!(problem, data.μ; mode=:nominal)
     
     # update performance measures for first iterate (req. for sufficient decrease conditions for step acceptance)
     data.primal_1_curr = constraint_violation_1norm(problem, mode=:nominal)
@@ -181,7 +179,7 @@ function reset_duals!(problem::ProblemData)
         fill!(problem.eq_duals[k], 0.0)
         fill!(problem.nominal_eq_duals[k], 0.0)
         constr = constr_data.constraints[k]
-        for i = constr.num_action
+        for i = 1:constr.num_action
             problem.ineq_duals_lo[k][i] = isinf(constr.bounds_lower[i]) ? 0.0 : 1.0
             problem.ineq_duals_up[k][i] = isinf(constr.bounds_upper[i]) ? 0.0 : 1.0
             problem.nominal_ineq_duals_lo[k][i] = isinf(constr.bounds_lower[i]) ? 0.0 : 1.0
