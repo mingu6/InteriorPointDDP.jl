@@ -94,24 +94,23 @@ function lagrangian_derivatives(mass_matrix, dynamics_bias, q, v)
     return D1L, D2L
 end
 
-function dynamics_acrobot(model::DoublePendulum{T}, mass_matrix, dynamics_bias, h, q0, q1, u1, λ1, q2) where T
+function dynamics_acrobot(model::DoublePendulum{T}, mass_matrix, dynamics_bias, dt, q0, q1, u1, λ1, q2) where T
 	# evalutate at midpoint
 	qm1 = 0.5 * (q0 + q1)
-    vm1 = (q1 - q0) / h
+    vm1 = (q1 - q0) / dt
     qm2 = 0.5 * (q1 + q2)
-    vm2 = (q2 - q1) / h
+    vm2 = (q2 - q1) / dt
 
 	D1L1, D2L1 = lagrangian_derivatives(mass_matrix, dynamics_bias, qm1, vm1)
 	D1L2, D2L2 = lagrangian_derivatives(mass_matrix, dynamics_bias, qm2, vm2)
 
-	return (-0.5 * h * D1L1 - 0.5 * h * D1L2 + D2L2  - D2L1
-		- B_func(model, qm2) * u1 * h
-        - transpose(P_func(model, q2)) * λ1 * h
-        + h * 0.5 .* vm2) # damping
+	return (-0.5 * dt * D1L1 - 0.5 * dt * D1L2 + D2L2  - D2L1
+		- B_func(model, qm2) * u1 * dt
+        - transpose(P_func(model, q2)) * λ1 * dt
+        + dt * 0.5 .* vm2) # damping
 end
 
-function implicit_contact_dynamics(x, u)
-    model = acrobot_impact
+function implicit_contact_dynamics(model::DoublePendulum{T}, x, u, dt) where T
     nq = model.nq
     nu = model.nu
     nc = model.nc
@@ -126,7 +125,7 @@ function implicit_contact_dynamics(x, u)
 
     [
         dynamics_acrobot(model, a -> M_func(model, a), (a, b) -> C_func(model, a, b),
-        h, q0, q1, u1, λ1, q2);
+        dt, q0, q1, u1, λ1, q2);
         (s1 .- ϕ_func(model, q2));
         λ1 .* s1;
     ]

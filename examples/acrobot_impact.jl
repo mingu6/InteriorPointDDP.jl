@@ -4,7 +4,7 @@ using Random
 using Plots
 using MeshCat
 
-h = 0.05
+dt = 0.05
 N = 101
 seed = 1
 options = Options(quasi_newton=false, verbose=true, max_iterations=1000000, optimality_tolerance=1e-5)
@@ -35,10 +35,10 @@ function objt(x, u)
 
 	q1 = x[1:acrobot_impact.nq] 
 	q2 = x[acrobot_impact.nq .+ (1:acrobot_impact.nq)]
-	v1 = (q2 - q1) ./ h
+	v1 = (q2 - q1) ./ dt
 
-	J += 0.1 * h * transpose(v1) * v1
-	J += 0.1 * h * u[1] * u[1]
+	J += 0.1 * dt * transpose(v1) * v1
+	J += 0.1 * dt * u[1] * u[1]
 	return J
 end
 
@@ -47,7 +47,7 @@ function objT(x, u)
 	
 	q1 = x[1:acrobot_impact.nq] 
 	q2 = x[acrobot_impact.nq .+ (1:acrobot_impact.nq)] 
-	v1 = (q2 - q1) ./ h
+	v1 = (q2 - q1) ./ dt
 
 	J += 100.0 *  (sqrt(dot(v1, v1) + 1e-12) - 1e-6)
     J += 500.0 * (sqrt(dot(q2 - qN, q2 - qN) + 1e-12) - 1e-6)
@@ -60,7 +60,7 @@ objective = [
     Cost(objT, nx, 0),
 ]
 
-stage_constr = Constraint(implicit_contact_dynamics, nx, ny,
+stage_constr = Constraint((x, u) -> implicit_contact_dynamics(acrobot_impact, x, u, dt), nx, ny,
             bounds_lower=[-Inf; -Inf * ones(nq); zeros(nc); zeros(nc)],
             bounds_upper=[Inf; Inf * ones(nq); Inf * ones(nc); Inf * ones(nc)],
 			indices_compl=[5, 6])
@@ -78,11 +78,11 @@ solve!(solver, x1, ū)
 x_mat = reduce(vcat, transpose.(solver.problem.nominal_states))
 q1 = x_mat[:, 1]
 q2 = x_mat[:, 2]
-v1 = (x_mat[:, 3] - x_mat[:, 1]) ./ h
-v2 = (x_mat[:, 4] - x_mat[:, 2]) ./ h
+v1 = (x_mat[:, 3] - x_mat[:, 1]) ./ dt
+v2 = (x_mat[:, 4] - x_mat[:, 2]) ./ dt
 u_mat = [map(x -> x[1], solver.problem.nominal_actions[1:end-1]); 0.0]
 plot(range(0, (N-1) * 0.05, length=N), [q1 q2 v1 v2 u_mat], label=["q1" "q2" "v1" "v2" "u"])
 savefig("examples/plots/acrobot_impact.png")
 
 q_sol = state_to_configuration(solver.problem.nominal_states)
-visualize!(vis, acrobot_impact, q_sol, Δt=h);
+visualize!(vis, acrobot_impact, q_sol, Δt=dt);
