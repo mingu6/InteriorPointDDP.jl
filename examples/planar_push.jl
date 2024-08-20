@@ -16,7 +16,7 @@ include("visualise/visualise_pp.jl")
 # render(vis)
 
 # ## mode
-MODE = :translate
+# MODE = :translate
 MODE = :rotate 
 
 nq = planarpush.nq
@@ -77,8 +77,10 @@ function objT(x, u)
 	q2 = x[planarpush.nq .+ (1:planarpush.nq)] 
 	v1 = (q2 - q1) ./ dt
 
-	J += 20.0 * 0.5 * (sqrt(transpose(v1) * Diagonal([1.0, 1.0, 1.0, 0.1, 0.1]) * v1 + 1e-12) - 1e-6)
-	J += 40.0 * 0.5 * (sqrt(transpose(x - xT) * Diagonal([1.0, 1.0, 1.0, 0.1, 0.1, 1.0, 1.0, 1.0, 0.1, 0.1]) * (x - xT) + 1e-12) - 1e-6)
+	# J += 20.0 * 0.5 * (sqrt(transpose(v1) * Diagonal([1.0, 1.0, 1.0, 0.1, 0.1]) * v1 + 1e-12) - 1e-6)
+	# J += 40.0 * 0.5 * (sqrt(transpose(x - xT) * Diagonal([1.0, 1.0, 1.0, 0.1, 0.1, 1.0, 1.0, 1.0, 0.1, 0.1]) * (x - xT) + 1e-12) - 1e-6)
+	J += 50.0 * 0.5 * transpose(v1) * Diagonal([1.0, 1.0, 1.0, 0.1, 0.1]) * v1
+	J += 100.0 * 0.5 * transpose(x - xT) * Diagonal([1.0, 1.0, 1.0, 0.1, 0.1, 1.0, 1.0, 1.0, 0.1, 0.1]) * (x - xT)
 
 	return J
 end

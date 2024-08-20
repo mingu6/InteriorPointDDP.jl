@@ -23,9 +23,9 @@ Base.@kwdef mutable struct Options{T}
     κ_c::Float64 = 0.25
     δ_c::Float64 = 1e-8
 
-    κ_ϵ::Float64 = 0.2                   # tolerance factor for lowering barrier parameter
-    κ_μ::Float64 = 0.2                   # linear decrease factor for barrier parameter
-    θ_μ::Float64 = 1.2                   # superlinear decrease factor for barrier parameter
+    κ_ϵ::Float64 = 1.0                   # tolerance factor for lowering barrier parameter
+    κ_μ::Float64 = 0.5                   # linear decrease factor for barrier parameter
+    θ_μ::Float64 = 1.1                   # superlinear decrease factor for barrier parameter
     τ_min::Float64 = 0.99                # lower bound on fraction-to-boundary parameter
     
     s_max::Float64 = 100.0               # scaling threshold for NLP error

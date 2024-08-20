@@ -15,6 +15,13 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     min_step_size = estimate_min_step_size(Δφ_L, data, options)
 
     while data.step_size >= min_step_size
+        # # filter reset heuristic, if filter is blocking large steps for several iterations, reset
+        # if data.t == 6 && data.status == 6 && data.max_primal_1 > θ / 10.0
+        #     data.max_primal_1 *= 0.1
+        #     reset_filter!(data)
+        #     data.t = 0
+        # end
+
         if data.l == 1 && data.status != 0 && θ >= θ_prev
             soc_status = second_order_correction!(policy, problem, data, options, τ)
             !soc_status && (data.status = 6)
@@ -48,7 +55,8 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         
         # check acceptability to filter
         data.status = !any(x -> all([θ, φ] .>= x), data.filter) ? 0 : 3
-        # println("filter ", data.k, " ", data.status, " ", α, " ", θ, " ", φ)
+        # println("filter ", data.k, " ", data.status, " ", α, " ", θ, " ", φ, " ", μ)
+        # println(data.filter)
         data.status != 0 && (data.step_size *= 0.5, data.l += 1, continue)  # failed, reduce step size
         
         # check for sufficient decrease conditions for the barrier objective/constraint violation
@@ -61,7 +69,7 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
             data.status = data.armijo_passed ? 0 : 4  #  sufficient decrease of barrier objective
         else
             suff = (θ <= (1. - options.γ_θ) * θ_prev) || (φ <= φ_prev - options.γ_φ * θ_prev)
-            # println("suff ", θ <= (1. - options.γ_θ) * θ_prev, " ", φ, " ", φ_prev - options.γ_φ * θ_prev)
+            # println("suff ", θ, " ", (1. - options.γ_θ) * θ_prev, " ", φ, " ", φ_prev - options.γ_φ * θ_prev)
             data.status = suff ? 0 : 5
         end
         data.status != 0 && (data.step_size *= 0.5, data.l += 1, continue)  # failed, reduce step size

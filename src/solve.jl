@@ -28,7 +28,7 @@ function ipddp_solve!(solver::Solver)
     # automatically select initial perturbation. loosely based on bound of CS condition (duality) for LPs
     cost!(data, problem, mode=:nominal)
     # data.μ = (data.μ == 0.0) ? options.μ_init * data.objective / max(problem.constr_data.num_constraints[1], 1.0) : data.μ
-    data.μ = 0.1
+    data.μ = 1.0
 
     constraint!(problem, data.μ; mode=:nominal)
     
@@ -59,9 +59,12 @@ function ipddp_solve!(solver::Solver)
             opt_err_μ = max(dual_inf_μ, cs_inf_μ, primal_inf_μ)          
             if opt_err_μ <= options.κ_ϵ * data.μ
                 data.μ = max(options.optimality_tolerance / 10.0, min(options.κ_μ * data.μ, data.μ ^ options.θ_μ))
+                # println("reset filter")
                 reset_filter!(data)
                 # performance of current iterate updated to account for barrier parameter change
                 data.barrier_obj_curr = barrier_objective!(problem, data, mode=:nominal)
+                constraint!(problem, data.μ; mode=:nominal)
+                data.primal_1_curr = constraint_violation_1norm(problem, mode=:nominal)
                 data.j += 1
                 continue
             end
@@ -72,9 +75,15 @@ function ipddp_solve!(solver::Solver)
             forward_pass!(policy, problem, data, options, verbose=options.verbose)
             data.status != 0 && break
             
+            # # for watchdog/filter reset heuristic (pg 13 IPOPT)
+            # if data.l >= 2
+            #     data.t += 1
+            # else
+            #     data.t = 0
+            # end
             rescale_duals!(problem, data.μ, options)
             update_nominal_trajectory!(problem)
-            (!data.armijo_passed || !data.switching) && update_filter!(data, options)
+            (!data.armijo_passed && !data.switching) && update_filter!(data, options)
             data.barrier_obj_curr = data.barrier_obj_next
             data.primal_1_curr = data.primal_1_next
         end

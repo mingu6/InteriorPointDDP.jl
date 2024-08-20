@@ -38,7 +38,7 @@ function objt(x, u)
 	v1 = (q2 - q1) ./ dt
 
 	J += 0.1 * dt * transpose(v1) * v1
-	J += 0.1 * dt * u[1] * u[1]
+	J += 0.5 * dt * u[1] * u[1]
 	return J
 end
 
@@ -49,8 +49,10 @@ function objT(x, u)
 	q2 = x[acrobot_impact.nq .+ (1:acrobot_impact.nq)] 
 	v1 = (q2 - q1) ./ dt
 
-	J += 100.0 *  (sqrt(dot(v1, v1) + 1e-12) - 1e-6)
-    J += 500.0 * (sqrt(dot(q2 - qN, q2 - qN) + 1e-12) - 1e-6)
+	# J += 100.0 *  (sqrt(dot(v1, v1) + 1e-12) - 1e-6)
+    # J += 200.0 * (sqrt(dot(q2 - qN, q2 - qN) + 1e-12) - 1e-6)
+	J += 100.0 *  dot(v1, v1)
+    J += 400.0 * dot(q2 - qN, q2 - qN)
 	return J
 end
 
