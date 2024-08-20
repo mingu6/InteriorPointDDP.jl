@@ -53,6 +53,9 @@ end
 
 function evaluate_cone_ineq!(res, actions, cone_inds)
     for inds in cone_inds
+        if length(inds) == 0
+            break
+        end
         res[inds] .= actions[inds[1]] - norm(actions[inds[2:end]], 2)
     end
 end
