@@ -23,6 +23,7 @@ function ipddp_solve!(solver::Solver)
     
     reset!(problem.model)
     reset!(problem.cost_data)
+    reset!(data)
     reset_duals!(problem)  # TODO: initialize better, wrap up with initialization of problem data
     
     # automatically select initial perturbation. loosely based on bound of CS condition (duality) for LPs
