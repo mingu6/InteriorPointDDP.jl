@@ -1,6 +1,7 @@
 """
     Problem Data
 """
+
 mutable struct Solver{T}#,N,M,NN,MM,MN,NNN,MNN,X,U,H,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX,C,CX,CU}
     problem::ProblemData#{T,X,U,H,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX,C,CX,CU}
 	policy::PolicyData#{N,M,NN,MM,MN,NNN,MNN}
@@ -8,34 +9,27 @@ mutable struct Solver{T}#,N,M,NN,MM,MN,NNN,MNN,X,U,H,D,O,FX,FU,FW,OX,OU,OXX,OUU,
     options::Options{T}
 end
 
-function Solver(dynamics::Vector{Dynamics{T}}, costs::Costs{T}, constraints::Constraints{T, J}; options=Options{T}()) where {T, J}
+function Solver(dynamics::Vector{Dynamics{T}}, costs::Costs{T}, constraints::Constraints{T, J}=nothing,
+                bounds::Bounds{T}=nothing; options=Options{T}()) where {T, J}
 
-    # allocate policy data  
-    policy = policy_data(dynamics, constraints)
-
-    # allocate model data
-    problem = problem_data(dynamics, costs, constraints)
-
-    # allocate solver data
-    data = solver_data()
-    
-	Solver(problem, policy, data, options)
-end
-
-function Solver(dynamics::Vector{Dynamics{T}}, costs::Costs{T}) where T
     N = length(costs)
-    constraint = Constraint()
-    constraints = [constraint for t = 1:N-1]
-    
-    # allocate policy data  
+    if isnothing(constraints)
+        constraint = Constraint()
+        constraints = [constraint for k = 1:N-1]
+    end
+    if isnothing(bounds)
+        bounds = [Bound(T, dynamics[k].num_action) for k = 1:N-1]
+    end
+
+    # allocate policy data
     policy = policy_data(dynamics, constraints)
 
     # allocate model data
-    problem = problem_data(dynamics, costs, constraints)
+    problem = problem_data(dynamics, costs, constraints, bounds)
 
     # allocate solver data
     data = solver_data()
-
+    
 	Solver(problem, policy, data, options)
 end
 
@@ -48,13 +42,14 @@ function current_trajectory(solver::Solver)
 end
 
 function initialize_trajectory!(solver::Solver, actions, x1)
+    bounds = solver.problem.bounds
     constraints = solver.problem.constr_data.constraints
     dynamics = solver.problem.model.dynamics
     options = solver.options
     solver.problem.nominal_states[1] .= x1
     for (t, ut) in enumerate(actions)
-        lb = constraints[t].bounds_lower
-        ub = constraints[t].bounds_upper
+        lb = bounds[t].lower
+        ub = bounds[t].upper
         nh = length(lb)
         for i = 1:nh
             if isinf(lb[i]) && isinf(ub[i])

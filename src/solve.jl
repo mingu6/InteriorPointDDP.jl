@@ -128,6 +128,8 @@ function optimality_error(policy::PolicyData, problem::ProblemData, solver::Solv
     
     Qu = policy.action_value.gradient_action
     hu = constr_data.jacobian_action
+
+    num_ineq = 0
     
     for k = N-1:-1:1
         constr = constr_data.constraints[k]
@@ -142,21 +144,21 @@ function optimality_error(policy::PolicyData, problem::ProblemData, solver::Solv
         primal_inf = max(primal_inf, norm(h[k], Inf))
 
         # complementary slackness
-        (constr.num_ineq_lower == 0 && constr.num_ineq_upper == 0) && continue
         for i = 1:constr.num_action
             if !isinf(il[k][i])
                 cs_inf = max(cs_inf, il[k][i] * vl[k][i])
                 v_norm += vl[k][i]
+                num_ineq += 1
             end
             if !isinf(iu[k][i])
                 cs_inf = max(cs_inf, iu[k][i] * vu[k][i])
                 v_norm += vu[k][i]
+                num_ineq += 1
             end
         end
     end
     cs_inf -= μ
     
-    num_ineq = constr_data.num_ineq_lower[1] + constr_data.num_ineq_upper[1]
     scaling_cs = max(options.s_max, v_norm / max(num_ineq, 1.0))  / options.s_max
     scaling_dual = max(options.s_max, (ϕ_norm + v_norm) / max(num_ineq + constr_data.num_constraints[1], 1.0))  / options.s_max
     return dual_inf / scaling_dual, primal_inf, cs_inf / scaling_cs
@@ -185,15 +187,16 @@ end
 function reset_duals!(problem::ProblemData)
     N = problem.horizon
     constr_data = problem.constr_data
+    bounds = problem.bounds
     for k = 1:N-1
         fill!(problem.eq_duals[k], 0.0)
         fill!(problem.nominal_eq_duals[k], 0.0)
         constr = constr_data.constraints[k]
         for i = 1:constr.num_action
-            problem.ineq_duals_lo[k][i] = isinf(constr.bounds_lower[i]) ? 0.0 : 1.0
-            problem.ineq_duals_up[k][i] = isinf(constr.bounds_upper[i]) ? 0.0 : 1.0
-            problem.nominal_ineq_duals_lo[k][i] = isinf(constr.bounds_lower[i]) ? 0.0 : 1.0
-            problem.nominal_ineq_duals_up[k][i] = isinf(constr.bounds_upper[i]) ? 0.0 : 1.0
+            problem.ineq_duals_lo[k][i] = isinf(bounds[k].lower[i]) ? 0.0 : 1.0
+            problem.ineq_duals_up[k][i] = isinf(bounds[k].upper[i]) ? 0.0 : 1.0
+            problem.nominal_ineq_duals_lo[k][i] = isinf(bounds[k].lower[i]) ? 0.0 : 1.0
+            problem.nominal_ineq_duals_up[k][i] = isinf(bounds[k].upper[i]) ? 0.0 : 1.0
         end
     end
 end

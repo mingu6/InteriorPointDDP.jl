@@ -1,3 +1,18 @@
+struct Bound{T}
+    lower::Vector{T}
+    upper::Vector{T}
+end
+
+function Bound(T, num_action::Int)
+    return Bound(-Inf .* ones(T, num_action), Inf .* ones(T, num_action))
+end
+
+function Bound(num_action::Int, lower::T, upper::T) where T
+    return Bound(lower .* ones(T, num_action), upper .* ones(T, num_action))
+end
+
+Bounds{T} = Vector{Bound{T}}
+
 mutable struct ProblemData#{T,X,U,H,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX,C,CX,CU}
     # current trajectory
     states#::Vector{X}
@@ -28,13 +43,16 @@ mutable struct ProblemData#{T,X,U,H,D,O,FX,FU,FW,OX,OU,OXX,OUU,OUX,C,CX,CU}
     # constraints data
     constr_data::ConstraintsData#{T,C,CX,CU}
 
+    # bounds data
+    bounds::Bounds
+
     # trajectory: z = (x1,..., xT, u1,..., uT-1) | Δz = (Δx1..., ΔxT, Δu1,..., ΔuT-1)
     trajectory::Vector#{T}
 
     horizon::Int
 end
 
-function problem_data(dynamics::Model{T}, costs::Costs{T}, constraints::Constraints{T}) where T
+function problem_data(dynamics::Model{T}, costs::Costs{T}, constraints::Constraints{T}, bounds::Bounds{T}) where T
 
     @assert length(dynamics) + 1 == length(costs)
 
@@ -68,6 +86,6 @@ function problem_data(dynamics::Model{T}, costs::Costs{T}, constraints::Constrai
     
     ProblemData(states, actions, constr, ineq_lower, ineq_upper, eq_duals, ineq_duals_lo, ineq_duals_up,
         nominal_states, nominal_actions, nominal_constr, nominal_ineq_lower, nominal_ineq_upper, nominal_eq_duals,
-        nominal_ineq_duals_lo, nominal_ineq_duals_up, model, costs_dat, constr_data,
+        nominal_ineq_duals_lo, nominal_ineq_duals_up, model, costs_dat, constr_data, bounds,
         trajectory, horizon)
 end

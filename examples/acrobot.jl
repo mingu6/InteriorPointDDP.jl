@@ -3,6 +3,7 @@ using LinearAlgebra
 using Random
 using MeshCat
 using Plots
+using BenchmarkTools
 
 N = 201
 dt = 0.05
@@ -89,9 +90,10 @@ function acrobot_continuous(model::DoublePendulum{T}, x, u) where T
 end
 
 acrobot_discrete = (x, u) -> x + dt * acrobot_continuous(acrobot_normal, x + 0.5 * dt * acrobot_continuous(acrobot_normal, x, u), u)
-# acrobot_discrete = (x, u) -> x + dt * acrobot_continuous(acrobot_normal, x, u)
 acrobot_dyn = Dynamics(acrobot_discrete, num_state, num_action)
 dynamics = [acrobot_dyn for k = 1:N-1]
+
+# ## Define costs
 
 stage = Cost((x, u) -> 0.5 * dt * dot(u, u) + dt * 0.5 * dot(x - xN, x - xN), num_state, num_action)
 objective = [
@@ -99,17 +101,23 @@ objective = [
     Cost((x, u) -> 300.0 * (sqrt(dot(x - xN, x - xN) + 1e-12) - 1e-6), num_state, 0),
 ] 
 
+# ## Define constraints
+
 stage_constr = Constraint((x, u) -> [
     acrobot_discrete(x, u)[2] + u[2]
 ], 
-num_state, num_action, bounds_lower=[-5.0, -0.5 * π], bounds_upper=[5.0, 0.5 * π])
-
+num_state, num_action)
 constraints = [stage_constr for k = 1:N-1]
+
+# ## Define bounds
+
+bound = Bound([-5.0, -0.5 * π], [5.0, 0.5 * π])
+bounds = [bound for k = 1:N-1]
 
 Random.seed!(seed)
 s_init = 0.01 * ones(1)
 ū = [[1e-3 .* randn(1); deepcopy(s_init)] for k = 1:N-1]
-solver = Solver(dynamics, objective, constraints, options=options)
+solver = Solver(dynamics, objective, constraints, bounds; options=options)
 solve!(solver, x1, ū)
 
 x_mat = reduce(vcat, transpose.(solver.problem.nominal_states))
@@ -123,3 +131,7 @@ savefig("examples/plots/acrobot_state.png")
 
 q_sol = map(x -> [x[1], x[2]], solver.problem.nominal_states)
 visualize!(vis, acrobot_normal, q_sol, Δt=dt);
+
+solver.options.verbose = false
+@benchmark solve!(solver, x1, ū) setup=(x1=deepcopy(x1), ū=deepcopy(ū))
+

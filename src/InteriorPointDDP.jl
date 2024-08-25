@@ -38,6 +38,12 @@ export Constraint
 # dynamics 
 export Dynamics
 
+# bounds
+export Bound, Bounds
+
+# options
+export Options
+
 # solver 
 export rollout, 
     dynamics!,

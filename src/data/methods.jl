@@ -19,6 +19,7 @@ end
 
 function constraint!(problem::ProblemData, μ::Float64; mode=:nominal)
     constr_data = problem.constr_data
+    bounds = problem.bounds
     states, actions = primal_trajectories(problem, mode=mode)
     constr_traj = mode == :nominal ? problem.nominal_constraints : problem.constraints
     ineq_lo_traj = mode == :nominal ? problem.nominal_ineq_lower : problem.ineq_lower
@@ -31,9 +32,8 @@ function constraint!(problem::ProblemData, μ::Float64; mode=:nominal)
                 constr_traj[k][i] -= μ
             end
         end
-        evaluate_ineq_lower!(ineq_lo_traj[k], actions[k], con.bounds_lower)
-        evaluate_ineq_upper!(ineq_up_traj[k], actions[k], con.bounds_upper)
-        evaluate_cone_ineq!(ineq_up_traj[k], actions[k], con.cone_indices)
+        evaluate_ineq_lower!(ineq_lo_traj[k], actions[k], bounds[k].lower)
+        evaluate_ineq_upper!(ineq_up_traj[k], actions[k], bounds[k].upper)
     end
 end
 
@@ -51,20 +51,10 @@ function evaluate_ineq_upper!(res, actions, bound)
     end
 end
 
-function evaluate_cone_ineq!(res, actions, cone_inds)
-    for inds in cone_inds
-        if length(inds) == 0
-            break
-        end
-        res[inds] .= actions[inds[1]] - norm(actions[inds[2:end]], 2)
-    end
-end
-
 function barrier_objective!(problem::ProblemData, data::SolverData; mode=:nominal)
     N = problem.horizon
     constr_data = problem.constr_data
-    _, _, h, il, iu = primal_trajectories(problem, mode=mode)
-    ϕ = mode == :nominal ? problem.nominal_eq_duals : problem.eq_duals
+    _, _, _, il, iu = primal_trajectories(problem, mode=mode)
     
     barrier_obj = 0.
     for k = 1:N-1
@@ -73,8 +63,7 @@ function barrier_objective!(problem::ProblemData, data::SolverData; mode=:nomina
             if !isinf(il[k][i])
                 barrier_obj -= log(il[k][i])
             end
-            iscone = any(i in inds for inds in constr.cone_indices)
-            if !isinf(iu[k][i]) && !iscone
+            if !isinf(iu[k][i])
                 barrier_obj -= log(iu[k][i])
             end
         end
