@@ -35,10 +35,14 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         α = data.step_size
         try
             rollout!(policy, problem, τ, step_size=α; mode=:main)
-        catch
+        catch e
             # reduces step size if NaN or Inf encountered
-            data.step_size *= 0.5
-            continue
+            if e isa DomainError
+                data.step_size *= 0.5
+                continue
+            else
+                rethrow(e)
+            end
         end
         constraint!(problem, data.μ; mode=:current)
         
@@ -88,7 +92,6 @@ function check_fraction_boundary(problem::ProblemData, τ::Float64)
     _, vl, vu = dual_trajectories(problem, mode=:current)
     x̄, ū, _, il̄, iū = primal_trajectories(problem, mode=:nominal)
     _, vl̄, vū = dual_trajectories(problem, mode=:nominal)
-    constraints = problem.constr_data.constraints
 
     status = 0
     for k = 1:N-1

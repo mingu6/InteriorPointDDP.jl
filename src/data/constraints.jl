@@ -18,10 +18,10 @@ function constraint_data(constraints::Constraints)
     
     residuals = [zeros(h.num_constraint) for h in constraints]
     jac_x = [zeros(h.num_constraint, h.num_state) for h in constraints]
-    jac_u = [zeros(h.num_constraint, h.num_action) for h in constraints]
+    jac_u = [zeros(h.num_constraint, h.num_control) for h in constraints]
     hessian_prod_state_state = [zeros(h.num_state, h.num_state) for h in constraints]
-	hessian_prod_action_state = [zeros(h.num_action, h.num_state) for h in constraints]
-	hessian_prod_action_action = [zeros(h.num_action, h.num_action) for h in constraints]
+	hessian_prod_action_state = [zeros(h.num_control, h.num_state) for h in constraints]
+	hessian_prod_action_action = [zeros(h.num_control, h.num_control) for h in constraints]
     
     return ConstraintsData(constraints, num_constraints,
             residuals, jac_x, jac_u,

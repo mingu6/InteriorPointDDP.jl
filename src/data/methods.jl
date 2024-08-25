@@ -18,17 +18,16 @@ function cost!(data::SolverData, problem::ProblemData; mode=:nominal)
 end
 
 function constraint!(problem::ProblemData, μ::Float64; mode=:nominal)
-    constr_data = problem.constr_data
+    constr = problem.constraints_fn
     bounds = problem.bounds
     states, actions = primal_trajectories(problem, mode=mode)
     constr_traj = mode == :nominal ? problem.nominal_constraints : problem.constraints
     ineq_lo_traj = mode == :nominal ? problem.nominal_ineq_lower : problem.ineq_lower
     ineq_up_traj = mode == :nominal ? problem.nominal_ineq_upper : problem.ineq_upper
-    for (k, con) in enumerate(constr_data.constraints)
+    for (k, con) in enumerate(constr)
         if con.num_constraint > 0
-            con.evaluate(con.evaluate_cache, states[k], actions[k])
-            constr_traj[k] .= con.evaluate_cache
-            for i in con.indices_compl
+            evaluate!(constr_traj[k], con, states[k], actions[k])
+            for i in con.indices_complementarity
                 constr_traj[k][i] -= μ
             end
         end
@@ -53,13 +52,12 @@ end
 
 function barrier_objective!(problem::ProblemData, data::SolverData; mode=:nominal)
     N = problem.horizon
-    constr_data = problem.constr_data
     _, _, _, il, iu = primal_trajectories(problem, mode=mode)
     
     barrier_obj = 0.
     for k = 1:N-1
-        constr = constr_data.constraints[k]
-        for i = 1:constr.num_action
+        num_control = length(il[k])
+        for i = 1:num_control
             if !isinf(il[k][i])
                 barrier_obj -= log(il[k][i])
             end

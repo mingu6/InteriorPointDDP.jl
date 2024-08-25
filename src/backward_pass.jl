@@ -1,22 +1,9 @@
 function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverData, options::Options; mode=:nominal, verbose::Bool=false)
     N = problem.horizon
-    constr_data = problem.constr_data
     reg::Float64 = 0.0
 
-    # Jacobians of system dynamics
-    fx = problem.model.jacobian_state
-    fu = problem.model.jacobian_action
-    # Hessians of system dynamics 
-    fxx = problem.model.hessian_prod_state_state
-    fux = problem.model.hessian_prod_action_state
-    fuu = problem.model.hessian_prod_action_action
-    # Jacobian constr_data 
-    hx = constr_data.jacobian_state
-    hu = constr_data.jacobian_action
-    # Second order cosntraint stuff
-    hxx = constr_data.hessian_prod_state_state
-    hux = constr_data.hessian_prod_action_state
-    huu = constr_data.hessian_prod_action_action
+    model_data = problem.model_data
+    constr_data = problem.constr_data
     # Cost gradients
     lx = problem.cost_data.gradient_state
     lu = problem.cost_data.gradient_action
@@ -58,57 +45,69 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
         
         for t = N-1:-1:1
             num_actions = length(lu[t])
+            fx = model_data[t].fx
+            fu = model_data[t].fu
+            fvyy = model_data[t].v∇²f
+            fvxx = model_data[t].vxx
+            fvxu = model_data[t].vxu
+            fvuu = model_data[t].vuu
+            hx = constr_data[t].fx
+            hu = constr_data[t].fu
+            hvyy = constr_data[t].v∇²f
+            hvxx = constr_data[t].vxx
+            hvxu = constr_data[t].vxu
+            hvuu = constr_data[t].vuu
 
             # Qx = lx + fx' * Vx
             Qx[t] .= lx[t]
-            mul!(Qx[t], transpose(fx[t]), Vx[t+1], 1.0, 1.0)
+            mul!(Qx[t], transpose(fx), Vx[t+1], 1.0, 1.0)
 
             # Qu = lu + fu' * Vx
             Qu[t] .= lu[t]
-            mul!(Qu[t], transpose(fu[t]), Vx[t+1], 1.0, 1.0)
+            mul!(Qu[t], transpose(fu), Vx[t+1], 1.0, 1.0)
             add_barrier_grad!(Qu[t], il[t], iu[t], μ)
             
             # Qxx = lxx + fx' * Vxx * fx
-            mul!(policy.xx_tmp[t], transpose(fx[t]), Vxx[t+1])
-            mul!(Qxx[t], policy.xx_tmp[t], fx[t])
+            mul!(policy.xx_tmp[t], transpose(fx), Vxx[t+1])
+            mul!(Qxx[t], policy.xx_tmp[t], fx)
             Qxx[t] .+= lxx[t]
     
             # Quu = luu + fu' * Vxx * fu
-            mul!(policy.ux_tmp[t], transpose(fu[t]), Vxx[t+1])
-            mul!(Quu[t], policy.ux_tmp[t], fu[t])
+            mul!(policy.ux_tmp[t], transpose(fu), Vxx[t+1])
+            mul!(Quu[t], policy.ux_tmp[t], fu)
             Quu[t] .+= luu[t]
             add_primal_dual!(Quu[t], il[t], iu[t], vl[t], vu[t])
     
             # Qux = lux + fu' * Vxx * fx
-            mul!(policy.ux_tmp[t], transpose(fu[t]), Vxx[t+1])
-            mul!(Qux[t], policy.ux_tmp[t], fx[t])
+            mul!(policy.ux_tmp[t], transpose(fu), Vxx[t+1])
+            mul!(Qux[t], policy.ux_tmp[t], fx)
             Qux[t] .+= lux[t]
             
             # apply second order terms to Q for full DDP, i.e., Vx * fxx, Vx * fuu, Vx * fxu
             if !options.quasi_newton
-                # secon!(fxx[t], fux[t], fuu[t], problem.model.dynamics[t], x[t], u[t], Vx[t+1])
-                # Qxx[t] .+= Symmetric(fxx[t])
-                # Qux[t] .+= fux[t]
-                # Quu[t] .+= Symmetric(fuu[t])
-                second_order_contraction!(hxx[t], hux[t], huu[t], constr_data.constraints[t], x[t], u[t], ϕ[t])
+                second_order_contraction!(fvyy, problem.model_fn[t], x[t], u[t], Vx[t+1])
+                Qxx[t] .+= Symmetric(fvxx)
+                Qux[t] .+= fvxu'
+                Quu[t] .+= Symmetric(fvuu)
+                second_order_contraction!(hvyy, problem.constraints_fn[t], x[t], u[t], ϕ[t])
             end
             # setup linear system in backward pass
             policy.lhs_tl[t] .= Symmetric(Quu[t])
-            policy.lhs_tr[t] .= transpose(hu[t])
-            policy.lhs_bl[t] .= hu[t]
+            policy.lhs_tr[t] .= transpose(hu)
+            policy.lhs_bl[t] .= hu
             fill!(policy.lhs_br[t], 0.0)
             if !options.quasi_newton
-                policy.lhs_tl[t] .+= Symmetric(huu[t])
+                policy.lhs_tl[t] .+= Symmetric(hvuu)
             end
 
             policy.rhs_t[t] .= -Qu[t]
-            mul!(policy.rhs_t[t], transpose(hu[t]), ϕ[t], -1.0, 1.0)
+            mul!(policy.rhs_t[t], transpose(hu), ϕ[t], -1.0, 1.0)
             policy.rhs_b[t] .= -h[t]
 
             policy.rhs_x_t[t] .= -Qux[t]
-            policy.rhs_x_b[t] .= -hx[t]
+            policy.rhs_x_b[t] .= -hx
             if !options.quasi_newton
-                policy.rhs_x_t[t] .-= hux[t]
+                policy.rhs_x_t[t] .-= hvxu'
             end
 
             # inertia calculation and correction

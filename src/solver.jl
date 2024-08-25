@@ -9,7 +9,7 @@ mutable struct Solver{T}#,N,M,NN,MM,MN,NNN,MNN,X,U,H,D,O,FX,FU,FW,OX,OU,OXX,OUU,
     options::Options{T}
 end
 
-function Solver(dynamics::Vector{Dynamics{T}}, costs::Costs{T}, constraints::Constraints{T, J}=nothing,
+function Solver(dynamics::Vector{Dynamics{T, J}}, costs::Costs{T}, constraints::Constraints{T, J}=nothing,
                 bounds::Bounds{T}=nothing; options=Options{T}()) where {T, J}
 
     N = length(costs)
@@ -43,8 +43,7 @@ end
 
 function initialize_trajectory!(solver::Solver, actions, x1)
     bounds = solver.problem.bounds
-    constraints = solver.problem.constr_data.constraints
-    dynamics = solver.problem.model.dynamics
+    model = solver.problem.model_fn
     options = solver.options
     solver.problem.nominal_states[1] .= x1
     for (t, ut) in enumerate(actions)
@@ -70,8 +69,7 @@ function initialize_trajectory!(solver::Solver, actions, x1)
                 end
             end
         end
-        solver.problem.nominal_states[t+1] .= dynamics!(dynamics[t], 
-                                solver.problem.nominal_states[t], solver.problem.nominal_actions[t])
+        evaluate!(solver.problem.nominal_states[t+1], model[t], solver.problem.nominal_states[t], solver.problem.nominal_actions[t])
     end
     # display(actions)
 end

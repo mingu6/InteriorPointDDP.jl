@@ -1,6 +1,6 @@
 module InteriorPointDDP
 
-using LinearAlgebra 
+using LinearAlgebra
 using ForwardDiff
 using Symbolics
 using Scratch 
@@ -9,8 +9,11 @@ using Printf
 using Crayons
 
 include("costs.jl")
-include("dynamics.jl")
-include("constraints.jl")
+# include("dynamics.jl")
+include(joinpath("autodiff", "vector_valued.jl"))
+include(joinpath("autodiff", "dynamics.jl"))
+include(joinpath("autodiff", "constraints.jl"))
+include(joinpath("data", "expansions.jl"))
 include(joinpath("data", "model.jl"))
 include(joinpath("data", "costs.jl"))
 include(joinpath("data", "constraints.jl"))
@@ -39,7 +42,7 @@ export Constraint
 export Dynamics
 
 # bounds
-export Bound, Bounds
+export Bound
 
 # options
 export Options

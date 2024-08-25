@@ -21,7 +21,7 @@ function ipddp_solve!(solver::Solver)
     options = solver.options
 	data = solver.data
     
-    reset!(problem.model)
+    reset!(problem.model_data)
     reset!(problem.cost_data)
     reset!(data)
     reset_duals!(problem)  # TODO: initialize better, wrap up with initialization of problem data
@@ -44,7 +44,7 @@ function ipddp_solve!(solver::Solver)
 
     while data.k < options.max_iterations
         iter_time = @elapsed begin
-            gradients!(problem, mode=:nominal)
+            evaluate_derivatives!(problem, options.quasi_newton; mode=:nominal)
             
             backward_pass!(policy, problem, data, options, mode=:nominal, verbose=options.verbose)
             data.status != 0 && break
@@ -60,7 +60,6 @@ function ipddp_solve!(solver::Solver)
             opt_err_μ = max(dual_inf_μ, cs_inf_μ, primal_inf_μ)          
             if opt_err_μ <= options.κ_ϵ * data.μ
                 data.μ = max(options.optimality_tolerance / 10.0, min(options.κ_μ * data.μ, data.μ ^ options.θ_μ))
-                # println("reset filter")
                 reset_filter!(data)
                 # performance of current iterate updated to account for barrier parameter change
                 data.barrier_obj_curr = barrier_objective!(problem, data, mode=:nominal)
@@ -127,24 +126,26 @@ function optimality_error(policy::PolicyData, problem::ProblemData, solver::Solv
     ϕ, vl, vu = dual_trajectories(problem, mode=mode)
     
     Qu = policy.action_value.gradient_action
-    hu = constr_data.jacobian_action
 
     num_ineq = 0
+    num_eq = 0
     
     for k = N-1:-1:1
-        constr = constr_data.constraints[k]
+        num_action = length(Qu[k])
+        hu = constr_data[k].fu
 
         # dual infeasibility (stationarity)
         policy.u_tmp[k] .= Qu[k]
-        mul!(policy.u_tmp[k], transpose(hu[k]), ϕ[k], 1.0, 1.0)
+        mul!(policy.u_tmp[k], transpose(hu), ϕ[k], 1.0, 1.0)
         dual_inf = max(dual_inf, norm(policy.u_tmp[k], Inf))
         ϕ_norm += norm(ϕ[k], 1)
+        num_eq += length(ϕ[k])
 
         # primal feasibility (eq. constraint satisfaction)
         primal_inf = max(primal_inf, norm(h[k], Inf))
 
         # complementary slackness
-        for i = 1:constr.num_action
+        for i = 1:num_action
             if !isinf(il[k][i])
                 cs_inf = max(cs_inf, il[k][i] * vl[k][i])
                 v_norm += vl[k][i]
@@ -160,7 +161,7 @@ function optimality_error(policy::PolicyData, problem::ProblemData, solver::Solv
     cs_inf -= μ
     
     scaling_cs = max(options.s_max, v_norm / max(num_ineq, 1.0))  / options.s_max
-    scaling_dual = max(options.s_max, (ϕ_norm + v_norm) / max(num_ineq + constr_data.num_constraints[1], 1.0))  / options.s_max
+    scaling_dual = max(options.s_max, (ϕ_norm + v_norm) / max(num_ineq + num_eq, 1.0))  / options.s_max
     return dual_inf / scaling_dual, primal_inf, cs_inf / scaling_cs
 end
 
@@ -173,7 +174,8 @@ function rescale_duals!(problem::ProblemData, μ::Float64, options::Options)
     vl = problem.ineq_duals_lo
     vu = problem.ineq_duals_up
     for k = 1:N-1
-        for i = constr_data.constraints[k].num_action
+        num_control = length(il[k])
+        for i = 1:num_control
             if !isinf(il[k][i])
                 vl[k][i] = max(min(vl[k][i], κ_Σ * μ / il[k][i]), μ / (κ_Σ *  il[k][i]))
             end
@@ -186,13 +188,12 @@ end
 
 function reset_duals!(problem::ProblemData)
     N = problem.horizon
-    constr_data = problem.constr_data
     bounds = problem.bounds
     for k = 1:N-1
         fill!(problem.eq_duals[k], 0.0)
         fill!(problem.nominal_eq_duals[k], 0.0)
-        constr = constr_data.constraints[k]
-        for i = 1:constr.num_action
+        num_control = length(bounds[k].lower)
+        for i = 1:num_control
             problem.ineq_duals_lo[k][i] = isinf(bounds[k].lower[i]) ? 0.0 : 1.0
             problem.ineq_duals_up[k][i] = isinf(bounds[k].upper[i]) ? 0.0 : 1.0
             problem.nominal_ineq_duals_lo[k][i] = isinf(bounds[k].lower[i]) ? 0.0 : 1.0

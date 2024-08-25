@@ -1,5 +1,5 @@
 function rollout!(policy::PolicyData, problem::ProblemData, τ::Float64; step_size=1.0, mode=:main)
-    dynamics = problem.model.dynamics
+    dynamics = problem.model_fn
     
     x, u, h, il, iu = primal_trajectories(problem, mode=:current)
     ϕ, vl, vu = dual_trajectories(problem, mode=:current)
@@ -13,8 +13,6 @@ function rollout!(policy::PolicyData, problem::ProblemData, τ::Float64; step_si
     kvl, kvu = gains.kvl, gains.kvu
     Kvl, Kvu = policy.gains_main.Kvl, policy.gains_main.Kvu
     Ku, Kϕ = policy.gains_main.Ku, policy.gains_main.Kϕ
-
-    N = length(dynamics) + 1
 
     for (k, d) in enumerate(dynamics)
         # u[k] .= ū[k] + K[k] * (x[k] - x̄[k]) + step_size * k[k]
@@ -43,7 +41,7 @@ function rollout!(policy::PolicyData, problem::ProblemData, τ::Float64; step_si
         mul!(vu[k], Kvu[k], x[k], 1.0, 1.0)
         mul!(vu[k], Kvu[k], x̄[k], -1.0, 1.0)
         
-        x[k+1] .= dynamics!(d, x[k], u[k])
+        evaluate!(x[k+1], d, x[k], u[k])
     end
 end
 
