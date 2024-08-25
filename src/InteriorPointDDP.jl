@@ -1,7 +1,8 @@
 module InteriorPointDDP
 
 using LinearAlgebra 
-using Symbolics 
+using ForwardDiff
+using Symbolics
 using Scratch 
 using JLD2
 using Printf

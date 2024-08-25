@@ -1,133 +1,101 @@
-struct Constraint{T}
+struct Constraint{T, J}
     evaluate
-    jacobian_state
-    jacobian_action
-    hessian_prod_state_state
-    hessian_prod_action_state
-    hessian_prod_action_action
+    jacobian
+    second_order
     num_constraint::Int
     num_ineq_lower::Int
     num_ineq_upper::Int
     num_state::Int
     num_action::Int
     evaluate_cache::Vector{T}
-    evaluate_ineq_lo_cache::Vector{T}  # TODO: unused?
-    evaluate_ineq_up_cache::Vector{T}
-    jacobian_state_cache::Matrix{T}
-    jacobian_action_cache::Matrix{T}
-    hessian_prod_state_state_cache::Matrix{T}
-    hessian_prod_action_state_cache::Matrix{T}
-    hessian_prod_action_action_cache::Matrix{T}
+    jacobian_cache::J
+    second_order_cache::Matrix{T}
     bounds_lower::Vector{T}
     bounds_upper::Vector{T}
     indices_compl::Vector{Int}
     cone_indices::Vector{Vector{Int}}
 end
 
-Constraints{T} = Vector{Constraint{T}} where T
+Constraints{T, J} = Vector{Constraint{T, J}} where {T, J}
 
-function Constraint(f::Function, num_state::Int, num_action::Int; bounds_lower::Vector{T}=ones(num_action) * -Inf,
-    bounds_upper::Vector{T}=ones(num_action) * Inf, quasi_newton::Bool=false, indices_compl=nothing, cone_inds=nothing) where T
+function Constraint(f::Function, num_constraint::Int, num_state::Int, num_action::Int; bounds_lower::Vector{T}=ones(num_action) * -Inf,
+    bounds_upper::Vector{T}=ones(num_action) * Inf, indices_compl=nothing, cone_inds=nothing) where T
 
-    x = Symbolics.variables(:x, 1:num_state)
-    u = Symbolics.variables(:u, 1:num_action)
+    f_knot = z -> f(z[1:num_state], z[num_state+1:end])
+    eval_cache = zeros(num_constraint)
+    f_ip! = (res, x, u) -> res .= f(x, u) 
 
-    evaluate = f(x, u)
-    jacobian_state = Symbolics.jacobian(evaluate, x)
-    jacobian_action = Symbolics.jacobian(evaluate, u)
+    res_jac = DiffResults.JacobianResult(zeros(num_constraint), zeros(num_state + num_action))
+    cfg_jac = ForwardDiff.JacobianConfig(f_knot, zeros(num_state + num_action))
+    f_jac! = (res, x, u) -> ForwardDiff.jacobian!(res, f_knot, [x; u], cfg_jac)
 
-    evaluate_func = eval(Symbolics.build_function(evaluate, x, u)[2])
-    jacobian_state_func = eval(Symbolics.build_function(jacobian_state, x, u)[2])
-    jacobian_action_func = eval(Symbolics.build_function(jacobian_action, x, u)[2])
-
-    num_constraint = length(evaluate)
     num_ineq_lower = sum(isfinite, bounds_lower)
     num_ineq_upper = sum(isfinite, bounds_upper)
 
     if length(bounds_lower) != num_action || length(bounds_upper) != num_action
         error("Bounds provided do not match dimension of actions.")
     end
-    
-    v = Symbolics.variables(:v, 1:num_constraint)  # vector variables for Hessian vector products
 
-    if !quasi_newton && num_constraint > 0
-        hessian_prod_state_state = sum([Symbolics.jacobian(v[k] .* jacobian_state[k, :], x) for k in 1:num_constraint])
-        hessian_prod_action_state = sum([Symbolics.jacobian(v[k] .* jacobian_action[k, :], x) for k in 1:num_constraint])
-        hessian_prod_action_action = sum([Symbolics.jacobian(v[k] .* jacobian_action[k, :], u) for k in 1:num_constraint])
-        hessian_prod_state_state_func = eval(Symbolics.build_function(hessian_prod_state_state, x, u, v)[2])
-        hessian_prod_action_state_func = eval(Symbolics.build_function(hessian_prod_action_state, x, u, v)[2])
-        hessian_prod_action_action_func = eval(Symbolics.build_function(hessian_prod_action_action, x, u, v)[2])
-    else
-        hessian_prod_state_state_func = nothing
-        hessian_prod_action_state_func = nothing
-        hessian_prod_action_action_func = nothing
-    end
+    second_order_cache = zeros(num_state + num_action, num_state + num_action)
+    second_order! = (cache, x, u, v) -> ForwardDiff.jacobian!(cache, z -> ForwardDiff.jacobian(f_knot, z)' * v, [x; u])
 
     indices_compl = isnothing(indices_compl) ? Int64[] : indices_compl 
     cone_inds = isnothing(cone_inds) ? [Int64[]] : cone_inds
 
     return Constraint(
-        evaluate_func,
-        jacobian_state_func, jacobian_action_func, 
-        hessian_prod_state_state_func, hessian_prod_action_state_func, hessian_prod_action_action_func,
+        f_ip!, f_jac!, second_order!,
         num_constraint, num_ineq_lower, num_ineq_upper, num_state, num_action,
-        zeros(num_constraint), zeros(num_action), zeros(num_action),
-        zeros(num_constraint, num_state), zeros(num_constraint, num_action),
-        zeros(num_state, num_state), zeros(num_action, num_state), zeros(num_action, num_action),
+        eval_cache, res_jac, second_order_cache,
         bounds_lower, bounds_upper, indices_compl, cone_inds)
+end
+
+function Constraint(f::Function, num_state::Int, num_action::Int; bounds_lower::Vector{T}=ones(num_action) * -Inf,
+    bounds_upper::Vector{T}=ones(num_action) * Inf, indices_compl=nothing, cone_inds=nothing) where T
+    num_constraint = length(f(zeros(num_state), zeros(num_action)))
+    return Constraint(f, num_constraint, num_state, num_action; bounds_lower=bounds_lower, bounds_upper=bounds_upper,
+                      indices_compl=indices_compl, cone_inds=cone_inds)
 end
 
 function Constraint()
     return Constraint(
-        (c, x, u) -> nothing,
-        (jx, x, u) -> nothing, (ju, x, u) -> nothing,
-        (hxx, x, u, v) -> nothing, (hux, x, u, v) -> nothing, (huu, x, u, v) -> nothing,
+        (c, x, u) -> nothing, (j, x, u) -> nothing, (h, x, u, v) -> nothing,
         0, 0, 0, 0, 0,
-        Float64[], Float64[], Float64[], Array{Float64}(undef, 0, 0), Array{Float64}(undef, 0, 0),
-        Array{Float64}(undef, 0, 0), Array{Float64}(undef, 0, 0), Array{Float64}(undef, 0, 0),
+        Float64[], Array{Float64}(undef, 0, 0), Array{Float64}(undef, 0, 0),
         Float64[], Float64[], Int64[], [Int64[]])
 end
 
-function Constraint(f::Function, fx::Function, fu::Function, num_constraint::Int, num_state::Int, num_action::Int;
+function Constraint(f::Function, fz::Function, num_constraint::Int, num_state::Int, num_action::Int;
     bounds_lower::Vector{T}=ones(num_action) *-Inf, bounds_upper::Vector{T}=ones(num_action) * Inf,
-    indices_compl=nothing, cone_inds=nothing,
-    fxx_prod::Function=nothing, fux_prod::Function=nothing, fuu_prod::Function=nothing) where T
+    indices_compl=nothing, cone_inds=nothing, vfyy::Function=nothing) where T
 
     num_ineq_lower = sum(isfinite, bounds_lower)
     num_ineq_upper = sum(isfinite, bounds_upper)
 
     return Constraint(
-        f, 
-        fx, fu,
-        fxx_prod, fux_prod, fuu_prod,
+        f, fz, vfyy,
         num_constraint, num_state, num_action, num_ineq_lower, num_ineq_upper,
-        zeros(num_constraint), zeros(num_action), zeros(num_action),
-        zeros(num_constraint, num_state), zeros(num_constraint, num_action),
-        zeros(num_state, num_state), zeros(num_action, num_state), zeros(num_action, num_action),
+        zeros(num_constraint), zeros(num_constraint, num_state + num_action), zeros(num_state + num_action, num_state + num_action),
         bounds_lower, bounds_upper, indices_compl, cone_inds)
 end
 
 function jacobian!(jacobian_states, jacobian_actions, constraints::Constraints{T}, states, actions) where T
-    N = length(constraints)
     for (k, con) in enumerate(constraints)
         con.num_constraint == 0 && continue
-        con.jacobian_state(con.jacobian_state_cache, states[k], actions[k])
-        @views jacobian_states[k] .= con.jacobian_state_cache
-        fill!(con.jacobian_state_cache, 0.0) # TODO: confirm this is necessary
-        con.jacobian_action(con.jacobian_action_cache, states[k], actions[k])
-        @views jacobian_actions[k] .= con.jacobian_action_cache
-        fill!(con.jacobian_action_cache, 0.0) # TODO: confirm this is necessary
+        num_state = length(states[k])
+        con.jacobian(con.jacobian_cache, states[k], actions[k])
+        @views jacobian_states[k] .= DiffResults.jacobian(con.jacobian_cache)[:, 1:num_state]
+        @views jacobian_actions[k] .= DiffResults.jacobian(con.jacobian_cache)[:, num_state+1:end]
     end
 end
 
-function hessian_vector_prod!(hessian_prod_state_state, hessian_prod_action_state, hessian_prod_action_action,
+function second_order_contraction!(hessian_prod_state_state, hessian_prod_action_state, hessian_prod_action_action,
     constraint::Union{Dynamics{T}, Constraint{T}}, states, actions, lhs_vector) where T
-    if !isnothing(constraint.hessian_prod_state_state)
-        constraint.hessian_prod_state_state(constraint.hessian_prod_state_state_cache, states, actions, lhs_vector)
-        constraint.hessian_prod_action_state(constraint.hessian_prod_action_state_cache, states, actions, lhs_vector)
-        constraint.hessian_prod_action_action(constraint.hessian_prod_action_action_cache, states, actions, lhs_vector)
-        @views hessian_prod_state_state .= constraint.hessian_prod_state_state_cache
-        @views hessian_prod_action_state .= constraint.hessian_prod_action_state_cache
-        @views hessian_prod_action_action .= constraint.hessian_prod_action_action_cache
+    if !isnothing(constraint.second_order)
+        num_state = length(states)
+        constraint.second_order(constraint.second_order_cache, states, actions, lhs_vector)
+        @views hessian_prod_state_state .= constraint.second_order_cache[1:num_state, 1:num_state]
+        @views hessian_prod_action_state .= constraint.second_order_cache[num_state+1:end, 1:num_state]
+        @views hessian_prod_action_action .= constraint.second_order_cache[num_state+1:end, num_state+1:end]
     end
 end
+

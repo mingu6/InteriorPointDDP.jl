@@ -86,11 +86,11 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
             
             # apply second order terms to Q for full DDP, i.e., Vx * fxx, Vx * fuu, Vx * fxu
             if !options.quasi_newton
-                hessian_vector_prod!(fxx[t], fux[t], fuu[t], problem.model.dynamics[t], x[t], u[t], Vx[t+1])
-                Qxx[t] .+= Symmetric(fxx[t])
-                Qux[t] .+= fux[t]
-                Quu[t] .+= Symmetric(fuu[t])
-                hessian_vector_prod!(hxx[t], hux[t], huu[t], constr_data.constraints[t], x[t], u[t], ϕ[t])
+                # secon!(fxx[t], fux[t], fuu[t], problem.model.dynamics[t], x[t], u[t], Vx[t+1])
+                # Qxx[t] .+= Symmetric(fxx[t])
+                # Qux[t] .+= fux[t]
+                # Quu[t] .+= Symmetric(fuu[t])
+                second_order_contraction!(hxx[t], hux[t], huu[t], constr_data.constraints[t], x[t], u[t], ϕ[t])
             end
             # setup linear system in backward pass
             policy.lhs_tl[t] .= Symmetric(Quu[t])
