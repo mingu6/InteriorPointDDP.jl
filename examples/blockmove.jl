@@ -32,14 +32,18 @@ objective = [
 stage_constr = Constraint((x, u) -> [
     u[2] - u[3] - u[1] * x[2]
 ], 
-2, 3, 
-bounds_lower=[-10.0, 0.0, 0.0], bounds_upper=[10.0, Inf, Inf])
+2, 3)
 constraints = [stage_constr for k = 1:N-1]
+
+# ## Define bounds
+
+bound = Bound([-10.0, 0.0, 0.0], [10.0, Inf, Inf])
+bounds = [bound for k = 1:N-1]
 
 Random.seed!(seed)
 s_init = 0.01 * ones(2)
 ū = [[1.0e-3 * randn(1); deepcopy(s_init)] for t = 1:N-1]
-solver = Solver(dynamics, objective, constraints, options=options)
+solver = Solver(dynamics, objective, constraints, bounds; options=options)
 solve!(solver, x1, ū)
 
 # plot solution
@@ -51,3 +55,7 @@ sp = [map(u -> u[2], solver.problem.nominal_actions[1:end-1]); 0.0]
 sn = [map(u -> u[3], solver.problem.nominal_actions[1:end-1]); 0.0]
 plot(range(0, (N-1) * dt, length=N), [x v u sp sn], label=["x" "v" "u" "s+" "s-"])
 savefig("examples/plots/blockmove.png")
+
+solver.options.verbose = false
+@benchmark solve!(solver, x1, ū) setup=(x1=deepcopy(x1), ū=deepcopy(ū))
+

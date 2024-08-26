@@ -11,7 +11,7 @@ num_state = 4
 num_action = 2 # slack variable for elbow constraint
 xN = [π; 0.0; 0.0; 0.0]
 multiplier = 1e-1
-options = Options(quasi_newton=false, verbose=true, max_iterations=500, optimality_tolerance=1e-6)
+options = Options(quasi_newton=false, verbose=true, max_iterations=1000, optimality_tolerance=1e-6)
 seed = 1
 x1 = [0.0; 0.0; 0.0; 0.0]
 
@@ -129,8 +129,8 @@ u_mat = [map(x -> x[1], solver.problem.nominal_actions[1:end-1]); 0.0]
 plot(range(0, (N-1) * 0.05, length=N), [q1 q2 v1 v2 u_mat], label=["q1" "q2" "v1" "v2" "u"])
 savefig("examples/plots/acrobot_state.png")
 
-q_sol = map(x -> [x[1], x[2]], solver.problem.nominal_states)
-visualize!(vis, acrobot_normal, q_sol, Δt=dt);
+# q_sol = map(x -> [x[1], x[2]], solver.problem.nominal_states)
+# visualize!(vis, acrobot_normal, q_sol, Δt=dt);
 
 solver.options.verbose = false
 @benchmark solve!(solver, x1, ū) setup=(x1=deepcopy(x1), ū=deepcopy(ū))

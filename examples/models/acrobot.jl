@@ -1,4 +1,4 @@
-using Symbolics
+using ForwardDiff
 """
     Double pendulum
 """
@@ -84,8 +84,7 @@ function ϕ_func(model, q)
 end
 
 function P_func(model, q)
-    ϕ = ϕ_func(model, q)
-    Symbolics.jacobian(ϕ, q)
+    ForwardDiff.jacobian(q -> ϕ_func(model, q), q)
 end
 
 function lagrangian_derivatives(mass_matrix, dynamics_bias, q, v)

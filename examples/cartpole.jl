@@ -51,16 +51,20 @@ objective = [
 
 stage_constr = Constraint(
     (x, u) -> [cartpole_discrete(x, u)[1] - u[2]], 
-    num_state, num_action, 
-    bounds_lower=[-3., -0.10], bounds_upper=[3., 0.2]
+    num_state, num_action
 )
 
 constraints = [stage_constr for k = 1:N-1]
 
+# ## Define bounds
+
+bound = Bound([-3., -0.10], [3., 0.2])
+bounds = [bound for k = 1:N-1]
+
 Random.seed!(seed)
 s_init = 0.01 * ones(1)
 ū = [[1e-3 .* randn(1); deepcopy(s_init)] for k = 1:N-1]
-solver = Solver(dynamics, objective, constraints, options=options)
+solver = Solver(dynamics, objective, constraints, bounds; options=options)
 solve!(solver, x1, ū)
 
 x_mat = reduce(vcat, transpose.(solver.problem.nominal_states))
@@ -73,5 +77,9 @@ s = [map(x -> x[2], solver.problem.nominal_actions[1:end-1]); 0.0]
 plot(range(0, (N-1) * dt, length=N), [x ẋ θ θ̇ u s], label=["x" "ẋ" "θ" "θ̇" "u" "s"])
 savefig("examples/plots/cartpole.png")
 
-q_sol = map(x -> [x[1], x[2]], solver.problem.nominal_states)
-visualize!(vis, cartpole, q_sol, Δt=dt);
+# q_sol = map(x -> [x[1], x[2]], solver.problem.nominal_states)
+# visualize!(vis, cartpole, q_sol, Δt=dt);
+
+solver.options.verbose = false
+@benchmark solve!(solver, x1, ū) setup=(x1=deepcopy(x1), ū=deepcopy(ū))
+

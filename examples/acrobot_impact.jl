@@ -63,17 +63,21 @@ objective = [
 ]
 
 stage_constr = Constraint((x, u) -> implicit_contact_dynamics(acrobot_impact, x, u, dt), nx, ny,
-            bounds_lower=[-Inf; -Inf * ones(nq); zeros(nc); zeros(nc)],
-            bounds_upper=[Inf; Inf * ones(nq); Inf * ones(nc); Inf * ones(nc)],
-			indices_compl=[5, 6])
+		indices_complementarity=[5, 6])
 
 constraints = [stage_constr for k = 1:N-1]
+
+# ## Define bounds
+
+bound = Bound([-Inf; -Inf * ones(nq); zeros(nc); zeros(nc)],
+			  [Inf; Inf * ones(nq); Inf * ones(nc); Inf * ones(nc)])
+bounds = [bound for k = 1:N-1]
 
 Random.seed!(seed)
 sλ_init = 0.01 * ones(nc)
 q2_init = LinRange(q1, qN, N)[2:end]
 ū = [[1.0e-3 * randn(nu); q2_init[t]; deepcopy(sλ_init); deepcopy(sλ_init)] for t = 1:N-1]
-solver = Solver(dynamics, objective, constraints, options=options)
+solver = Solver(dynamics, objective, constraints, bounds ;options=options)
 solve!(solver, x1, ū)
 
 # plot solution
@@ -86,5 +90,9 @@ u_mat = [map(x -> x[1], solver.problem.nominal_actions[1:end-1]); 0.0]
 plot(range(0, (N-1) * 0.05, length=N), [q1 q2 v1 v2 u_mat], label=["q1" "q2" "v1" "v2" "u"])
 savefig("examples/plots/acrobot_impact.png")
 
-q_sol = state_to_configuration(solver.problem.nominal_states)
-visualize!(vis, acrobot_impact, q_sol, Δt=dt);
+# q_sol = state_to_configuration(solver.problem.nominal_states)
+# visualize!(vis, acrobot_impact, q_sol, Δt=dt);
+
+solver.options.verbose = false
+@benchmark solve!(solver, x1, ū) setup=(x1=deepcopy(x1), ū=deepcopy(ū))
+
