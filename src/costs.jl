@@ -51,30 +51,20 @@ function cost(costs::Vector{Cost{T}}, states, actions) where T
 end
 
 function cost_gradient!(gradient_states, gradient_actions, costs::Vector{Cost{T}}, states, actions) where T
-    H = length(costs)
-    for (t, cost) in enumerate(costs)
-        cost.gradient_state(cost.gradient_state_cache, states[t], actions[t])
-        @views gradient_states[t] .= cost.gradient_state_cache
-        fill!(cost.gradient_state_cache, 0.0) # TODO: confirm this is necessary
-        t == H && continue
-        cost.gradient_action(cost.gradient_action_cache, states[t], actions[t])
-        @views gradient_actions[t] .= cost.gradient_action_cache
-        fill!(cost.gradient_action_cache, 0.0) # TODO: confirm this is necessary
+    N = length(costs)
+    for (k, cost) in enumerate(costs)
+        cost.gradient_state(gradient_states[k], states[k], actions[k])
+        k == N && continue
+        cost.gradient_action(gradient_actions[k], states[k], actions[k])
     end
 end
 
 function cost_hessian!(hessian_state_state, hessian_action_action, hessian_action_state, costs::Vector{Cost{T}}, states, actions) where T
-    H = length(costs)
-    for (t, cost) in enumerate(costs)
-        cost.hessian_state_state(cost.hessian_state_state_cache, states[t], actions[t])
-        @views hessian_state_state[t] .= cost.hessian_state_state_cache
-        fill!(cost.hessian_state_state_cache, 0.0) # TODO: confirm this is necessary
-        t == H && continue
-        cost.hessian_action_action(cost.hessian_action_action_cache, states[t], actions[t])
-        cost.hessian_action_state(cost.hessian_action_state_cache, states[t], actions[t])
-        @views hessian_action_action[t] .= cost.hessian_action_action_cache
-        @views hessian_action_state[t]  .= cost.hessian_action_state_cache
-        fill!(cost.hessian_action_action_cache, 0.0) # TODO: confirm this is necessary
-        fill!(cost.hessian_action_state_cache, 0.0) # TODO: confirm this is necessary
+    N = length(costs)
+    for (k, cost) in enumerate(costs)
+        cost.hessian_state_state(hessian_state_state[k], states[k], actions[k])
+        k == N && continue
+        cost.hessian_action_action(hessian_action_action[k], states[k], actions[k])
+        cost.hessian_action_state(hessian_action_state[k], states[k], actions[k])
     end
 end

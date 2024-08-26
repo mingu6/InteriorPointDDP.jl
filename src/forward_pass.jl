@@ -92,25 +92,26 @@ function check_fraction_boundary(problem::ProblemData, τ::Float64)
 
     status = 0
     for k = 1:N-1
-        if any((il[k] .< (1. - τ) .*  il̄[k]) .* .!isinf.(il̄[k]))
-            # println(k, " il ", il[k], " ", (1. - τ + τ) .*  il̄[k])
-            status = 2
-            break
-        elseif any((iu[k] .< (1. - τ) .*  iū[k]) .* .!isinf.(iū[k]))
-            # println(k, " iu ", iu[k], " ", (1. - τ + τ) .*  iū[k])
-            status = 2
-            break
-        elseif any((vl[k] .< (1. - τ) .*  vl̄[k]) .* .!isinf.(vl̄[k]))
-            # println(k, " vl ", vl[k], " ", (1. - τ + τ) .*  vl̄[k])
-            status = 2
-            break
-        elseif any((vu[k] .< (1. - τ) .*  vū[k]) .* .!isinf.(vū[k]))
-            status = 2
-            # println(k, " vu ", vu[k], " ", (1. - τ + τ) .*  vū[k])
-            break
+        num_action = length(il[k])
+        for i = 1:num_action
+            if !isinf(il̄[k][i]) && (il[k][i] < (1. - τ) *  il̄[k][i])
+                status = 2
+                break
+            end
+            if !isinf(iū[k][i]) && (iu[k][i] < (1. - τ) *  iū[k][i])
+                status = 2
+                break
+            end
+            if !isinf(vl̄[k][i]) && (vl[k][i] < (1. - τ) *  vl̄[k][i])
+                status = 2
+                break
+            end
+            if !isinf(vū[k][i]) && (vu[k][i] < (1. - τ) *  vū[k][i])
+                status = 2
+                break
+            end
         end
     end
-    # TODO: make more efficient
     return status
 end
 

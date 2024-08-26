@@ -57,16 +57,3 @@ function rollout(dynamics::Vector{Dynamics{T}}, initial_state, actions) where T
     return x_history
 end
 
-function max_step_dual(v::Vector{T}, kv::Vector{T}, τ::T) where T
-    n = length(v)
-    step_size = 1.0
-    for i = 1:n
-        if iszero(kv[i])
-            continue
-        else
-            a = -τ * v[i] / kv[i]
-            step_size = a < 0 ? min(step_size, 1.0) : min(step_size, min(a, 1.0))
-        end
-    end
-    return step_size
-end

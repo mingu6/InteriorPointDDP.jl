@@ -32,7 +32,6 @@ function constraint!(problem::ProblemData, μ::Float64; mode=:nominal)
         end
         evaluate_ineq_lower!(ineq_lo_traj[k], actions[k], con.bounds_lower)
         evaluate_ineq_upper!(ineq_up_traj[k], actions[k], con.bounds_upper)
-        evaluate_cone_ineq!(ineq_up_traj[k], actions[k], con.cone_indices)
     end
 end
 
@@ -50,15 +49,6 @@ function evaluate_ineq_upper!(res, actions, bound)
     end
 end
 
-function evaluate_cone_ineq!(res, actions, cone_inds)
-    for inds in cone_inds
-        if length(inds) == 0
-            break
-        end
-        res[inds] .= actions[inds[1]] - norm(actions[inds[2:end]], 2)
-    end
-end
-
 function barrier_objective!(problem::ProblemData, data::SolverData; mode=:nominal)
     N = problem.horizon
     constr_data = problem.constr_data
@@ -73,8 +63,7 @@ function barrier_objective!(problem::ProblemData, data::SolverData; mode=:nomina
             if !isinf(il[k][i])
                 barrier_obj -= log(il[k][i])
             end
-            iscone = any(i in inds for inds in constr.cone_indices)
-            if !isinf(iu[k][i]) && !iscone
+            if !isinf(iu[k][i])
                 barrier_obj -= log(iu[k][i])
             end
         end

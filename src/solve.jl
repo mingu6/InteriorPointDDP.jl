@@ -92,7 +92,6 @@ function ipddp_solve!(solver::Solver)
         data.k += 1
         data.wall_time += iter_time
     end
-    display(problem.nominal_states)
     
     options.verbose && iteration_status(data, options)
     if data.k == options.max_iterations 

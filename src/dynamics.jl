@@ -58,21 +58,16 @@ end
 
 function jacobian!(jacobian_states, jacobian_actions, dynamics::Vector{Dynamics{T}}, states, actions) where T
     for (t, d) in enumerate(dynamics)
-        d.jacobian_state(d.jacobian_state_cache, states[t], actions[t])
-        d.jacobian_action(d.jacobian_action_cache, states[t], actions[t])
-        @views jacobian_states[t] .= d.jacobian_state_cache
-        @views jacobian_actions[t] .= d.jacobian_action_cache
+        d.jacobian_state(jacobian_states[t], states[t], actions[t])
+        d.jacobian_action(jacobian_actions[t], states[t], actions[t])
     end
 end
 
 function hessian_vector_prod!(hessian_prod_state_state, hessian_prod_action_state, hessian_prod_action_action,
         dynamics::Dynamics{T}, states, actions, parameters, lhs_vector) where T
-    dynamics.hessian_prod_state_state(dynamics.hessian_prod_state_state_cache, states, actions, parameters, lhs_vector)
-    dynamics.hessian_prod_action_state(dynamics.hessian_prod_action_state_cache, states, actions, parameters, lhs_vector)
-    dynamics.hessian_prod_action_action(dynamics.hessian_prod_action_action_cache, states, actions, parameters, lhs_vector)
-    @views hessian_prod_state_state .= dynamics.hessian_prod_state_state_cache
-    @views hessian_prod_action_state .= dynamics.hessian_prod_action_state_cache
-    @views hessian_prod_action_action .= dynamics.hessian_prod_action_action_cache
+    dynamics.hessian_prod_state_state(hessian_prod_state_state, states, actions, parameters, lhs_vector)
+    dynamics.hessian_prod_action_state(hessian_prod_action_state, states, actions, parameters, lhs_vector)
+    dynamics.hessian_prod_action_action(hessian_prod_action_action, states, actions, parameters, lhs_vector)
 end
 
 num_trajectory(dynamics::Vector{Dynamics{T}}) where T = sum([d.num_state + d.num_action for d in dynamics]) + dynamics[end].num_next_state

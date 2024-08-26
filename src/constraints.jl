@@ -21,13 +21,12 @@ struct Constraint{T}
     bounds_lower::Vector{T}
     bounds_upper::Vector{T}
     indices_compl::Vector{Int}
-    cone_indices::Vector{Vector{Int}}
 end
 
 Constraints{T} = Vector{Constraint{T}} where T
 
 function Constraint(f::Function, num_state::Int, num_action::Int; bounds_lower::Vector{T}=ones(num_action) * -Inf,
-    bounds_upper::Vector{T}=ones(num_action) * Inf, quasi_newton::Bool=false, indices_compl=nothing, cone_inds=nothing) where T
+    bounds_upper::Vector{T}=ones(num_action) * Inf, quasi_newton::Bool=false, indices_compl=nothing) where T
 
     x = Symbolics.variables(:x, 1:num_state)
     u = Symbolics.variables(:u, 1:num_action)
@@ -64,7 +63,6 @@ function Constraint(f::Function, num_state::Int, num_action::Int; bounds_lower::
     end
 
     indices_compl = isnothing(indices_compl) ? Int64[] : indices_compl 
-    cone_inds = isnothing(cone_inds) ? [Int64[]] : cone_inds
 
     return Constraint(
         evaluate_func,
@@ -74,7 +72,7 @@ function Constraint(f::Function, num_state::Int, num_action::Int; bounds_lower::
         zeros(num_constraint), zeros(num_action), zeros(num_action),
         zeros(num_constraint, num_state), zeros(num_constraint, num_action),
         zeros(num_state, num_state), zeros(num_action, num_state), zeros(num_action, num_action),
-        bounds_lower, bounds_upper, indices_compl, cone_inds)
+        bounds_lower, bounds_upper, indices_compl)
 end
 
 function Constraint()
@@ -90,7 +88,7 @@ end
 
 function Constraint(f::Function, fx::Function, fu::Function, num_constraint::Int, num_state::Int, num_action::Int;
     bounds_lower::Vector{T}=ones(num_action) *-Inf, bounds_upper::Vector{T}=ones(num_action) * Inf,
-    indices_compl=nothing, cone_inds=nothing,
+    indices_compl=nothing,
     fxx_prod::Function=nothing, fux_prod::Function=nothing, fuu_prod::Function=nothing) where T
 
     num_ineq_lower = sum(isfinite, bounds_lower)
@@ -104,30 +102,23 @@ function Constraint(f::Function, fx::Function, fu::Function, num_constraint::Int
         zeros(num_constraint), zeros(num_action), zeros(num_action),
         zeros(num_constraint, num_state), zeros(num_constraint, num_action),
         zeros(num_state, num_state), zeros(num_action, num_state), zeros(num_action, num_action),
-        bounds_lower, bounds_upper, indices_compl, cone_inds)
+        bounds_lower, bounds_upper, indices_compl)
 end
 
 function jacobian!(jacobian_states, jacobian_actions, constraints::Constraints{T}, states, actions) where T
     N = length(constraints)
     for (k, con) in enumerate(constraints)
         con.num_constraint == 0 && continue
-        con.jacobian_state(con.jacobian_state_cache, states[k], actions[k])
-        @views jacobian_states[k] .= con.jacobian_state_cache
-        fill!(con.jacobian_state_cache, 0.0) # TODO: confirm this is necessary
-        con.jacobian_action(con.jacobian_action_cache, states[k], actions[k])
-        @views jacobian_actions[k] .= con.jacobian_action_cache
-        fill!(con.jacobian_action_cache, 0.0) # TODO: confirm this is necessary
+        con.jacobian_state(jacobian_states[k], states[k], actions[k])
+        con.jacobian_action(jacobian_actions[k], states[k], actions[k])
     end
 end
 
 function hessian_vector_prod!(hessian_prod_state_state, hessian_prod_action_state, hessian_prod_action_action,
     constraint::Union{Dynamics{T}, Constraint{T}}, states, actions, lhs_vector) where T
     if !isnothing(constraint.hessian_prod_state_state)
-        constraint.hessian_prod_state_state(constraint.hessian_prod_state_state_cache, states, actions, lhs_vector)
-        constraint.hessian_prod_action_state(constraint.hessian_prod_action_state_cache, states, actions, lhs_vector)
-        constraint.hessian_prod_action_action(constraint.hessian_prod_action_action_cache, states, actions, lhs_vector)
-        @views hessian_prod_state_state .= constraint.hessian_prod_state_state_cache
-        @views hessian_prod_action_state .= constraint.hessian_prod_action_state_cache
-        @views hessian_prod_action_action .= constraint.hessian_prod_action_action_cache
+        constraint.hessian_prod_state_state(hessian_prod_state_state, states, actions, lhs_vector)
+        constraint.hessian_prod_action_state(hessian_prod_action_state, states, actions, lhs_vector)
+        constraint.hessian_prod_action_action(hessian_prod_action_action, states, actions, lhs_vector)
     end
 end

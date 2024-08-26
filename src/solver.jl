@@ -78,7 +78,6 @@ function initialize_trajectory!(solver::Solver, actions, x1)
         dynamics!(dynamics[t], solver.problem.nominal_states[t+1],
                   solver.problem.nominal_states[t], solver.problem.nominal_actions[t])
     end
-    # display(actions)
 end
 
 # TODO: initialize_duals
