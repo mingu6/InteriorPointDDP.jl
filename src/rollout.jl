@@ -43,7 +43,7 @@ function rollout!(policy::PolicyData, problem::ProblemData, τ::Float64; step_si
         mul!(vu[k], Kvu[k], x[k], 1.0, 1.0)
         mul!(vu[k], Kvu[k], x̄[k], -1.0, 1.0)
         
-        x[k+1] .= dynamics!(d, x[k], u[k])
+        dynamics!(d, x[k+1], x[k], u[k])
     end
 end
 

@@ -51,9 +51,9 @@ function Dynamics(f::Function, num_state::Int, num_action::Int; quasi_newton::Bo
                     zeros(num_state, num_state), zeros(num_action, num_state), zeros(num_action, num_action))
 end
 
-function dynamics!(d::Dynamics, state, action)
-    d.evaluate(d.evaluate_cache, state, action)
-    return d.evaluate_cache
+function dynamics!(d::Dynamics, cache, state, action)
+    d.evaluate(cache, state, action)
+    return nothing
 end
 
 function jacobian!(jacobian_states, jacobian_actions, dynamics::Vector{Dynamics{T}}, states, actions) where T

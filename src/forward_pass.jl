@@ -110,6 +110,7 @@ function check_fraction_boundary(problem::ProblemData, τ::Float64)
             break
         end
     end
+    # TODO: make more efficient
     return status
 end
 
@@ -145,7 +146,7 @@ function expected_decrease_cost(policy::PolicyData, problem::ProblemData, step_s
     
     for k = N-1:-1:1
         Δφ_L += dot(Qu[k], gains.ku[k])
-        Δφ_Q += 0.5 * dot(gains.ku[k], Quu[k], gains.ku[k])
+        Δφ_Q += 0.5 * dot(gains.ku[k], Quu[k], gains.ku[k])  # TODO, maybe slow?
     end
     return Δφ_L * step_size, Δφ_Q * step_size^2
 end

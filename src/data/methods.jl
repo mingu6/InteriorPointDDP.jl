@@ -25,8 +25,7 @@ function constraint!(problem::ProblemData, μ::Float64; mode=:nominal)
     ineq_up_traj = mode == :nominal ? problem.nominal_ineq_upper : problem.ineq_upper
     for (k, con) in enumerate(constr_data.constraints)
         if con.num_constraint > 0
-            con.evaluate(con.evaluate_cache, states[k], actions[k])
-            constr_traj[k] .= con.evaluate_cache
+            con.evaluate(constr_traj[k], states[k], actions[k])
             for i in con.indices_compl
                 constr_traj[k][i] -= μ
             end
@@ -68,6 +67,7 @@ function barrier_objective!(problem::ProblemData, data::SolverData; mode=:nomina
     
     barrier_obj = 0.
     for k = 1:N-1
+        # precompute constraint indices for speed
         constr = constr_data.constraints[k]
         for i = 1:constr.num_action
             if !isinf(il[k][i])
