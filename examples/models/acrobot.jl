@@ -110,7 +110,7 @@ function dynamics_acrobot(model::DoublePendulum{T}, mass_matrix, dynamics_bias, 
         + dt * 0.5 .* vm2) # damping
 end
 
-function implicit_contact_dynamics(model::DoublePendulum{T}, x, u, dt) where T
+function implicit_contact_dynamics(model::DoublePendulum{T}, x, u, dt, μ=0.0) where T
     nq = model.nq
     nu = model.nu
     nc = model.nc
@@ -127,7 +127,7 @@ function implicit_contact_dynamics(model::DoublePendulum{T}, x, u, dt) where T
         dynamics_acrobot(model, a -> M_func(model, a), (a, b) -> C_func(model, a, b),
         dt, q0, q1, u1, λ1, q2);
         (s1 .- ϕ_func(model, q2));
-        λ1 .* s1;
+        λ1 .* s1 .- μ;
     ]
 end
 

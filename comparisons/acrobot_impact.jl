@@ -1,4 +1,4 @@
-using InteriorPointDDP
+using IterativeLQR
 using LinearAlgebra
 using Random
 using Plots
@@ -6,15 +6,22 @@ using MeshCat
 
 h = 0.05
 N = 101
-options = Options(quasi_newton=false, verbose=true, max_iterations=5000, optimality_tolerance=1e-5)
 visualise = true
+
+options = Options()
+options.scaling_penalty = 1.0
+options.initial_constraint_penalty = 1e-2
+options.max_iterations = 1000
+options.max_dual_updates = 9
+options.objective_tolerance = 1e-4
+options.lagrangian_gradient_tolerance = 1e-4
 
 Random.seed!(0)
 
-include("models/acrobot.jl")
+include("../examples/models/acrobot.jl")
 
 if visualise
-	include("visualise/visualise_acrobot.jl")
+	include("../examples/visualise/visualise_acrobot.jl")
 	!@isdefined(vis) && (vis = Visualizer())
 	render(vis)
 end
@@ -38,7 +45,7 @@ dynamics = [dyn_acrobot for k = 1:N-1]
 
 # ## Costs
 
-function objt(x, u)
+function objk(x, u)
 	J = 0.0 
 
 	q1 = x[1:acrobot_impact.nq] 
@@ -50,7 +57,7 @@ function objt(x, u)
 	return J
 end
 
-function objT(x, u)
+function objN(x, u)
 	J = 0.0 
 	
 	q1 = x[1:acrobot_impact.nq] 
@@ -62,28 +69,37 @@ function objT(x, u)
 	return J
 end
 
-stage = Cost(objt, nx, ny)
+stage = Cost(objk, nx, ny)
 objective = [
     [stage for k = 1:N-1]...,
-    Cost(objT, nx, 0),
+    Cost(objN, nx, 0),
 ]
 
-# ## Constraints
+# ## Constraints - perturb complementarity to make easier
 
-stage_constr = Constraint((x, u) -> implicit_contact_dynamics(acrobot_impact, x, u, h),
-			nx, ny,
-            bounds_lower=[-Inf; -Inf * ones(nq); zeros(nc); zeros(nc)],
-            bounds_upper=[Inf; Inf * ones(nq); Inf * ones(nc); Inf * ones(nc)],
-			indices_compl=[5, 6])
+stage_constr = Constraint((x, u) -> [
+            implicit_contact_dynamics(acrobot_impact, x, u, h, 0.0);
+            -u[nq+2:nq+2+2*nc:end]
+            ],
+            nx, ny)
 
-constraints = [stage_constr for k = 1:N-1]
+constraints = [[stage_constr for k = 1:N-1]...,
+                Constraint()
+                # Constraint((x, u) -> x - xN, nx, 0)
+                ]
 
 # ## Initialise solver and solve
 
+solver = Solver(dynamics, objective, constraints; options=options)
 q2_init = LinRange(q1, qN, N)[2:end]
 ū = [[1.0e-3 * randn(nu); q2_init[k]; 0.01 * ones(nc); 0.01 * ones(nc)] for k = 1:N-1]
-solver = Solver(dynamics, objective, constraints, options=options)
-solve!(solver, x0, ū)
+
+x̄ = rollout(dynamics, x0, ū)
+
+initialize_controls!(solver, ū)
+initialize_states!(solver, x̄)
+
+solve!(solver)
 
 # ## Plot solution
 
@@ -94,7 +110,7 @@ v1 = (x_mat[:, 3] - x_mat[:, 1]) ./ h
 v2 = (x_mat[:, 4] - x_mat[:, 2]) ./ h
 u_mat = [map(x -> x[1], solver.problem.nominal_actions[1:end-1]); 0.0]
 plot(range(0, (N-1) * h, length=N), [q1 q2 v1 v2 u_mat], label=["q1" "q2" "v1" "v2" "u"])
-savefig("examples/plots/acrobot_impact.png")
+savefig("comparisons/plots/acrobot_impact.png")
 
 if visualise
 	q_sol = state_to_configuration(solver.problem.nominal_states)
