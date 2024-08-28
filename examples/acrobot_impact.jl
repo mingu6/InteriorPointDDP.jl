@@ -100,3 +100,9 @@ if visualise
 	q_sol = state_to_configuration(solver.problem.nominal_states)
 	visualize!(vis, acrobot_impact, q_sol, Δt=h);
 end
+
+# ## Benchmark solver
+
+using BenchmarkTools
+solver.options.verbose = false
+@benchmark solve!(solver, x0, ū)

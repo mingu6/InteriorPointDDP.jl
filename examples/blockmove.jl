@@ -57,3 +57,7 @@ plot(range(0, (N-1) * h, length=N), [x v u work], label=["x" "v" "u" "work"])
 savefig("examples/plots/blockmove.png")
 
 println("Total absolute work: ", sum(work))
+
+using BenchmarkTools
+solver.options.verbose = false
+@benchmark solve!(solver, x0, ū)

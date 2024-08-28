@@ -83,7 +83,7 @@ function Constraint()
         0, 0, 0, 0, 0,
         Float64[], Float64[], Float64[], Array{Float64}(undef, 0, 0), Array{Float64}(undef, 0, 0),
         Array{Float64}(undef, 0, 0), Array{Float64}(undef, 0, 0), Array{Float64}(undef, 0, 0),
-        Float64[], Float64[], Int64[], [Int64[]])
+        Float64[], Float64[], Int64[])
 end
 
 function Constraint(f::Function, fx::Function, fu::Function, num_constraint::Int, num_state::Int, num_action::Int;
