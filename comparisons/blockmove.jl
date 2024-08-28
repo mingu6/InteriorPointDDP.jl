@@ -73,3 +73,6 @@ plot(range(0, (N-1) * h, length=N), [x v u work], label=["x" "v" "u" "work"])
 savefig("comparisons/plots/blockmove.png")
 
 println("Total absolute work: ", sum(work))
+
+using BenchmarkTools
+info = @benchmark solve!($solver, x̄, ū) setup=(x̄=deepcopy(x̄), ū=deepcopy(ū))
