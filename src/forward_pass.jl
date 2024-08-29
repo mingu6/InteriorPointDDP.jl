@@ -1,10 +1,11 @@
-function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverData, options::Options; verbose=false)
+function forward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::SolverData{T},
+            options::Options{T}; verbose=false) where T
     data.l = 0  # line search iteration counter
     data.status = 0
-    data.step_size = 1.0
-    Δφ = 0.0
+    data.step_size = T(1.0)
+    Δφ = T(0.0)
     μ = data.μ
-    τ = max(options.τ_min, 1.0 - μ)
+    τ = max(options.τ_min, T(1.0) - μ)
 
     θ_prev = data.primal_1_curr
     φ_prev = data.barrier_obj_curr
@@ -18,11 +19,11 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
         α = data.step_size
         # TODO: do not catch all exceptions, only BoundsError
         try
-            rollout!(policy, problem, τ, step_size=α; mode=:main)
-        catch
+            rollout!(policy, problem, step_size=α; mode=:main)
+        catch e
             # reduces step size if NaN or Inf encountered
-            data.step_size *= 0.5
-            continue
+            e isa DomainError && (data.step_size *= 0.5, continue)
+            rethrow(e)
         end
         constraint!(problem, data.μ; mode=:current)
         
@@ -66,11 +67,11 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     data.status != 0 && (verbose && (@warn "Line search failed to find a suitable iterate"))
 end
 
-function check_fraction_boundary(problem::ProblemData, τ::Float64)
+function check_fraction_boundary(problem::ProblemData{T}, τ::T) where T
     N = problem.horizon
 
-    u = problem.actions
-    ū = problem.nominal_actions
+    u = problem.controls
+    ū = problem.nominal_controls
     vl = problem.ineq_duals_lo
     vu = problem.ineq_duals_up
     vl̄ = problem.nominal_ineq_duals_lo
@@ -79,26 +80,26 @@ function check_fraction_boundary(problem::ProblemData, τ::Float64)
     bounds = problem.bounds
 
     status = 0
-    for k = 1:N-1
-        bk = bounds[k]
+    for t = 1:N-1
+        bk = bounds[t]
         il = bk.indices_lower
         iu = bk.indices_upper
         # equivalent to u - ul < (ū - ul) * (1 - τ)
-        if any(u[k][il] - bk.lower[il] .* τ .< ū[k][il] .* (1. - τ))
+        if any(u[t][il] - bk.lower[il] .* τ .< ū[t][il] .* (1. - τ))
             status = 2
             break
         end
         # equivalent to uu - u < (uu - ū) * (1 - τ)
-        if any(u[k][iu] - bk.upper[iu] .* τ .> ū[k][iu] .* (1. - τ))
+        if any(u[t][iu] - bk.upper[iu] .* τ .> ū[t][iu] .* (1. - τ))
             status = 2
             break
         end
 
-        if any(vl[k][il] .< vl̄[k][il] .* (1. - τ))
+        if any(vl[t][il] .< vl̄[t][il] .* (1. - τ))
             status = 2
             break
         end
-        if any(vu[k][iu] .< vū[k][iu] .* (1. - τ))
+        if any(vu[t][iu] .< vū[t][iu] .* (1. - τ))
             status = 2
             break
         end
@@ -106,7 +107,7 @@ function check_fraction_boundary(problem::ProblemData, τ::Float64)
     return status
 end
 
-function estimate_min_step_size(Δφ_L::Float64, data::SolverData, options::Options)
+function estimate_min_step_size(Δφ_L::T, data::SolverData{T}, options::Options{T}) where T
     # compute minimum step size based on linear models of step acceptance conditions
     θ_min = data.min_primal_1
     θ = data.primal_1_curr
@@ -128,17 +129,17 @@ function estimate_min_step_size(Δφ_L::Float64, data::SolverData, options::Opti
     return min_step_size
 end
 
-function expected_decrease_cost(policy::PolicyData, problem::ProblemData, step_size::Float64; mode=:main)
-    Δφ_L = 0.0
-    Δφ_Q = 0.0
+function expected_decrease_cost(policy::PolicyData{T}, problem::ProblemData{T}, step_size::T; mode=:main) where T
+    Δφ_L = T(0.0)
+    Δφ_Q = T(0.0)
     N = problem.horizon
-    Qu = policy.action_value.gradient_action
-    Quu = policy.action_value.hessian_action_action
+    Qu = policy.hamiltonian.gradient_control
+    Quu = policy.hamiltonian.hessian_control_control
     gains = mode == :main ? policy.gains_main : policy.gains_soc
     
-    for k = N-1:-1:1
-        Δφ_L += dot(Qu[k], gains.ku[k])
-        Δφ_Q += 0.5 * dot(gains.ku[k], Quu[k], gains.ku[k])
+    for t = N-1:-1:1
+        Δφ_L += dot(Qu[t], gains.ku[t])
+        Δφ_Q += 0.5 * dot(gains.ku[t], Quu[t], gains.ku[t])
     end
     return Δφ_L * step_size, Δφ_Q * step_size^2
 end

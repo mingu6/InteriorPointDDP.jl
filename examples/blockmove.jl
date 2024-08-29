@@ -3,11 +3,12 @@ using LinearAlgebra
 using Random
 using Plots
 
+T = Float64
 h = 0.01
 N = 101
-xN = [1.0; 0.0]
-x0 = [0.0; 0.0]
-options = Options(quasi_newton=false, verbose=true)
+xN = T[1.0; 0.0]
+x0 = T[0.0; 0.0]
+options = Options{T}(quasi_newton=false, verbose=true)
 
 Random.seed!(0)
 
@@ -41,20 +42,22 @@ constraints = [stage_constr for k = 1:N-1]
 
 # ## Bounds
 
-bound = Bound([-10.0, 0.0, 0.0], [10.0, Inf, Inf])
+bound = Bound(T[-10.0, 0.0, 0.0], T[10.0, Inf, Inf])
 bounds = [bound for k = 1:N-1]
 
 # ## Initialise solver and solve
 
-ū = [[1.0e-2 * randn(1); 0.01 * ones(2)] for k = 1:N-1]
-solver = Solver(dynamics, objective, constraints, bounds, options=options)
+ū = [[T(1.0e-2) * randn(T, 1); T(0.01) * ones(T, 2)] for k = 1:N-1]
+solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
 solve!(solver, x0, ū)
 
 # ## Plot solution
 
-x = map(x -> x[1], solver.problem.nominal_states)
-v = map(x -> x[2], solver.problem.nominal_states)
-u = [map(u -> u[1], solver.problem.nominal_actions[1:end-1]); 0.0]
+x_sol, u_sol = get_trajectory(solver)
+
+x = map(x -> x[1], x_sol)
+v = map(x -> x[2], x_sol)
+u = [map(u -> u[1], u_sol); 0.0]
 work = [abs(vk * uk) for (vk, uk) in zip(v, u)]
 plot(range(0, (N-1) * h, length=N), [x v u work], label=["x" "v" "u" "work"])
 savefig("examples/plots/blockmove.png")

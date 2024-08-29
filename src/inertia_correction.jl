@@ -204,16 +204,16 @@ function inertia(B::BunchKaufman{TS};
     return np, nn, nz
 end
 
-function inertia_correction!(mat::Matrix{T}, num_actions::Int64, μ::Float64, 
-                reg::Float64, reg_last::Float64, options::Options; rook::Bool=false) where T
+function inertia_correction!(mat::Matrix{T}, num_controls::Int64, μ::T, 
+                reg::T, reg_last::T, options::Options; rook::Bool=false) where T
     status = 0
     δ_c = 0.0
     bk = bunchkaufman!(mat, rook; check=false)
     if bk.info > 0
         δ_c = options.δ_c * μ^options.κ_c
     end
-    np, _, _ = inertia(bk; atol=1e-12)
-    if np != num_actions || bk.info != 0
+    np, _, _ = inertia(bk; atol=T(1e-12))
+    if np != num_controls || bk.info != 0
         if iszero(reg) # initial setting of regularisation
             reg = (reg_last == 0.0) ? options.reg_1 : max(options.reg_min, options.κ_w_m * reg_last)
         else

@@ -8,9 +8,9 @@ function solver_info()
     ╚═╝╚═╝░░░░░╚════╝░░░╚════╝░░░╚═╝░░░░░    
     ")
     println(crayon"reset bold black",
-    "Andrei Pavlov, Iman Shames, and Chris Manzie")
+    "Ming Xu, Stephen Gould, Iman Shames")
     println("Implemented by Mingda Xu, Pranav Pativada and Jeffrey Liang")
-    println("School of Computing")
+    println("School of Computing and School of Engineering")
     println("The Australian National University\n")
     print(crayon"reset")
 end

@@ -7,14 +7,14 @@ struct Value{N,NN}
 end
 
 """ 
-    Action-value function approximation 
+    control-value function approximation 
 """
-struct ActionValue{N,M,NN,MM,MN}
+struct Hamiltonian{N,M,NN,MM,MN}
     gradient_state::Vector{N}
-    gradient_action::Vector{M}
+    gradient_control::Vector{M}
     hessian_state_state::Vector{NN}
-    hessian_action_action::Vector{MM}
-    hessian_action_state::Vector{MN}
+    hessian_control_control::Vector{MM}
+    hessian_control_state::Vector{MN}
 end
 
 """
@@ -36,7 +36,7 @@ end
 """
     Policy Data
 """
-struct PolicyData#{N,M,NN,MM,MN,NNN,MNN,H,HN,HM} 
+struct PolicyData{T}
     # policy u = ū + K * (x - x̄) + k
     gains_main
     gains_soc
@@ -44,8 +44,8 @@ struct PolicyData#{N,M,NN,MM,MN,NNN,MNN,H,HN,HM}
     # value function approximation
     value#::Value{N,NN}
 
-    # action-value function approximation
-    action_value#::ActionValue{N,M,NN,MM,MN}
+    # control-value (Q) function approximation
+    hamiltonian#::controlValue{N,M,NN,MM,MN}
 
     # pre-allocated memory
     x_tmp#::Vector{N}
@@ -74,78 +74,78 @@ struct PolicyData#{N,M,NN,MM,MN,NNN,MNN,H,HN,HM}
     lhs_bk
 end
 
-function gains_data(dynamics::Vector{Dynamics{T}}, constraints::Constraints{T}) where T
-    H = length(dynamics) + 1
+function gains_data(T, dynamics::Model, constraints::Constraints)
+    N = length(dynamics) + 1
 
-    Kuϕ = [zeros(dynamics[t].num_action + constraints[t].num_constraint, dynamics[t].num_state)
-                for t = 1:H-1]
-    kuϕ = [zeros(dynamics[t].num_action + constraints[t].num_constraint) for t = 1:H-1]
+    Kuϕ = [zeros(T, dynamics[t].num_control + constraints[t].num_constraint, dynamics[t].num_state)
+                for t = 1:N-1]
+    kuϕ = [zeros(T, dynamics[t].num_control + constraints[t].num_constraint) for t = 1:N-1]
 
-	Ku = [@views Kuϕ[t][1:dynamics[t].num_action, :] for t = 1:H-1]
-    ku = [@views kuϕ[t][1:dynamics[t].num_action] for t = 1:H-1]
+	Ku = [@views Kuϕ[t][1:dynamics[t].num_control, :] for t = 1:N-1]
+    ku = [@views kuϕ[t][1:dynamics[t].num_control] for t = 1:N-1]
 
-	Kϕ = [@views Kuϕ[t][dynamics[t].num_action+1:end, :] for t = 1:H-1]
-    kϕ = [@views kuϕ[t][dynamics[t].num_action+1:end] for t = 1:H-1]
+	Kϕ = [@views Kuϕ[t][dynamics[t].num_control+1:end, :] for t = 1:N-1]
+    kϕ = [@views kuϕ[t][dynamics[t].num_control+1:end] for t = 1:N-1]
 
-    kvl = [zeros(d.num_action) for d in dynamics]
-    Kvl = [zeros(d.num_action, d.num_state) for d in dynamics]
+    kvl = [zeros(T, d.num_control) for d in dynamics]
+    Kvl = [zeros(T, d.num_control, d.num_state) for d in dynamics]
 
-    kvu = [zeros(d.num_action) for d in dynamics]
-    Kvu = [zeros(d.num_action, d.num_state) for d in dynamics]
+    kvu = [zeros(T, d.num_control) for d in dynamics]
+    Kvu = [zeros(T, d.num_control, d.num_state) for d in dynamics]
     return Gains(kuϕ, Kuϕ, ku, Ku, kϕ, Kϕ, kvl, Kvl, kvu, Kvu)
 end
 
-function policy_data(dynamics::Vector{Dynamics{T}}, constraints::Constraints{T}) where T
-    H = length(dynamics) + 1
+function policy_data(T, dynamics::Vector{Dynamics}, constraints::Constraints)
+    N = length(dynamics) + 1
 
-    gains_main = gains_data(dynamics, constraints)
-    gains_soc = gains_data(dynamics, constraints)
+    gains_main = gains_data(T, dynamics, constraints)
+    gains_soc = gains_data(T, dynamics, constraints)
 
     # value function approximation
-    P = [[zeros(d.num_state, d.num_state) for d in dynamics]..., 
-            zeros(dynamics[end].num_next_state, dynamics[end].num_next_state)]
-    p =  [[zeros(d.num_state) for d in dynamics]..., 
-            zeros(dynamics[end].num_next_state)]
+    P = [[zeros(T, d.num_state, d.num_state) for d in dynamics]..., 
+            zeros(T, dynamics[end].num_next_state, dynamics[end].num_next_state)]
+    p =  [[zeros(T, d.num_state) for d in dynamics]..., 
+            zeros(T, dynamics[end].num_next_state)]
     value = Value(p, P)
 
-    # action-value function approximation
-    Qx = [zeros(d.num_state) for d in dynamics]
-    Qu = [zeros(d.num_action) for d in dynamics]
-    Qxx = [zeros(d.num_state, d.num_state) for d in dynamics]
-    Quu = [zeros(d.num_action, d.num_action) for d in dynamics]
-    Qux = [zeros(d.num_action, d.num_state) for d in dynamics]
+    # control-value function approximation
+    Qx = [zeros(T, d.num_state) for d in dynamics]
+    Qu = [zeros(T, d.num_control) for d in dynamics]
+    Qxx = [zeros(T, d.num_state, d.num_state) for d in dynamics]
+    Quu = [zeros(T, d.num_control, d.num_control) for d in dynamics]
+    Qux = [zeros(T, d.num_control, d.num_state) for d in dynamics]
 
-    action_value = ActionValue(Qx, Qu, Qxx, Quu, Qux)
+    hamiltonian = Hamiltonian(Qx, Qu, Qxx, Quu, Qux)
 
-    x_tmp = [[zeros(d.num_state) for d in dynamics]..., zeros(dynamics[end].num_next_state)]
-    u_tmp = [zeros(d.num_action) for d in dynamics]
-	h_tmp = [zeros(g.num_constraint) for g in constraints]
-	uu_tmp = [zeros(d.num_action, d.num_action) for d in dynamics]
-	ux_tmp = [zeros(d.num_action, d.num_state) for d in dynamics]
-    xx_tmp = [zeros(d.num_state, d.num_state) for d in dynamics]
+    x_tmp = [[zeros(T, d.num_state) for d in dynamics]..., zeros(T, dynamics[end].num_next_state)]
+    u_tmp = [zeros(T, d.num_control) for d in dynamics]
+	h_tmp = [zeros(T, g.num_constraint) for g in constraints]
+	uu_tmp = [zeros(T, d.num_control, d.num_control) for d in dynamics]
+	ux_tmp = [zeros(T, d.num_control, d.num_state) for d in dynamics]
+    xx_tmp = [zeros(T, d.num_state, d.num_state) for d in dynamics]
 
-    hu_tmp = [zeros(constraints[t].num_constraint, dynamics[t].num_action) for t = 1:H-1]
-    hx_tmp = [zeros(constraints[t].num_constraint, dynamics[t].num_state) for t = 1:H-1]
+    hu_tmp = [zeros(T, constraints[t].num_constraint, dynamics[t].num_control) for t = 1:N-1]
+    hx_tmp = [zeros(T, constraints[t].num_constraint, dynamics[t].num_state) for t = 1:N-1]
 
-    lhs = [zeros(constraints[t].num_constraint + dynamics[t].num_action,
-            constraints[t].num_constraint + dynamics[t].num_action) for t = 1:H-1]
-    lhs_tl = [@views lhs[t][1:dynamics[t].num_action, 1:dynamics[t].num_action] for t = 1:H-1]
-    lhs_tr = [@views lhs[t][1:dynamics[t].num_action, dynamics[t].num_action+1:end] for t = 1:H-1]
-    lhs_bl = [@views lhs[t][dynamics[t].num_action+1:end, 1:dynamics[t].num_action] for t = 1:H-1]
-    lhs_br = [@views lhs[t][dynamics[t].num_action+1:end, dynamics[t].num_action+1:end] for t = 1:H-1]
+    lhs = [zeros(T, constraints[t].num_constraint + dynamics[t].num_control,
+            constraints[t].num_constraint + dynamics[t].num_control) for t = 1:N-1]
+    lhs_tl = [@views lhs[t][1:dynamics[t].num_control, 1:dynamics[t].num_control] for t = 1:N-1]
+    lhs_tr = [@views lhs[t][1:dynamics[t].num_control, dynamics[t].num_control+1:end] for t = 1:N-1]
+    lhs_bl = [@views lhs[t][dynamics[t].num_control+1:end, 1:dynamics[t].num_control] for t = 1:N-1]
+    lhs_br = [@views lhs[t][dynamics[t].num_control+1:end, dynamics[t].num_control+1:end] for t = 1:N-1]
 
-    rhs = [zeros(constraints[t].num_constraint + dynamics[t].num_action) for t = 1:H-1]
-    rhs_t = [@views rhs[t][1:dynamics[t].num_action] for t = 1:H-1]
-    rhs_b = [@views rhs[t][dynamics[t].num_action+1:end] for t = 1:H-1]
+    rhs = [zeros(T, constraints[t].num_constraint + dynamics[t].num_control) for t = 1:N-1]
+    rhs_t = [@views rhs[t][1:dynamics[t].num_control] for t = 1:N-1]
+    rhs_b = [@views rhs[t][dynamics[t].num_control+1:end] for t = 1:N-1]
 
-    rhs_x = [zeros(constraints[t].num_constraint + dynamics[t].num_action, dynamics[t].num_state) for t = 1:H-1]
-    rhs_x_t = [@views rhs_x[t][1:dynamics[t].num_action, :] for t = 1:H-1]
-    rhs_x_b = [@views rhs_x[t][dynamics[t].num_action+1:end, :] for t = 1:H-1]
+    rhs_x = [zeros(T, constraints[t].num_constraint + dynamics[t].num_control, dynamics[t].num_state) for t = 1:N-1]
+    rhs_x_t = [@views rhs_x[t][1:dynamics[t].num_control, :] for t = 1:N-1]
+    rhs_x_b = [@views rhs_x[t][dynamics[t].num_control+1:end, :] for t = 1:N-1]
 
     lhs_bk = [bunchkaufman(L, true; check=false) for L in lhs]
 
-    PolicyData(gains_main, gains_soc,
-        value, action_value,
+    PolicyData{T}(gains_main, gains_soc,
+        value, hamiltonian,
         x_tmp, u_tmp, h_tmp, uu_tmp, ux_tmp, xx_tmp, hu_tmp, hx_tmp,
         lhs, lhs_tl, lhs_tr, lhs_bl, lhs_br, rhs, rhs_t, rhs_b, rhs_x, rhs_x_t, rhs_x_b, lhs_bk)
 end

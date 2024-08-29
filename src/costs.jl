@@ -1,70 +1,62 @@
-struct Cost{T}
+struct Cost
     evaluate
     gradient_state
-    gradient_action
+    gradient_control
     hessian_state_state
-    hessian_action_action
-    hessian_action_state
-    evaluate_cache::Vector{T}
-    gradient_state_cache::Vector{T}
-    gradient_action_cache::Vector{T}
-    hessian_state_state_cache::Matrix{T}
-    hessian_action_action_cache::Matrix{T}
-    hessian_action_state_cache::Matrix{T}
+    hessian_control_control
+    hessian_control_state
 end
 
-function Cost(f::Function, num_state::Int, num_action::Int)
+function Cost(f::Function, num_state::Int, num_control::Int)
     x = Symbolics.variables(:x, 1:num_state)
-    u = Symbolics.variables(:u, 1:num_action)
+    u = Symbolics.variables(:u, 1:num_control)
 
     evaluate = f(x, u)
     gradient_state = Symbolics.gradient(evaluate, x)
-    gradient_action = Symbolics.gradient(evaluate, u)
+    gradient_control = Symbolics.gradient(evaluate, u)
     hessian_state_state = Symbolics.jacobian(gradient_state, x)
-    hessian_action_action = Symbolics.jacobian(gradient_action, u)
-    hessian_action_state = Symbolics.jacobian(gradient_action, x)
+    hessian_control_control = Symbolics.jacobian(gradient_control, u)
+    hessian_control_state = Symbolics.jacobian(gradient_control, x)
 
-    evaluate_func = eval(Symbolics.build_function([evaluate], x, u)[2])
     gradient_state_func = eval(Symbolics.build_function(gradient_state, x, u)[2])
-    gradient_action_func = eval(Symbolics.build_function(gradient_action, x, u)[2])
+    gradient_control_func = eval(Symbolics.build_function(gradient_control, x, u)[2])
     hessian_state_state_func = eval(Symbolics.build_function(hessian_state_state, x, u)[2])
-    hessian_action_action_func = eval(Symbolics.build_function(hessian_action_action, x, u)[2])
-    hessian_action_state_func = eval(Symbolics.build_function(hessian_action_state, x, u)[2])
+    hessian_control_control_func = eval(Symbolics.build_function(hessian_control_control, x, u)[2])
+    hessian_control_state_func = eval(Symbolics.build_function(hessian_control_state, x, u)[2])
 
-    return Cost(evaluate_func,
-        gradient_state_func, gradient_action_func,
-        hessian_state_state_func, hessian_action_action_func, hessian_action_state_func,
-        zeros(1),
-        zeros(num_state), zeros(num_action),
-        zeros(num_state, num_state), zeros(num_action, num_action), zeros(num_action, num_state))
+    return Cost(f, gradient_state_func, gradient_control_func,
+        hessian_state_state_func, hessian_control_control_func, hessian_control_state_func)
 end
 
-Costs{T} = Vector{Cost{T}} where T
+Costs = Vector{Cost}
 
-function cost(costs::Vector{Cost{T}}, states, actions) where T
+function cost(costs::Costs, states::Vector{Vector{T}}, controls::Vector{Vector{T}}) where T
+    N = length(states)
     J = 0.0
-    for (t, cost) in enumerate(costs)
-        cost.evaluate(cost.evaluate_cache, states[t], actions[t])
-        J += cost.evaluate_cache[1]
+    for t in 1:N-1
+        J += costs[t].evaluate(states[t], controls[t])
     end
+    J += costs[N].evaluate(states[N], T[])
     return J
 end
 
-function cost_gradient!(gradient_states, gradient_actions, costs::Vector{Cost{T}}, states, actions) where T
+function cost_gradient!(gradient_states::Vector{Vector{T}}, gradient_controls::Vector{Vector{T}}, costs::Costs,
+            states::Vector{Vector{T}}, controls::Vector{Vector{T}}) where T
     N = length(costs)
-    for (k, cost) in enumerate(costs)
-        cost.gradient_state(gradient_states[k], states[k], actions[k])
-        k == N && continue
-        cost.gradient_action(gradient_actions[k], states[k], actions[k])
+    for t in 1:N-1
+        costs[t].gradient_state(gradient_states[t], states[t], controls[t])
+        costs[t].gradient_control(gradient_controls[t], states[t], controls[t])
     end
+    costs[N].gradient_state(gradient_states[N], states[N], T[])
 end
 
-function cost_hessian!(hessian_state_state, hessian_action_action, hessian_action_state, costs::Vector{Cost{T}}, states, actions) where T
+function cost_hessian!(hessian_state_state::Vector{Matrix{T}}, hessian_control_control::Vector{Matrix{T}},
+            hessian_control_state::Vector{Matrix{T}}, costs::Costs, states::Vector{Vector{T}}, controls::Vector{Vector{T}}) where T
     N = length(costs)
-    for (k, cost) in enumerate(costs)
-        cost.hessian_state_state(hessian_state_state[k], states[k], actions[k])
-        k == N && continue
-        cost.hessian_action_action(hessian_action_action[k], states[k], actions[k])
-        cost.hessian_action_state(hessian_action_state[k], states[k], actions[k])
+    for t in 1:N-1
+        costs[t].hessian_state_state(hessian_state_state[t], states[t], controls[t])
+        costs[t].hessian_control_control(hessian_control_control[t], states[t], T[])
+        costs[t].hessian_control_state(hessian_control_state[t], states[t], T[])
     end
+    costs[N].hessian_state_state(hessian_state_state[N], states[N], T[])
 end

@@ -3,12 +3,13 @@ using LinearAlgebra
 using Plots
 using Random
 
+T = Float64
 N = 101
 h = 0.05
 r_car = 0.02
-x0 = [0.0; 0.0; 0.0] 
-xN = [1.0; 1.0; π / 2]
-options = Options(quasi_newton=false, verbose=true, max_iterations=1000)
+x0 = T[0.0; 0.0; 0.0] 
+xN = T[1.0; 1.0; π / 2]
+options = Options{T}(quasi_newton=false, verbose=true, max_iterations=1000)
 
 Random.seed!(0)
 
@@ -17,23 +18,23 @@ num_action = 2
 
 # ## control limits
 
-ul = -1.0 * [1.0; 5.0]
-uu = 1.0 * [1.0; 5.0]
+ul = T[-1.0; -5.0]
+uu = T[1.0; 5.0]
 
 # ## obstacles
 
 xyr_obs = [
-    [0.05, 0.25, 0.1],
-    [0.45, 0.1, 0.15],
-    [0.7, 0.7, 0.2],
-    [0.35, 0.4, 0.1]
+    T[0.05, 0.25, 0.1],
+    T[0.45, 0.1, 0.15],
+    T[0.7, 0.7, 0.2],
+    T[0.35, 0.4, 0.1]
     ]
 num_obstacles = length(xyr_obs)
 num_primal = num_action + num_obstacles + 2  # 2 slacks for box constraints
 
 # ## intermediate waypoints
 
-xy_wp = [[0.2, 0.6], [0.7, 0.4]]
+xy_wp = [T[0.2, 0.6], T[0.7, 0.4]]
 inds_wp = [39, 79]
 
 include("../examples/visualise/concar.jl")
@@ -93,16 +94,19 @@ constraints = [obs_constr for k = 1:N-1]
 # ## bounds
 
 # [control limits; obs slack; bound slack]
-bound = Bound([ul; zeros(num_obstacles); zeros(2)], [uu; Inf * ones(num_obstacles); ones(2)])
+bound = Bound(
+    [ul; zeros(T, num_obstacles); zeros(T, 2)],
+    [uu; T(Inf) * ones(T, num_obstacles); ones(T, 2)]
+)
 bounds = [bound for k in 1:N-1]
 
 # ## Initialise solver and solve
 
-ū = [[1.0e-1 * randn(2); 0.1 * ones(num_obstacles); 0.1 * ones(2)] for k = 1:N-1]
+ū = [[T(1.0e-1) * randn(T, 2); T(0.1) * ones(T, num_obstacles); T(0.1) * ones(T, 2)] for k = 1:N-1]
 for (i, k) in enumerate(inds_wp)
     objective[k] = waypoint_cost(xy_wp[i])
 end
-solver = Solver(dynamics, objective, constraints, bounds, options=options)
+solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
 solve!(solver, x0, ū)
 
 # # ## Plot solution

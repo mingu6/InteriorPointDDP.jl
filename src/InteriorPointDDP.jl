@@ -42,10 +42,8 @@ export Dynamics
 export Bound
 
 # solver 
-export rollout, 
-    dynamics!,
-    Solver, Options,
-    initialize_controls!, initialize_states!, 
+export Solver,
+    Options,
     solve!,
     get_trajectory
 

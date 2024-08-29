@@ -14,11 +14,11 @@ function Bound(lower::Vector{T}, upper::Vector{T}) where T
     indices_upper = [i for (i, mask) in enumerate(.!isinf.(upper)) if mask]
     num_lower = sum([1 for b in lower if !isinf(b)])
     num_upper = sum([1 for b in upper if !isinf(b)])
-    return Bound(lower, upper, indices_lower, indices_upper, num_lower, num_upper)
+    return Bound{T}(lower, upper, indices_lower, indices_upper, num_lower, num_upper)
 end
 
 function Bound(T, num_control::Int)
-    return Bound(-Inf .* ones(T, num_control), Inf .* ones(T, num_control))
+    return Bound(-T(Inf) .* ones(T, num_control), T(Inf) .* ones(T, num_control))
 end
 
 function Bound(num_control::Int, lower::T, upper::T) where T

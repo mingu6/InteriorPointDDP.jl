@@ -2,34 +2,34 @@
     Costs Data
 """
 
-struct CostsData{C,X,U,XX,UU,UX}
-    costs::C
-    gradient_state::Vector{X}
-    gradient_action::Vector{U}
-    hessian_state_state::Vector{XX}
-    hessian_action_action::Vector{UU}
-    hessian_action_state::Vector{UX}
+struct CostsData{T}
+    costs
+    gradient_state::Vector{Vector{T}}
+    gradient_control::Vector{Vector{T}}
+    hessian_state_state::Vector{Matrix{T}}
+    hessian_control_control::Vector{Matrix{T}}
+    hessian_control_state::Vector{Matrix{T}}
 end
 
-function costs_data(dynamics::Vector{Dynamics{T}}, costs) where T
-	gradient_state = [[zeros(d.num_state) for d in dynamics]..., 
-        zeros(dynamics[end].num_next_state)]
-    gradient_action = [zeros(d.num_action) for d in dynamics]
-    hessian_state_state = [[zeros(d.num_state, d.num_state) for d in dynamics]..., 
-        zeros(dynamics[end].num_next_state, dynamics[end].num_next_state)]
-    hessian_action_action = [zeros(d.num_action, d.num_action) for d in dynamics]
-    hessian_action_state = [zeros(d.num_action, d.num_state) for d in dynamics]
-    CostsData(costs, gradient_state, gradient_action, hessian_state_state, hessian_action_action, hessian_action_state)
+function costs_data(T, dynamics::Model, costs::Costs)
+	gradient_state = [[zeros(T, d.num_state) for d in dynamics]..., 
+        zeros(T, dynamics[end].num_next_state)]
+    gradient_control = [zeros(T, d.num_control) for d in dynamics]
+    hessian_state_state = [[zeros(T, d.num_state, d.num_state) for d in dynamics]..., 
+        zeros(T, dynamics[end].num_next_state, dynamics[end].num_next_state)]
+    hessian_control_control = [zeros(T, d.num_control, d.num_control) for d in dynamics]
+    hessian_control_state = [zeros(T, d.num_control, d.num_state) for d in dynamics]
+    CostsData{T}(costs, gradient_state, gradient_control, hessian_state_state, hessian_control_control, hessian_control_state)
 end
 
-function reset!(data::CostsData) 
+function reset!(data::CostsData{T}) where T 
     N = length(data.gradient_state) 
-    for k = 1:N 
-        fill!(data.gradient_state[k], 0.0) 
-        fill!(data.hessian_state_state[k], 0.0) 
-        k == N && continue
-        fill!(data.gradient_action[k], 0.0)
-        fill!(data.hessian_action_action[k], 0.0)
-        fill!(data.hessian_action_state[k], 0.0)
+    for t = 1:N 
+        fill!(data.gradient_state[t], 0.0) 
+        fill!(data.hessian_state_state[t], 0.0) 
+        t == N && continue
+        fill!(data.gradient_control[t], 0.0)
+        fill!(data.hessian_control_control[t], 0.0)
+        fill!(data.hessian_control_state[t], 0.0)
     end 
 end
