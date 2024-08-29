@@ -8,6 +8,7 @@ function cost(problem::ProblemData{T}; mode=:nominal) where T
     end
 end
 
+# TODO: Why this???
 function cost!(data::SolverData{T}, problem::ProblemData{T}; mode=:nominal) where T
 	if mode == :nominal
 		data.objective = cost(problem.cost_data.costs, problem.nominal_states, problem.nominal_controls)
@@ -18,7 +19,7 @@ function cost!(data::SolverData{T}, problem::ProblemData{T}; mode=:nominal) wher
 end
 
 function constraint!(problem::ProblemData{T}, μ::T; mode=:nominal) where T
-    constraints = problem.constr_data.constraints
+    constraints = problem.constraints_data.constraints
     x, u, h = primal_trajectories(problem, mode=mode)
     for (t, con) in enumerate(constraints)
         if con.num_constraint > 0

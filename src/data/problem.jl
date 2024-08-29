@@ -22,7 +22,7 @@ mutable struct ProblemData{T}
     cost_data::CostsData{T}
     
     # constraints data
-    constr_data::ConstraintsData{T}
+    constraints_data::ConstraintsData{T}
 
     # control bounds
     bounds::Bounds{T}

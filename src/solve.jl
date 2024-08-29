@@ -41,7 +41,7 @@ function solve!(solver::Solver{T}) where T
 
     while data.k < options.max_iterations
         iter_time = @elapsed begin
-            gradients!(problem, mode=:nominal)
+            evaluate_derivatives!(problem, mode=:nominal)
             
             backward_pass!(policy, problem, data, options, mode=:nominal, verbose=options.verbose)
             data.status != 0 && break
@@ -99,30 +99,29 @@ end
 
 function reset_filter!(data::SolverData{T}) where T
     empty!(data.filter)
-    push!(data.filter, [data.max_primal_1, -Inf])
+    push!(data.filter, [data.max_primal_1, T(-Inf)])
     data.status = 0
 end
 
 function optimality_error(policy::PolicyData{T}, problem::ProblemData{T},
             options::Options{T}, μ::T; mode=:nominal) where T
-    dual_inf::Float64 = 0     # dual infeasibility (stationarity of Lagrangian)
-    primal_inf::Float64 = 0   # constraint violation (primal infeasibility)
-    cs_inf::Float64 = 0       # complementary slackness violation
-    ϕ_norm::Float64 = 0       # norm of dual equality
-    v_norm::Float64 = 0       # norm of dual inequality
+    dual_inf::T = 0     # dual infeasibility (stationarity of Lagrangian)
+    primal_inf::T = 0   # constraint violation (primal infeasibility)
+    cs_inf::T = 0       # complementary slackness violation
+    ϕ_norm::T = 0       # norm of dual equality
+    v_norm::T = 0       # norm of dual inequality
     
     N = problem.horizon
-    constr_data = problem.constr_data
     bounds = problem.bounds
     h = mode == :nominal ? problem.nominal_constraints : problem.constraints
     u = mode == :nominal ? problem.nominal_controls : problem.controls
     ϕ, vl, vu = dual_trajectories(problem, mode=mode)
     
     Qu = policy.hamiltonian.gradient_control
-    hu = constr_data.jacobian_control
+    hu = problem.constraints_data.jacobian_control
 
     num_ineq = 0
-    num_constr = constr_data.num_constraints[1]
+    num_constr = problem.constraints_data.num_constraints[1]
     
     for t = N-1:-1:1
         bk = bounds[t]
