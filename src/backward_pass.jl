@@ -42,8 +42,10 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
     # Value function
     Vx = policy.value.gradient
     Vxx = policy.value.hessian
+    # Bound constraints
+    bounds = problem.bounds
     
-    x, u, h, il, iu = primal_trajectories(problem, mode=mode)
+    x, u, h = primal_trajectories(problem, mode=mode)
     ϕ, vl, vu = dual_trajectories(problem, mode=mode)
 
     μ = data.μ
@@ -56,92 +58,102 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
         Vxx[N] .= lxx[N]
         Vx[N] .= lx[N]
         
-        for t = N-1:-1:1
-            num_actions = length(lu[t])
+        for k = N-1:-1:1
+            num_action = length(u[k])
+
+            bk = bounds[k]
+            il = u[k][bk.indices_lower] - bk.lower[bk.indices_lower]
+            iu = bk.upper[bk.indices_upper] - u[k][bk.indices_upper]
+            σl = vl[k][bk.indices_lower] ./ il
+            σu = vu[k][bk.indices_upper] ./ iu
 
             # Qx = lx + fx' * Vx
-            Qx[t] .= lx[t]
-            mul!(Qx[t], transpose(fx[t]), Vx[t+1], 1.0, 1.0)
+            Qx[k] .= lx[k]
+            mul!(Qx[k], transpose(fx[k]), Vx[k+1], 1.0, 1.0)
 
-            # Qu = lu + fu' * Vx
-            Qu[t] .= lu[t]
-            mul!(Qu[t], transpose(fu[t]), Vx[t+1], 1.0, 1.0)
-            add_barrier_grad!(Qu[t], il[t], iu[t], μ)
+            # Qu = lu + fu' * Vx + μ log(u - ul) + μ log(uu - u)
+            Qu[k] .= lu[k]
+            mul!(Qu[k], transpose(fu[k]), Vx[k+1], 1.0, 1.0)
+            Qu[k][bk.indices_lower] .-= μ ./ il
+            Qu[k][bk.indices_upper] .+= μ ./ iu
             
             # Qxx = lxx + fx' * Vxx * fx
-            mul!(policy.xx_tmp[t], transpose(fx[t]), Vxx[t+1])
-            mul!(Qxx[t], policy.xx_tmp[t], fx[t])
-            Qxx[t] .+= lxx[t]
+            mul!(policy.xx_tmp[k], transpose(fx[k]), Vxx[k+1])
+            mul!(Qxx[k], policy.xx_tmp[k], fx[k])
+            Qxx[k] .+= lxx[k]
     
-            # Quu = luu + fu' * Vxx * fu
-            mul!(policy.ux_tmp[t], transpose(fu[t]), Vxx[t+1])
-            mul!(Quu[t], policy.ux_tmp[t], fu[t])
-            Quu[t] .+= luu[t]
-            add_primal_dual!(Quu[t], il[t], iu[t], vl[t], vu[t])
+            # Quu = luu + fu' * Vxx * fu + Σ
+            mul!(policy.ux_tmp[k], transpose(fu[k]), Vxx[k+1])
+            mul!(Quu[k], policy.ux_tmp[k], fu[k])
+            Quu[k] .+= luu[k]
+            Quu[k][diagind(Quu[k])[bk.indices_lower]] .+= σl
+            Quu[k][diagind(Quu[k])[bk.indices_upper]] .+= σu
     
             # Qux = lux + fu' * Vxx * fx
-            mul!(policy.ux_tmp[t], transpose(fu[t]), Vxx[t+1])
-            mul!(Qux[t], policy.ux_tmp[t], fx[t])
-            Qux[t] .+= lux[t]
+            mul!(policy.ux_tmp[k], transpose(fu[k]), Vxx[k+1])
+            mul!(Qux[k], policy.ux_tmp[k], fx[k])
+            Qux[k] .+= lux[k]
             
             # apply second order terms to Q for full DDP, i.e., Vx * fxx, Vx * fuu, Vx * fxu
             if !options.quasi_newton
-                hessian_vector_prod!(fxx[t], fux[t], fuu[t], problem.model.dynamics[t], x[t], u[t], Vx[t+1])
-                Qxx[t] .+= fxx[t]
-                Qux[t] .+= fux[t]
-                Quu[t] .+= fuu[t]
-                hessian_vector_prod!(hxx[t], hux[t], huu[t], constr_data.constraints[t], x[t], u[t], ϕ[t])
+                hessian_vector_prod!(fxx[k], fux[k], fuu[k], problem.model.dynamics[k], x[k], u[k], Vx[k+1])
+                Qxx[k] .+= fxx[k]
+                Qux[k] .+= fux[k]
+                Quu[k] .+= fuu[k]
+                hessian_vector_prod!(hxx[k], hux[k], huu[k], constr_data.constraints[k], x[k], u[k], ϕ[k])
             end
             # setup linear system in backward pass
-            policy.lhs_tl[t] .= Quu[t]
-            policy.lhs_tr[t] .= transpose(hu[t])
-            policy.lhs_bl[t] .= hu[t]
-            fill!(policy.lhs_br[t], 0.0)
+            policy.lhs_tl[k] .= Quu[k]
+            policy.lhs_tr[k] .= transpose(hu[k])
+            fill!(policy.lhs_br[k], 0.0)
             if !options.quasi_newton
-                policy.lhs_tl[t] .+= huu[t]
+                policy.lhs_tl[k] .+= huu[k]
             end
-            policy.lhs_tl[t] .= Symmetric(policy.lhs_tl[t])
+            policy.lhs[k] .= Symmetric(policy.lhs[k])
 
-            policy.rhs_t[t] .= -Qu[t]
-            mul!(policy.rhs_t[t], transpose(hu[t]), ϕ[t], -1.0, 1.0)
-            policy.rhs_b[t] .= -h[t]
+            policy.rhs_t[k] .= -Qu[k]
+            mul!(policy.rhs_t[k], transpose(hu[k]), ϕ[k], -1.0, 1.0)
+            policy.rhs_b[k] .= -h[k]
 
-            policy.rhs_x_t[t] .= -Qux[t]
-            policy.rhs_x_b[t] .= -hx[t]
+            policy.rhs_x_t[k] .= -Qux[k]
+            policy.rhs_x_b[k] .= -hx[k]
             if !options.quasi_newton
-                policy.rhs_x_t[t] .-= hux[t]
+                policy.rhs_x_t[k] .-= hux[k]
             end
 
             # inertia calculation and correction
-            policy.lhs_tl[t][diagind(policy.lhs_tl[t])] .+= reg
-            policy.lhs_br[t][diagind(policy.lhs_br[t])] .-= δ_c
+            policy.lhs_tl[k][diagind(policy.lhs_tl[k])] .+= reg
+            policy.lhs_br[k][diagind(policy.lhs_br[k])] .-= δ_c
 
-            policy.lhs_bk[t], data.status, reg, δ_c = inertia_correction!(policy.lhs[t], num_actions,
+            policy.lhs_bk[k], data.status, reg, δ_c = inertia_correction!(policy.lhs[k], num_action,
                         μ, reg, data.reg_last, options; rook=true)
 
             data.status != 0 && break
 
-            kuϕ[t] .= policy.lhs_bk[t] \ policy.rhs[t]
-            Kuϕ[t] .= policy.lhs_bk[t] \ policy.rhs_x[t]
+            kuϕ[k] .= policy.lhs_bk[k] \ policy.rhs[k]
+            Kuϕ[k] .= policy.lhs_bk[k] \ policy.rhs_x[k]
 
-            # update gains for ineq. duals
-            gains_ineq!(kvl[t], kvu[t], Kvl[t], Kvu[t], il[t], iu[t], vl[t], vu[t], ku[t], Ku[t], μ)
+            # update gains for ineq. dual variables TODO: merge when gains are merged
+            kvl[k][bk.indices_lower] .= μ ./ il - vl[k][bk.indices_lower] - σl .* ku[k][bk.indices_lower]
+            kvu[k][bk.indices_upper] .= μ ./ iu - vu[k][bk.indices_upper] + σu .* ku[k][bk.indices_upper]
+            Kvl[k][bk.indices_lower, :] .= -σl .* Ku[k][bk.indices_lower, :]
+            Kvu[k][bk.indices_upper, :] .= σu .* Ku[k][bk.indices_upper, :]
 
             # Update return function approx. for next timestep 
             # Vxx = Q̂xx + Q̂ux' * Ku + Ku * Q̂ux' + Ku' Q̂uu' * Ku
-            mul!(policy.ux_tmp[t], Quu[t], Ku[t])
-            mul!(Vxx[t], transpose(Ku[t]), Qux[t])
+            mul!(policy.ux_tmp[k], Quu[k], Ku[k])
+            mul!(Vxx[k], transpose(Ku[k]), Qux[k])
 
-            mul!(Vxx[t], transpose(Qux[t]), Ku[t], 1.0, 1.0)
-            Vxx[t] .+= Qxx[t]
-            mul!(Vxx[t], transpose(Ku[t]), policy.ux_tmp[t], 1.0, 1.0)
-            Vxx[t] .= Symmetric(Vxx[t])
+            mul!(Vxx[k], transpose(Qux[k]), Ku[k], 1.0, 1.0)
+            Vxx[k] .+= Qxx[k]
+            mul!(Vxx[k], transpose(Ku[k]), policy.ux_tmp[k], 1.0, 1.0)
+            Vxx[k] .= Symmetric(Vxx[k])
 
             # Vx = Q̂x + Ku' * Q̂u + [Q̂uu Ku + Q̂ux]^T ku
-            policy.ux_tmp[t] .+= Qux[t]
-            mul!(Vx[t], transpose(policy.ux_tmp[t]), ku[t])
-            mul!(Vx[t], transpose(Ku[t]), Qu[t], 1.0, 1.0)
-            Vx[t] .+= Qx[t]
+            policy.ux_tmp[k] .+= Qux[k]
+            mul!(Vx[k], transpose(policy.ux_tmp[k]), ku[k])
+            mul!(Vx[k], transpose(Ku[k]), Qu[k], 1.0, 1.0)
+            Vx[k] .+= Qx[k]
         end
         data.status == 0 && break
     end
@@ -149,38 +161,5 @@ function backward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDa
     data.status != 0 && (verbose && (@warn "Backward pass failure, unable to find positive definite iteration matrix."))
 end
 
-function add_primal_dual!(Quu, ineq_lower, ineq_upper, dual_lower, dual_upper)
-    m = length(ineq_lower)
-    for i = 1:m
-        if !isinf(ineq_lower[i])
-            Quu[i, i] += dual_lower[i] / ineq_lower[i]
-        end
-        if !isinf(ineq_upper[i])
-            Quu[i, i] += dual_upper[i] / ineq_upper[i]
-        end
-    end
-end
-
-function add_barrier_grad!(Qu, ineq_lower, ineq_upper, μ)
-    m = length(ineq_lower)
-    for i = 1:m
-        if !isinf(ineq_lower[i])
-            Qu[i] -= μ / ineq_lower[i]
-        end
-        if !isinf(ineq_upper[i])
-            Qu[i] += μ / ineq_upper[i]
-        end
-    end
-end
-
-function gains_ineq!(kvl, kvu, Kvl, Kvu, il, iu, vl, vu, ku, Ku, μ)
-    m = length(il)
-    for i = 1:m
-        σ_l = vl[i] / il[i]
-        σ_u = vu[i] / iu[i]
-        kvl[i] = isinf(il[i]) ? 0.0 : μ / il[i] - vl[i] - σ_l * ku[i]
-        kvu[i] = isinf(iu[i]) ? 0.0 : μ / iu[i] - vu[i] + σ_u * ku[i]
-        Kvl[i, :] .= isinf(il[i]) ? 0.0 : -σ_l * Ku[i, :]
-        Kvu[i, :] .= isinf(iu[i]) ? 0.0 : σ_u * Ku[i, :]
-    end
-end
+# TODO: transpose allocates and slows things down
+# TODO: lots of unnecessary tranposes? fx, fu, ux_tmp etc

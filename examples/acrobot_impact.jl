@@ -79,11 +79,19 @@ stage_constr = Constraint((x, u) -> implicit_contact_dynamics(acrobot_impact, x,
 
 constraints = [stage_constr for k = 1:N-1]
 
+# ## Bounds
+
+bound = Bound(
+	[-Inf; -Inf * ones(nq); zeros(nc); zeros(nc)],
+	[Inf; Inf * ones(nq); Inf * ones(nc); Inf * ones(nc)]
+)
+bounds = [bound for k in 1:N-1]
+
 # ## Initialise solver and solve
 
 q2_init = LinRange(q1, qN, N)[2:end]
 ū = [[1.0e-3 * randn(nu); q2_init[k]; 0.01 * ones(nc); 0.01 * ones(nc)] for k = 1:N-1]
-solver = Solver(dynamics, objective, constraints, options=options)
+solver = Solver(dynamics, objective, constraints, bounds, options=options)
 solve!(solver, x0, ū)
 
 # ## Plot solution

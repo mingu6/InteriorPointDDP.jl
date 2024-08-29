@@ -10,6 +10,7 @@ using Crayons
 include("costs.jl")
 include("dynamics.jl")
 include("constraints.jl")
+include("bounds.jl")
 include(joinpath("data", "model.jl"))
 include(joinpath("data", "costs.jl"))
 include(joinpath("data", "constraints.jl"))
@@ -36,6 +37,9 @@ export Constraint
 
 # dynamics 
 export Dynamics
+
+# bounds
+export Bound
 
 # solver 
 export rollout, 

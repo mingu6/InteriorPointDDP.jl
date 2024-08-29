@@ -23,13 +23,13 @@ function costs_data(dynamics::Vector{Dynamics{T}}, costs) where T
 end
 
 function reset!(data::CostsData) 
-    H = length(data.gradient_state) 
-    for t = 1:H 
-        fill!(data.gradient_state[t], 0.0) 
-        fill!(data.hessian_state_state[t], 0.0) 
-        t == H && continue
-        fill!(data.gradient_action[t], 0.0)
-        fill!(data.hessian_action_action[t], 0.0)
-        fill!(data.hessian_action_state[t], 0.0)
+    N = length(data.gradient_state) 
+    for k = 1:N 
+        fill!(data.gradient_state[k], 0.0) 
+        fill!(data.hessian_state_state[k], 0.0) 
+        k == N && continue
+        fill!(data.gradient_action[k], 0.0)
+        fill!(data.hessian_action_action[k], 0.0)
+        fill!(data.hessian_action_state[k], 0.0)
     end 
 end

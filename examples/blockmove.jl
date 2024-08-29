@@ -36,15 +36,18 @@ objective = [
 
 stage_constr = Constraint((x, u) -> [
     u[2] - u[3] - u[1] * x[2]
-], 
-2, 3, 
-bounds_lower=[-10.0, 0.0, 0.0], bounds_upper=[10.0, Inf, Inf])
+], 2, 3)
 constraints = [stage_constr for k = 1:N-1]
+
+# ## Bounds
+
+bound = Bound([-10.0, 0.0, 0.0], [10.0, Inf, Inf])
+bounds = [bound for k = 1:N-1]
 
 # ## Initialise solver and solve
 
 ū = [[1.0e-2 * randn(1); 0.01 * ones(2)] for k = 1:N-1]
-solver = Solver(dynamics, objective, constraints, options=options)
+solver = Solver(dynamics, objective, constraints, bounds, options=options)
 solve!(solver, x0, ū)
 
 # ## Plot solution

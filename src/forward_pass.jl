@@ -15,24 +15,8 @@ function forward_pass!(policy::PolicyData, problem::ProblemData, data::SolverDat
     min_step_size = estimate_min_step_size(Δφ_L, data, options)
 
     while data.step_size >= min_step_size
-        # # filter reset heuristic, if filter is blocking large steps for several iterations, reset
-        # if data.t == 6 && data.status == 6 && data.max_primal_1 > θ / 10.0
-        #     data.max_primal_1 *= 0.1
-        #     reset_filter!(data)
-        #     data.t = 0
-        # end
-
-        if data.l == 1 && data.status != 0 && θ >= θ_prev
-            soc_status = second_order_correction!(policy, problem, data, options, τ)
-            !soc_status && (data.status = 6)
-            data.status == 0 && break
-
-            data.step_size *= 0.5
-            data.l += 1
-            continue
-        end
-
         α = data.step_size
+        # TODO: do not catch all exceptions, only BoundsError
         try
             rollout!(policy, problem, τ, step_size=α; mode=:main)
         catch
@@ -84,32 +68,39 @@ end
 
 function check_fraction_boundary(problem::ProblemData, τ::Float64)
     N = problem.horizon
-    x, u, _, il, iu = primal_trajectories(problem, mode=:current)
-    _, vl, vu = dual_trajectories(problem, mode=:current)
-    x̄, ū, _, il̄, iū = primal_trajectories(problem, mode=:nominal)
-    _, vl̄, vū = dual_trajectories(problem, mode=:nominal)
-    constraints = problem.constr_data.constraints
+
+    u = problem.actions
+    ū = problem.nominal_actions
+    vl = problem.ineq_duals_lo
+    vu = problem.ineq_duals_up
+    vl̄ = problem.nominal_ineq_duals_lo
+    vū = problem.nominal_ineq_duals_up
+
+    bounds = problem.bounds
 
     status = 0
     for k = 1:N-1
-        num_action = length(il[k])
-        for i = 1:num_action
-            if !isinf(il̄[k][i]) && (il[k][i] < (1. - τ) *  il̄[k][i])
-                status = 2
-                break
-            end
-            if !isinf(iū[k][i]) && (iu[k][i] < (1. - τ) *  iū[k][i])
-                status = 2
-                break
-            end
-            if !isinf(vl̄[k][i]) && (vl[k][i] < (1. - τ) *  vl̄[k][i])
-                status = 2
-                break
-            end
-            if !isinf(vū[k][i]) && (vu[k][i] < (1. - τ) *  vū[k][i])
-                status = 2
-                break
-            end
+        bk = bounds[k]
+        il = bk.indices_lower
+        iu = bk.indices_upper
+        # equivalent to u - ul < (ū - ul) * (1 - τ)
+        if any(u[k][il] - bk.lower[il] .* τ .< ū[k][il] .* (1. - τ))
+            status = 2
+            break
+        end
+        # equivalent to uu - u < (uu - ū) * (1 - τ)
+        if any(u[k][iu] - bk.upper[iu] .* τ .> ū[k][iu] .* (1. - τ))
+            status = 2
+            break
+        end
+
+        if any(vl[k][il] .< vl̄[k][il] .* (1. - τ))
+            status = 2
+            break
+        end
+        if any(vu[k][iu] .< vū[k][iu] .* (1. - τ))
+            status = 2
+            break
         end
     end
     return status
@@ -147,7 +138,7 @@ function expected_decrease_cost(policy::PolicyData, problem::ProblemData, step_s
     
     for k = N-1:-1:1
         Δφ_L += dot(Qu[k], gains.ku[k])
-        Δφ_Q += 0.5 * dot(gains.ku[k], Quu[k], gains.ku[k])  # TODO, maybe slow?
+        Δφ_Q += 0.5 * dot(gains.ku[k], Quu[k], gains.ku[k])
     end
     return Δφ_L * step_size, Δφ_Q * step_size^2
 end

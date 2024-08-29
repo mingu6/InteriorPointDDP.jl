@@ -50,17 +50,16 @@ function ipddp_solve!(solver::Solver)
             data.status != 0 && break
             # check (outer) overall problem convergence
 
-            data.dual_inf, data.primal_inf, data.cs_inf = optimality_error(policy, problem, data, options, 0.0, mode=:nominal)
+            data.dual_inf, data.primal_inf, data.cs_inf = optimality_error(policy, problem, options, 0.0, mode=:nominal)
             opt_err_0 = max(data.dual_inf, data.cs_inf, data.primal_inf)
             
             opt_err_0 <= options.optimality_tolerance && break
             
             # check (inner) barrier problem convergence and update barrier parameter if so
-            dual_inf_μ, primal_inf_μ, cs_inf_μ = optimality_error(policy, problem, data, options, data.μ, mode=:nominal)
+            dual_inf_μ, primal_inf_μ, cs_inf_μ = optimality_error(policy, problem, options, data.μ, mode=:nominal)
             opt_err_μ = max(dual_inf_μ, cs_inf_μ, primal_inf_μ)          
             if opt_err_μ <= options.κ_ϵ * data.μ
                 data.μ = max(options.optimality_tolerance / 10.0, min(options.κ_μ * data.μ, data.μ ^ options.θ_μ))
-                # println("reset filter")
                 reset_filter!(data)
                 # performance of current iterate updated to account for barrier parameter change
                 data.barrier_obj_curr = barrier_objective!(problem, data, mode=:nominal)
@@ -76,12 +75,6 @@ function ipddp_solve!(solver::Solver)
             forward_pass!(policy, problem, data, options, verbose=options.verbose)
             data.status != 0 && break
             
-            # # for watchdog/filter reset heuristic (pg 13 IPOPT)
-            # if data.l >= 2
-            #     data.t += 1
-            # else
-            #     data.t = 0
-            # end
             rescale_duals!(problem, data.μ, options)
             update_nominal_trajectory!(problem)
             (!data.armijo_passed && !data.switching) && update_filter!(data, options)
@@ -113,7 +106,7 @@ function reset_filter!(data::SolverData)
     data.status = 0
 end
 
-function optimality_error(policy::PolicyData, problem::ProblemData, solver::SolverData, options::Options, μ::Float64; mode=:nominal)
+function optimality_error(policy::PolicyData, problem::ProblemData, options::Options, μ::Float64; mode=:nominal)
     dual_inf::Float64 = 0     # dual infeasibility (stationarity of Lagrangian)
     primal_inf::Float64 = 0   # constraint violation (primal infeasibility)
     cs_inf::Float64 = 0       # complementary slackness violation
@@ -122,78 +115,84 @@ function optimality_error(policy::PolicyData, problem::ProblemData, solver::Solv
     
     N = problem.horizon
     constr_data = problem.constr_data
-    _, _, h, il, iu = primal_trajectories(problem, mode=mode)
+    bounds = problem.bounds
+    h = mode == :nominal ? problem.nominal_constraints : problem.constraints
+    u = mode == :nominal ? problem.nominal_actions : problem.actions
     ϕ, vl, vu = dual_trajectories(problem, mode=mode)
     
     Qu = policy.action_value.gradient_action
     hu = constr_data.jacobian_action
+
+    num_ineq = 0
+    num_constr = constr_data.num_constraints[1]
     
     for k = N-1:-1:1
-        constr = constr_data.constraints[k]
+        bk = bounds[k]
+        num_ineq += bk.num_lower + bk.num_upper
 
         # dual infeasibility (stationarity)
+
         policy.u_tmp[k] .= Qu[k]
         mul!(policy.u_tmp[k], transpose(hu[k]), ϕ[k], 1.0, 1.0)
         dual_inf = max(dual_inf, norm(policy.u_tmp[k], Inf))
         ϕ_norm += norm(ϕ[k], 1)
 
         # primal feasibility (eq. constraint satisfaction)
+
         primal_inf = max(primal_inf, norm(h[k], Inf))
 
         # complementary slackness
-        (constr.num_ineq_lower == 0 && constr.num_ineq_upper == 0) && continue
-        for i = 1:constr.num_action
-            if !isinf(il[k][i])
-                cs_inf = max(cs_inf, il[k][i] * vl[k][i])
-                v_norm += vl[k][i]
-            end
-            if !isinf(iu[k][i])
-                cs_inf = max(cs_inf, iu[k][i] * vu[k][i])
-                v_norm += vu[k][i]
-            end
-        end
+
+        (bk.num_upper == 0 && bk.num_lower == 0) && continue
+        vlk = vl[k][bk.indices_lower]
+        vuk = vu[k][bk.indices_upper]
+        cs_inf = max(cs_inf, norm((u[k][bk.indices_lower] - bk.lower[bk.indices_lower])
+                    .* vlk, Inf))
+        cs_inf = max(cs_inf, norm((bk.upper[bk.indices_upper] - u[k][bk.indices_upper])
+                    .* vuk, Inf))
+        v_norm += sum(vlk)
+        v_norm += sum(vuk)
     end
     cs_inf -= μ
     
-    num_ineq = constr_data.num_ineq_lower[1] + constr_data.num_ineq_upper[1]
     scaling_cs = max(options.s_max, v_norm / max(num_ineq, 1.0))  / options.s_max
-    scaling_dual = max(options.s_max, (ϕ_norm + v_norm) / max(num_ineq + constr_data.num_constraints[1], 1.0))  / options.s_max
+    scaling_dual = max(options.s_max, (ϕ_norm + v_norm) / max(num_ineq + num_constr, 1.0))  / options.s_max
     return dual_inf / scaling_dual, primal_inf, cs_inf / scaling_cs
 end
 
-function rescale_duals!(problem::ProblemData, μ::Float64, options::Options)
+function rescale_duals!(problem::ProblemData, μ::Float64, options::Options; mode=:nominal)
     N = problem.horizon
-    constr_data = problem.constr_data
     κ_Σ = options.κ_Σ
-    il = problem.ineq_lower
-    iu = problem.ineq_upper
-    vl = problem.ineq_duals_lo
-    vu = problem.ineq_duals_up
+    u = mode == :nominal ? problem.nominal_actions : problem.num_actions
+    bounds = problem.bounds
+    _, vl, vu = dual_trajectories(problem, mode=mode)
     for k = 1:N-1
-        for i = constr_data.constraints[k].num_action
-            if !isinf(il[k][i])
-                vl[k][i] = max(min(vl[k][i], κ_Σ * μ / il[k][i]), μ / (κ_Σ *  il[k][i]))
-            end
-            if !isinf(iu[k][i])
-                vu[k][i] = max(min(vu[k][i], κ_Σ * μ / iu[k][i]), μ / (κ_Σ *  iu[k][i]))
-            end
-        end
+        bk = bounds[k]
+
+        vlk = vl[k][bk.indices_lower]
+        ilk = u[k][bk.indices_lower] - bk.lower[bk.indices_lower]
+        vlk .= max.(min.(vlk, κ_Σ * μ ./ ilk), μ ./ (κ_Σ *  ilk))
+
+        vuk = vu[k][bk.indices_upper]
+        iuk = bk.upper[bk.indices_upper] - u[k][bk.indices_upper]
+        vuk .= max.(min.(vuk, κ_Σ * μ ./ iuk), μ ./ (κ_Σ *  iuk))
     end
 end
 
 function reset_duals!(problem::ProblemData)
     N = problem.horizon
-    constr_data = problem.constr_data
+    bounds = problem.bounds
     for k = 1:N-1
         fill!(problem.eq_duals[k], 0.0)
         fill!(problem.nominal_eq_duals[k], 0.0)
-        constr = constr_data.constraints[k]
-        for i = 1:constr.num_action
-            problem.ineq_duals_lo[k][i] = isinf(constr.bounds_lower[i]) ? 0.0 : 1.0
-            problem.ineq_duals_up[k][i] = isinf(constr.bounds_upper[i]) ? 0.0 : 1.0
-            problem.nominal_ineq_duals_lo[k][i] = isinf(constr.bounds_lower[i]) ? 0.0 : 1.0
-            problem.nominal_ineq_duals_up[k][i] = isinf(constr.bounds_upper[i]) ? 0.0 : 1.0
-        end
+        fill!(problem.ineq_duals_lo[k], 0.0)
+        fill!(problem.nominal_ineq_duals_lo[k], 0.0)
+        fill!(problem.ineq_duals_up[k], 0.0)
+        fill!(problem.nominal_ineq_duals_up[k], 0.0)
+        problem.ineq_duals_lo[k][bounds[k].indices_lower].= 1.0
+        problem.ineq_duals_up[k][bounds[k].indices_upper] .= 1.0
+        problem.nominal_ineq_duals_lo[k][bounds[k].indices_lower] .= 1.0
+        problem.nominal_ineq_duals_up[k][bounds[k].indices_upper] .= 1.0
     end
 end
 

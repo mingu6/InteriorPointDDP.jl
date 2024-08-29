@@ -11,15 +11,11 @@ struct Constraint{T}
     num_state::Int
     num_action::Int
     evaluate_cache::Vector{T}
-    evaluate_ineq_lo_cache::Vector{T}  # TODO: unused?
-    evaluate_ineq_up_cache::Vector{T}
     jacobian_state_cache::Matrix{T}
     jacobian_action_cache::Matrix{T}
     hessian_prod_state_state_cache::Matrix{T}
     hessian_prod_action_state_cache::Matrix{T}
     hessian_prod_action_action_cache::Matrix{T}
-    bounds_lower::Vector{T}
-    bounds_upper::Vector{T}
     indices_compl::Vector{Int}
 end
 
@@ -69,10 +65,9 @@ function Constraint(f::Function, num_state::Int, num_action::Int; bounds_lower::
         jacobian_state_func, jacobian_action_func, 
         hessian_prod_state_state_func, hessian_prod_action_state_func, hessian_prod_action_action_func,
         num_constraint, num_ineq_lower, num_ineq_upper, num_state, num_action,
-        zeros(num_constraint), zeros(num_action), zeros(num_action),
-        zeros(num_constraint, num_state), zeros(num_constraint, num_action),
+        zeros(num_constraint), zeros(num_constraint, num_state), zeros(num_constraint, num_action),
         zeros(num_state, num_state), zeros(num_action, num_state), zeros(num_action, num_action),
-        bounds_lower, bounds_upper, indices_compl)
+        indices_compl)
 end
 
 function Constraint()
@@ -81,9 +76,9 @@ function Constraint()
         (jx, x, u) -> nothing, (ju, x, u) -> nothing,
         (hxx, x, u, v) -> nothing, (hux, x, u, v) -> nothing, (huu, x, u, v) -> nothing,
         0, 0, 0, 0, 0,
-        Float64[], Float64[], Float64[], Array{Float64}(undef, 0, 0), Array{Float64}(undef, 0, 0),
+        Float64[], Array{Float64}(undef, 0, 0), Array{Float64}(undef, 0, 0),
         Array{Float64}(undef, 0, 0), Array{Float64}(undef, 0, 0), Array{Float64}(undef, 0, 0),
-        Float64[], Float64[], Int64[])
+        Int64[])
 end
 
 function Constraint(f::Function, fx::Function, fu::Function, num_constraint::Int, num_state::Int, num_action::Int;
@@ -99,10 +94,9 @@ function Constraint(f::Function, fx::Function, fu::Function, num_constraint::Int
         fx, fu,
         fxx_prod, fux_prod, fuu_prod,
         num_constraint, num_state, num_action, num_ineq_lower, num_ineq_upper,
-        zeros(num_constraint), zeros(num_action), zeros(num_action),
-        zeros(num_constraint, num_state), zeros(num_constraint, num_action),
+        zeros(num_constraint), zeros(num_constraint, num_state), zeros(num_constraint, num_action),
         zeros(num_state, num_state), zeros(num_action, num_state), zeros(num_action, num_action),
-        bounds_lower, bounds_upper, indices_compl)
+        indices_compl)
 end
 
 function jacobian!(jacobian_states, jacobian_actions, constraints::Constraints{T}, states, actions) where T

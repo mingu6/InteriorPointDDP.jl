@@ -8,13 +8,13 @@ mutable struct Solver{T}#,N,M,NN,MM,MN,NNN,MNN,X,U,H,D,O,FX,FU,FW,OX,OU,OXX,OUU,
     options::Options{T}
 end
 
-function Solver(dynamics::Vector{Dynamics{T}}, costs::Costs{T}, constraints::Constraints{T}; options=Options{T}()) where T
+function Solver(dynamics::Vector{Dynamics{T}}, costs::Costs{T}, constraints::Constraints{T}, bounds=nothing; options=Options{T}()) where T
 
     # allocate policy data  
     policy = policy_data(dynamics, constraints)
 
     # allocate model data
-    problem = problem_data(dynamics, costs, constraints)
+    problem = problem_data(dynamics, costs, constraints, bounds)
 
     # allocate solver data
     data = solver_data()
@@ -23,9 +23,9 @@ function Solver(dynamics::Vector{Dynamics{T}}, costs::Costs{T}, constraints::Con
 end
 
 function Solver(dynamics::Vector{Dynamics{T}}, costs::Costs{T}) where T
-    H = length(costs)
+    N = length(costs)
     constraint = Constraint()
-    constraints = [constraint for t = 1:H-1]
+    constraints = [constraint for k = 1:N-1]
     
     # allocate policy data  
     policy = policy_data(dynamics, constraints)
@@ -48,36 +48,25 @@ function current_trajectory(solver::Solver)
 end
 
 function initialize_trajectory!(solver::Solver, actions, x1)
-    constraints = solver.problem.constr_data.constraints
+    bounds = solver.problem.bounds
     dynamics = solver.problem.model.dynamics
     options = solver.options
     solver.problem.nominal_states[1] .= x1
-    for (t, ut) in enumerate(actions)
-        lb = constraints[t].bounds_lower
-        ub = constraints[t].bounds_upper
-        nh = length(lb)
-        for i = 1:nh
-            if isinf(lb[i]) && isinf(ub[i])
-                solver.problem.nominal_actions[t][i] = ut[i]
-            elseif isinf(lb[i]) && !isinf(ub[i])
-                solver.problem.nominal_actions[t][i] = min(ut[i], ub[i] - options.κ_1 * max(1, abs(ub[i])))
-            elseif !isinf(lb[i]) && isinf(ub[i])
-                solver.problem.nominal_actions[t][i] = max(ut[i], lb[i] + options.κ_1 * max(1, abs(lb[i])))
-            else
-                p_L = min(options.κ_1 * max(1, abs(lb[i])), options.κ_2 * (ub[i] - lb[i]))
-                p_U = min(options.κ_1 * max(1, abs(ub[i])), options.κ_2 * (ub[i] - lb[i]))
-                if ut[i] < lb[i] + p_L
-                    solver.problem.nominal_actions[t][i] = lb[i] + p_L
-                elseif ut[i] > ub[i] - p_U
-                    solver.problem.nominal_actions[t][i] = ub[i] - p_U
-                else
-                    solver.problem.nominal_actions[t][i] = ut[i]
-                end
-            end
-        end
-        dynamics!(dynamics[t], solver.problem.nominal_states[t+1],
-                  solver.problem.nominal_states[t], solver.problem.nominal_actions[t])
+    ū = solver.problem.nominal_actions
+    x̄ = solver.problem.nominal_states
+
+    for (k, uk) in enumerate(actions)
+        # project primal variables within bounds
+
+        bk = bounds[k]
+        bkl = bounds[k].lower[bk.indices_lower]
+        bku = bounds[k].upper[bk.indices_upper]
+
+        ū[k] .= uk
+        ū[k][bk.indices_lower] .= max.(uk[bk.indices_lower], bkl + options.κ_1 .* max.(1., bkl))
+        ū[k][bk.indices_upper] .= min.(uk[bk.indices_upper], bku - options.κ_1 .* max.(1., bku))
+
+        dynamics!(dynamics[k], x̄[k+1], x̄[k], ū[k])
     end
 end
 
-# TODO: initialize_duals

@@ -8,7 +8,7 @@ h = 0.05
 r_car = 0.02
 x0 = [0.0; 0.0; 0.0] 
 xN = [1.0; 1.0; π / 2]
-options = Options(quasi_newton=false, verbose=true)
+options = Options(quasi_newton=false, verbose=true, max_iterations=1000)
 
 Random.seed!(0)
 
@@ -28,7 +28,7 @@ xyr_obs = [
     [0.7, 0.7, 0.2],
     [0.35, 0.4, 0.1]
     ]
-num_obstacles = length(r_obs)
+num_obstacles = length(xyr_obs)
 num_primal = num_action + num_obstacles + 2  # 2 slacks for box constraints
 
 # ## intermediate waypoints
@@ -87,11 +87,14 @@ stage_constr_fn = (x, u) -> begin
 ]
 end
 
-obs_constr = Constraint(stage_constr_fn, num_state, num_primal,
-    bounds_lower=[ul; zeros(num_obstacles); zeros(2)], # [control limits; obs slack; bound slack]
-    bounds_upper=[uu; Inf * ones(num_obstacles); ones(2)]
-)
+obs_constr = Constraint(stage_constr_fn, num_state, num_primal)
 constraints = [obs_constr for k = 1:N-1]
+
+# ## bounds
+
+# [control limits; obs slack; bound slack]
+bound = Bound([ul; zeros(num_obstacles); zeros(2)], [uu; Inf * ones(num_obstacles); ones(2)])
+bounds = [bound for k in 1:N-1]
 
 # ## Initialise solver and solve
 
@@ -99,17 +102,17 @@ ū = [[1.0e-1 * randn(2); 0.1 * ones(num_obstacles); 0.1 * ones(2)] for k = 1:N
 for (i, k) in enumerate(inds_wp)
     objective[k] = waypoint_cost(xy_wp[i])
 end
-solver = Solver(dynamics, objective, constraints, options=options)
+solver = Solver(dynamics, objective, constraints, bounds, options=options)
 solve!(solver, x0, ū)
 
-# ## Plot solution
+# # ## Plot solution
 
 x_sol, u_sol = get_trajectory(solver)
 
 plot()
 plotTrajectory!(x_sol)
-for (xy, r) in zip(xy_obs, r_obs)
-    plotCircle!(xy[1], xy[2], r)
+for xyr in xyr_obs
+    plotCircle!(xyr[1], xyr[2], xyr[3])
 end
 scatter!(map(x -> x[1], xy_wp), map(x -> x[2], xy_wp),
          markershape=:star, markersize=5)
