@@ -107,7 +107,7 @@ for (i, k) in enumerate(inds_wp)
     objective[k] = waypoint_cost(xy_wp[i])
 end
 solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
-solve!(solver, x0, ū)
+solve!(solver, x1, ū)
 
 # # ## Plot solution
 
@@ -125,4 +125,4 @@ savefig("examples/plots/concar.png")
 # ## benchmark allocations + timing
 using BenchmarkTools
 solver.options.verbose = false
-@benchmark solve!(solver, x0, ū)
+@benchmark solve!(solver, x1, ū)

@@ -28,7 +28,7 @@ ny = nu + nq + 2 * nc
 
 q1 = T[0.0; 0.0]
 q2 = T[0.0; 0.0]
-x0 = T[q1; q2]
+x1 = T[q1; q2]
 qN = T[π; 0.0]
 xN = T[qN; qN]
 
@@ -90,7 +90,7 @@ bounds = [bound for k in 1:N-1]
 q2_init = LinRange(q1, qN, N)[2:end]
 ū = [[T(1.0e-3) * randn(T, nu); q2_init[k]; T(0.01) * ones(T, nc); T(0.01) * ones(T, nc)] for k = 1:N-1]
 solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
-solve!(solver, x0, ū)
+solve!(solver, x1, ū)
 
 # ## Plot solution
 
@@ -113,4 +113,4 @@ end
 
 using BenchmarkTools
 solver.options.verbose = false
-@benchmark solve!(solver, x0, ū)
+@benchmark solve!(solver, x1, ū)

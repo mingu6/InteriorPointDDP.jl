@@ -1,7 +1,6 @@
 function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::SolverData{T},
             options::Options{T}; mode=:nominal, verbose::Bool=false) where T
     N = problem.horizon
-    constr_data = problem.constr_data
     reg::T = 0.0
 
     # Jacobians of system dynamics
@@ -11,12 +10,12 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
     vfxx = problem.model.vfxx
     vfux = problem.model.vfux
     vfuu = problem.model.vfuu
-    # Jacobian constr_data 
-    hx = constr_data.jacobian_state
-    hu = constr_data.jacobian_control
+    # Jacobian caches
+    hx = problem.constraints_data.jacobian_state
+    hu = problem.constraints_data.jacobian_control
     # Tensor contraction of constraints (DDP)
-    vhux = constr_data.vhux
-    vhuu = constr_data.vhuu
+    vhux = problem.constraints_data.vhux
+    vhuu = problem.constraints_data.vhuu
     # Cost gradients
     lx = problem.cost_data.gradient_state
     lu = problem.cost_data.gradient_control
@@ -131,7 +130,8 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
             kuϕ[t] .= policy.lhs_bk[t] \ policy.rhs[t]
             Kuϕ[t] .= policy.lhs_bk[t] \ policy.rhs_x[t]
 
-            # update gains for ineq. dual variables
+            # update gains for ineq. dual variables 
+            # TODO: improve, copying and slow
             kvl[t][bk.indices_lower] .= μ ./ il - vl[t][bk.indices_lower] - σl .* ku[t][bk.indices_lower]
             kvu[t][bk.indices_upper] .= μ ./ iu - vu[t][bk.indices_upper] + σu .* ku[t][bk.indices_upper]
             Kvl[t][bk.indices_lower, :] .= -σl .* Ku[t][bk.indices_lower, :]
@@ -159,5 +159,4 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
     data.status != 0 && (verbose && (@warn "Backward pass failure, unable to find positive definite iteration matrix."))
 end
 
-# TODO: transpose allocates and slows things down
-# TODO: lots of unnecessary tranposes? fx, fu, ux_tmp etc
+

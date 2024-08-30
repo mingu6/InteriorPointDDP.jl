@@ -84,6 +84,7 @@ function check_fraction_boundary(problem::ProblemData{T}, τ::T) where T
         bk = bounds[t]
         il = bk.indices_lower
         iu = bk.indices_upper
+        # TODO: copying, slow: improve
         # equivalent to u - ul < (ū - ul) * (1 - τ)
         if any(u[t][il] - bk.lower[il] .* τ .< ū[t][il] .* (1. - τ))
             status = 2

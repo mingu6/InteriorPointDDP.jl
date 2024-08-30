@@ -143,6 +143,7 @@ function optimality_error(policy::PolicyData{T}, problem::ProblemData{T},
         (bk.num_upper == 0 && bk.num_lower == 0) && continue
         vlk = vl[t][bk.indices_lower]
         vuk = vu[t][bk.indices_upper]
+        # TODO: slow, copies
         cs_inf = max(cs_inf, norm((u[t][bk.indices_lower] - bk.lower[bk.indices_lower])
                     .* vlk, Inf))
         cs_inf = max(cs_inf, norm((bk.upper[bk.indices_upper] - u[t][bk.indices_upper])

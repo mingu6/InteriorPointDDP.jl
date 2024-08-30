@@ -7,7 +7,7 @@ T = Float64
 h = 0.01
 N = 101
 xN = T[1.0; 0.0]
-x0 = T[0.0; 0.0]
+x1 = T[0.0; 0.0]
 options = Options{T}(quasi_newton=false, verbose=true)
 
 Random.seed!(0)
@@ -49,7 +49,7 @@ bounds = [bound for k = 1:N-1]
 
 ū = [[T(1.0e-2) * randn(T, 1); T(0.01) * ones(T, 2)] for k = 1:N-1]
 solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
-solve!(solver, x0, ū)
+solve!(solver, x1, ū)
 
 # ## Plot solution
 
@@ -66,4 +66,4 @@ println("Total absolute work: ", sum(work))
 
 using BenchmarkTools
 solver.options.verbose = false
-@benchmark solve!(solver, x0, ū)
+@benchmark solve!(solver, x1, ū)
