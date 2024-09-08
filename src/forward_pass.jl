@@ -17,7 +17,6 @@ function forward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::Sol
 
     while data.step_size >= min_step_size
         α = data.step_size
-        # TODO: do not catch all exceptions, only BoundsError
         try
             rollout!(policy, problem, step_size=α; mode=:main)
         catch e

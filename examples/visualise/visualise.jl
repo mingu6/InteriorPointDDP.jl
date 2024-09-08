@@ -1,6 +1,7 @@
 using GeometryBasics
 using Rotations
 using CoordinateTransformations
+using LinearAlgebra
 
 function cable_transform(y, z)
     v1 = [0.0, 0.0, 1.0]

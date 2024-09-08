@@ -18,10 +18,10 @@ options.lagrangian_gradient_tolerance = 1e-4
 
 Random.seed!(0)
 
-include("../examples/models/acrobot.jl")
+include("../../examples/models/acrobot.jl")
 
 if visualise
-	include("../examples/visualise/visualise_acrobot.jl")
+	include("../../examples/visualise/visualise_acrobot.jl")
 	!@isdefined(vis) && (vis = Visualizer())
 	render(vis)
 end

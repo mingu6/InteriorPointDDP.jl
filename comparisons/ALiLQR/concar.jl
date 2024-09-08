@@ -46,7 +46,7 @@ num_obstacles = length(r_obs)
 xy_wp = [[0.2, 0.6], [0.7, 0.4]]
 inds_wp = [40, 80]
 
-include("../examples/visualise/concar.jl")
+include("../../examples/visualise/concar.jl")
 
 # ## Dynamics - explicit midpoint for integrator
 
@@ -137,7 +137,7 @@ for (xy, r) in zip(xy_obs, r_obs)
     plotCircle!(xy[1], xy[2], r)
 end
 scatter!(map(x -> x[1], waypoint_xy), map(x -> x[2], waypoint_xy), markershape=:star)
-savefig("comparisons/plots/concar.png")
+savefig("plots/concar.png")
 
 # ## benchmark allocations + timing
 using BenchmarkTools

@@ -7,7 +7,7 @@ using MeshCat
 T = Float64
 h = 0.05
 N = 101
-options = Options{T}(quasi_newton=false, verbose=true, max_iterations=3000, optimality_tolerance=1e-5)
+options = Options{T}(quasi_newton=false, verbose=true, max_iterations=5000, optimality_tolerance=1e-5)
 visualise = true
 
 Random.seed!(0)
@@ -46,9 +46,8 @@ function objt(x, u)
 	q2 = x[acrobot_impact.nq .+ (1:acrobot_impact.nq)]
 	v1 = (q2 - q1) ./ h
 
-	J += 0.2 * h * transpose(v1) * v1
-	J += 0.5 * h * u[1] * u[1]
-	J += 0.2 * h * dot(q2 - qN, q2 - qN)
+	J += 0.01 * h * transpose(v1) * v1
+	J += 0.01 * h * u[1] * u[1]
 	return J
 end
 
@@ -101,7 +100,13 @@ q2 = x_mat[:, 2]
 v1 = (x_mat[:, 3] - x_mat[:, 1]) ./ h
 v2 = (x_mat[:, 4] - x_mat[:, 2]) ./ h
 u_mat = [map(x -> x[1], u_sol); 0.0]
-plot(range(0, (N-1) * h, length=N), [q1 q2 v1 v2 u_mat], label=["q1" "q2" "v1" "v2" "u"])
+λ1 = [map(x -> x[end-1], u_sol); 0.0]
+λ2 = [map(x -> x[end], u_sol); 0.0]
+# plot(range(0, (N-1) * h, length=N), [q1 q2 v1 v2 u_mat λ1 λ2], label=["q1" "q2" "v1" "v2" "u" "λ1" "λ2"])
+# plot(range(0, (N-1) * h, length=N), [v1 v2 λ1 λ2], label=["v1" "v2" "λ1" "λ2"])
+# plot(range(0, (N-1) * h, length=N), [λ1 λ2], label=["λ1" "λ2"])
+# plot(range(0, (N-1) * h, length=N), [q1 q2], label=["q1" "q2"])
+plot(range(0, (N-1) * h, length=N), [q2 λ1 λ2 v2], label=["q2" "λ1" "λ2" "v2"])
 savefig("examples/plots/acrobot_impact.png")
 
 if visualise

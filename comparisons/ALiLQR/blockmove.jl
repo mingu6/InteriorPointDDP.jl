@@ -70,7 +70,7 @@ v = map(x -> x[2], solver.problem.nominal_states)
 u = [map(u -> u[1], solver.problem.nominal_actions[1:end-1]); 0.0]
 work = [abs(vk * uk) for (vk, uk) in zip(v, u)]
 plot(range(0, (N-1) * h, length=N), [x v u work], label=["x" "v" "u" "work"])
-savefig("comparisons/plots/blockmove.png")
+savefig("plots/blockmove.png")
 
 println("Total absolute work: ", sum(work))
 

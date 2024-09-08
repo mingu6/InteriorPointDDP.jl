@@ -10,9 +10,6 @@ Base.@kwdef mutable struct Options{T}
     ineq_dual_init::T= 1.0        # dual variable initialisation value TODO: change name
     κ_1::T= 0.01                  # fraction-to-boundary initialization for controls
     κ_2::T= 0.01                  # fraction-to-boundary initialization for controls
-
-    n_soc_max::Int64 = 4                 # maximum number of second-order correction steps
-    κ_soc::T= 0.99        # sufficient decrease in constraint violation condition SOC
     
     reg_1::T= 1e-4
     reg_min::T= 1e-20
@@ -23,8 +20,8 @@ Base.@kwdef mutable struct Options{T}
     κ_c::T= 0.25
     δ_c::T= 1e-8
 
-    κ_ϵ::T= 1.0                   # tolerance factor for lowering barrier parameter
-    κ_μ::T= 0.5                   # linear decrease factor for barrier parameter
+    κ_ϵ::T= 3.0                   # tolerance factor for lowering barrier parameter
+    κ_μ::T= 0.2                   # linear decrease factor for barrier parameter
     θ_μ::T= 1.1                   # superlinear decrease factor for barrier parameter
     τ_min::T= 0.99                # lower bound on fraction-to-boundary parameter
     
