@@ -9,12 +9,12 @@ N = 101
 visualise = true
 
 options = Options()
-options.scaling_penalty = 1.0
-options.initial_constraint_penalty = 1e-2
-options.max_iterations = 1000
-options.max_dual_updates = 9
-options.objective_tolerance = 1e-4
-options.lagrangian_gradient_tolerance = 1e-4
+options.scaling_penalty = 1.2
+options.initial_constraint_penalty = 1e-5
+options.max_iterations = 500
+options.max_dual_updates = 20
+options.objective_tolerance = 1e-7
+options.lagrangian_gradient_tolerance = 1e-7
 
 Random.seed!(0)
 
@@ -52,8 +52,8 @@ function objk(x, u)
 	q2 = x[acrobot_impact.nq .+ (1:acrobot_impact.nq)]
 	v1 = (q2 - q1) ./ h
 
-	J += 0.1 * h * transpose(v1) * v1
-	J += 0.5 * h * u[1] * u[1]
+	J += 0.01 * h * transpose(v1) * v1
+	J += 0.01 * h * u[1] * u[1]
 	return J
 end
 
@@ -65,7 +65,7 @@ function objN(x, u)
 	v1 = (q2 - q1) ./ h
 
 	J += 100.0 *  dot(v1, v1)
-    J += 400.0 * dot(q2 - qN, q2 - qN)
+    J += 500.0 * dot(q2 - qN, q2 - qN)
 	return J
 end
 
@@ -103,14 +103,17 @@ solve!(solver)
 
 # ## Plot solution
 
-x_mat = reduce(vcat, transpose.(solver.problem.nominal_states))
+x_sol, u_sol = get_trajectory(solver)
+x_mat = reduce(vcat, transpose.(x_sol))
 q1 = x_mat[:, 1]
 q2 = x_mat[:, 2]
 v1 = (x_mat[:, 3] - x_mat[:, 1]) ./ h
 v2 = (x_mat[:, 4] - x_mat[:, 2]) ./ h
-u_mat = [map(x -> x[1], solver.problem.nominal_actions[1:end-1]); 0.0]
-plot(range(0, (N-1) * h, length=N), [q1 q2 v1 v2 u_mat], label=["q1" "q2" "v1" "v2" "u"])
-savefig("comparisons/plots/acrobot_impact.png")
+u_mat = [map(x -> x[1], u_sol); 0.0]
+λ1 = [map(x -> x[end-1], u_sol); 0.0]
+λ2 = [map(x -> x[end], u_sol); 0.0]
+plot(range(0, (N-1) * h, length=N), [q2 λ1 λ2 v2], label=["q2" "λ1" "λ2" "v2"])
+savefig("plots/acrobot_contact.png")
 
 if visualise
 	q_sol = state_to_configuration(solver.problem.nominal_states)
