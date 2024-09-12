@@ -63,21 +63,22 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
         
         for t = N-1:-1:1
             num_control = length(u[t])
+            num_constr = length(h[t])
 
             bt = bounds[t]
 
-            bl1[t] .= u[t][bt.indices_lower]
-            bl1[t] .-= bt.lower[bt.indices_lower]
+            bl1[t] .= @views u[t][bt.indices_lower]
+            bl1[t] .-= @views bt.lower[bt.indices_lower]
             bl1[t] .= inv.(bl1[t])
             bl2[t] .= bl1[t]  # σ_L
-            bl2[t] .*= vl[t][bt.indices_lower]  
+            bl2[t] .*= @views vl[t][bt.indices_lower]  
             bl1[t] .*= μ  # μ / (u - ul)
 
-            bu1[t] .= bt.upper[bt.indices_upper]
-            bu1[t] .-= u[t][bt.indices_upper]
+            bu1[t] .= @views bt.upper[bt.indices_upper]
+            bu1[t] .-= @views u[t][bt.indices_upper]
             bu1[t] .= inv.(bu1[t])
             bu2[t] .= bu1[t]  # σ_U
-            bu2[t] .*= vu[t][bt.indices_upper]  
+            bu2[t] .*= @views vu[t][bt.indices_upper]  
             bu1[t] .*= μ  # μ / (uu - u)
 
             # Qx = lx + fx' * Vx
@@ -99,8 +100,14 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
             mul!(policy.ux_tmp[t], transpose(fu[t]), Vxx[t+1])
             mul!(Quu[t], policy.ux_tmp[t], fu[t])
             Quu[t] .+= luu[t]
-            Quu[t][diagind(Quu[t])[bt.indices_lower]] .+= bl2[t]
-            Quu[t][diagind(Quu[t])[bt.indices_upper]] .+= bu2[t]
+            # Quu[t][diagind(Quu[t])[bt.indices_lower]] .+= bl2[t]
+            # Quu[t][diagind(Quu[t])[bt.indices_upper]] .+= bu2[t]
+            for (i1, i) in enumerate(bt.indices_lower)
+                Quu[t][i, i] += bl2[t][i1]
+            end
+            for (i1, i) in enumerate(bt.indices_upper)
+                Quu[t][i, i] += bu2[t][i1]
+            end
     
             # Qux = lux + fu' * Vxx * fx
             mul!(policy.ux_tmp[t], transpose(fu[t]), Vxx[t+1])
@@ -123,19 +130,27 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
             end
             policy.lhs[t] .= Symmetric(policy.lhs[t])
 
-            α[t] .= -Qu[t]
+            α[t] .= Qu[t]
+            α[t] .*= -1.0
             mul!(α[t], transpose(hu[t]), ϕ[t], -1.0, 1.0)
-            ψ[t] .= -h[t]
+            ψ[t] .= h[t]
+            ψ[t] .*= -1.0
 
-            β[t] .= -Qux[t]
-            ω[t] .= -hx[t]
+            β[t] .= Qux[t]
+            β[t] .*= -1.0
+            ω[t] .= hx[t]
+            ω[t] .*= -1.0
             if !options.quasi_newton
                 β[t] .-= vhux[t]
             end
 
             # inertia calculation and correction
-            policy.lhs_tl[t][diagind(policy.lhs_tl[t])] .+= reg
-            policy.lhs_br[t][diagind(policy.lhs_br[t])] .-= δ_c
+            for i in 1:num_control
+                policy.lhs_tl[t][i, i] += reg
+            end
+            for i in 1:num_constr
+                policy.lhs_br[t][i, i] -= δ_c
+            end
 
             bk, data.status, reg, δ_c = inertia_correction!(policy.kkt_matrix_ws[t], policy.lhs[t], num_control,
                         μ, reg, data.reg_last, options)
@@ -146,25 +161,25 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
 
             # update gains for ineq. dual variables 
             χlt = @views χl[t][bt.indices_lower]
-            χlt .= α[t][bt.indices_lower]
+            χlt .= @views α[t][bt.indices_lower]
             χlt .*= bl2[t]
             χlt .*= -1.0
-            χlt .-= vl[t][bt.indices_lower]
+            χlt .-= @views vl[t][bt.indices_lower]
             χlt .+= bl1[t]
 
             χut = @views χu[t][bt.indices_upper]
-            χut .= α[t][bt.indices_upper]
+            χut .= @views α[t][bt.indices_upper]
             χut .*= bu2[t]
-            χut .-= vu[t][bt.indices_upper]
+            χut .-= @views vu[t][bt.indices_upper]
             χut .+= bu1[t]
 
             ζlt = @views ζl[t][bt.indices_lower, :]
-            ζlt .= β[t][bt.indices_lower, :]
+            ζlt .= @views β[t][bt.indices_lower, :]
             ζlt .*= bl2[t]
             ζlt .*= -1.0
 
             ζut = @views ζu[t][bt.indices_upper, :]
-            ζut .= β[t][bt.indices_upper, :]
+            ζut .= @views β[t][bt.indices_upper, :]
             ζut .*= bu2[t]
 
             # Update return function approx. for next timestep 

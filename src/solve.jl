@@ -140,17 +140,17 @@ function optimality_error(policy::PolicyData{T}, problem::ProblemData{T},
         # complementary slackness
 
         (bt.num_upper == 0 && bt.num_lower == 0) && continue
-        bl1[t] .= u[t][bt.indices_lower]
-        bl1[t] .-= bt.lower[bt.indices_lower]
-        bl1[t] .*= vl[t][bt.indices_lower]
+        bl1[t] .= @views u[t][bt.indices_lower]
+        bl1[t] .-= @views bt.lower[bt.indices_lower]
+        bl1[t] .*= @views vl[t][bt.indices_lower]
         cs_inf = max(cs_inf, norm(bl1[t], Inf))
-        v_norm += sum(vl[t][bt.indices_lower])
+        v_norm += @views sum(vl[t][bt.indices_lower])
 
-        bu1[t] .= u[t][bt.indices_upper]
-        bu1[t] .-= bt.upper[bt.indices_upper]
-        bu1[t] .*= vu[t][bt.indices_upper]
+        bu1[t] .= @views u[t][bt.indices_upper]
+        bu1[t] .-= @views bt.upper[bt.indices_upper]
+        bu1[t] .*= @views vu[t][bt.indices_upper]
         cs_inf = max(cs_inf, norm(bu1[t], Inf))
-        v_norm += sum(vu[t][bt.indices_upper])
+        v_norm += @views sum(vu[t][bt.indices_upper])
     end
     cs_inf -= μ
     
@@ -172,8 +172,9 @@ function rescale_duals!(problem::ProblemData{T}, policy::PolicyData{T}, μ::T, o
     for t = 1:N-1
         bt = bounds[t]
 
-        bl1[t] .= u[t][bt.indices_lower]
-        bl1[t] .-= bt.lower[bt.indices_lower]
+        bl1[t] .= @views u[t][bt.indices_lower]
+        bl1[t] .-= @views bt.lower[bt.indices_lower]
+        # TODO: allocs
         vl[t][bt.indices_lower] .= max.(min.(vl[t][bt.indices_lower], (κ_Σ * μ) ./ bl1[t]), (μ / κ_Σ) .*  bl1[t])
 
         bu1[t] .= bt.upper[bt.indices_upper]
@@ -192,10 +193,10 @@ function reset_duals!(problem::ProblemData{T}) where T
         fill!(problem.nominal_ineq_duals_lo[t], 0.0)
         fill!(problem.ineq_duals_up[t], 0.0)
         fill!(problem.nominal_ineq_duals_up[t], 0.0)
-        problem.ineq_duals_lo[t][bounds[t].indices_lower].= 1.0
-        problem.ineq_duals_up[t][bounds[t].indices_upper] .= 1.0
-        problem.nominal_ineq_duals_lo[t][bounds[t].indices_lower] .= 1.0
-        problem.nominal_ineq_duals_up[t][bounds[t].indices_upper] .= 1.0
+        @views problem.ineq_duals_lo[t][bounds[t].indices_lower].= 1.0
+        @views problem.ineq_duals_up[t][bounds[t].indices_upper] .= 1.0
+        @views problem.nominal_ineq_duals_lo[t][bounds[t].indices_lower] .= 1.0
+        @views problem.nominal_ineq_duals_up[t][bounds[t].indices_upper] .= 1.0
     end
 end
 

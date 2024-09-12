@@ -77,7 +77,8 @@ function check_fraction_boundary(problem::ProblemData{T}, τ::T) where T
         bt = bounds[t]
         il = bt.indices_lower
         iu = bt.indices_upper
-
+        
+        # TODO: allocs
         if any(((u[t] - bt.lower) .< (ū[t] - bt.lower)  .* (1. - τ))[il]) ||
                 any(((bt.upper - u[t]) .< (bt.upper - ū[t]) .* (1. - τ))[iu]) ||
                 any((vl[t] .< vl̄[t] .* (1. - τ))[il]) ||

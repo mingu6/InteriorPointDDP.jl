@@ -89,7 +89,7 @@ function inertia(B::BunchKaufman{TS};
     c = real_matrix ? TR(1) : (TR <: AbstractFloat ? 1/sqrt(TR(2)) : TR(12//17))
 
     # First pass, estimate largest singular value and group together size-1 blocks
-    D = B.D
+    D = B.D  # TODO: create cache for this
     s1 = TR(0)
     i = 1
     while i <= N; @inbounds begin

@@ -43,12 +43,12 @@ function barrier_objective!(problem::ProblemData{T}, data::SolverData{T}, policy
     for t = 1:N-1
         bt = bounds[t]
 
-        bl1[t] .= u[t][bt.indices_lower]
-        bl1[t] .-= bt.lower[bt.indices_lower]
+        bl1[t] .= @views u[t][bt.indices_lower]
+        bl1[t] .-= @views bt.lower[bt.indices_lower]
         bl1[t] .= log.(bl1[t])
 
-        bu1[t] .= bt.upper[bt.indices_upper]
-        bu1[t] .-= u[t][bt.indices_upper]
+        bu1[t] .= @views bt.upper[bt.indices_upper]
+        bu1[t] .-= @views u[t][bt.indices_upper]
         bu1[t] .= log.(bu1[t])
 
         barrier_obj -= sum(bl1[t])
@@ -56,7 +56,7 @@ function barrier_objective!(problem::ProblemData{T}, data::SolverData{T}, policy
     end
     
     barrier_obj *= data.μ
-    cost!(data, problem, mode=mode)
+    cost!(data, problem, mode=mode) # TODO: allocs
     barrier_obj += data.objective
     return barrier_obj
 end

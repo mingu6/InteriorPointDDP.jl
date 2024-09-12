@@ -14,14 +14,14 @@ function rollout!(policy::PolicyData{T}, problem::ProblemData{T}; step_size::T=1
     ζl, ζu = policy.gains_data.ζl, policy.gains_data.ζu
 
     for (t, d) in enumerate(dynamics)
-        # u[t] .= ū[t] + K[t] * (x[t] - x̄[t]) + step_size * k[t]
+        # u[t] .= ū[t] + β[t] * (x[t] - x̄[t]) + step_size * α[t]
         u[t] .= α[t]
         u[t] .*= step_size
         u[t] .+= ū[t]
         mul!(u[t], β[t], x[t], 1.0, 1.0)
         mul!(u[t], β[t], x̄[t], -1.0, 1.0)
 
-        # for ϕ, note we use ϕ^+ instead of δϕ for update hence different formula
+        # ϕ[t] .= ϕ̄[t] + ω[t] * (x[t] - x̄[t]) + step_size * ψ[t]
         ϕ[t] .= ψ[t]
         ϕ[t] .*= step_size
         ϕ[t] .+= ϕ̄[t]
