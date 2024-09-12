@@ -1,6 +1,7 @@
 name = "InteriorPointDDP"
 authors = ["mingu6 <mingda.xu@anu.edu.au>"]
 version = "0.1.0"
+uuid = "d27d4283-bd76-49d0-8229-c70ce1692508"
 
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
@@ -30,3 +31,9 @@ JLD2 = "0.4"
 Scratch = "1.0"
 Symbolics = "4.8.2, 4.8.2"
 julia = "1.6"
+
+[extras]
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+
+[targets]
+test = ["SparseArrays"]
