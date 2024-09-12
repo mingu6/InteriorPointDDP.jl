@@ -6,6 +6,7 @@ using Scratch
 using JLD2
 using Printf
 using Crayons
+using FastLapackInterface
 
 include("costs.jl")
 include("dynamics.jl")

@@ -29,7 +29,7 @@ function forward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::Sol
         data.status = check_fraction_boundary(problem, τ)
         data.status != 0 && (data.step_size *= 0.5, continue)
 
-        Δφ_L, Δφ_Q = expected_decrease_cost(policy, problem, α; mode=:main)
+        Δφ_L, Δφ_Q = expected_decrease_cost(policy, problem, α)
         Δφ = Δφ_L + Δφ_Q
         
         # used for sufficient decrease from current iterate step acceptance criterion
@@ -123,17 +123,17 @@ function estimate_min_step_size(Δφ_L::T, data::SolverData{T}, options::Options
     return min_step_size
 end
 
-function expected_decrease_cost(policy::PolicyData{T}, problem::ProblemData{T}, step_size::T; mode=:main) where T
+function expected_decrease_cost(policy::PolicyData{T}, problem::ProblemData{T}, step_size::T) where T
     Δφ_L = T(0.0)
     Δφ_Q = T(0.0)
     N = problem.horizon
     Qu = policy.hamiltonian.gradient_control
     Quu = policy.hamiltonian.hessian_control_control
-    gains = mode == :main ? policy.gains_main : policy.gains_soc
+    gains = policy.gains_data
     
     for t = N-1:-1:1
-        Δφ_L += dot(Qu[t], gains.ku[t])
-        Δφ_Q += 0.5 * dot(gains.ku[t], Quu[t], gains.ku[t])
+        Δφ_L += dot(Qu[t], gains.α[t])
+        Δφ_Q += 0.5 * dot(gains.α[t], Quu[t], gains.α[t])
     end
     return Δφ_L * step_size, Δφ_Q * step_size^2
 end

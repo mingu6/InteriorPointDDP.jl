@@ -8,38 +8,37 @@ function rollout!(policy::PolicyData{T}, problem::ProblemData{T}; step_size::T=1
     
     x[1] .= x̄[1]
 
-    gains = mode == :main ? policy.gains_main : policy.gains_soc
-    ku, kϕ = gains.ku, gains.kϕ
-    kvl, kvu = gains.kvl, gains.kvu
-    Kvl, Kvu = policy.gains_main.Kvl, policy.gains_main.Kvu
-    Ku, Kϕ = policy.gains_main.Ku, policy.gains_main.Kϕ
+    α, ψ = policy.gains_data.α, policy.gains_data.ψ
+    β, ω = policy.gains_data.β, policy.gains_data.ω
+    χl, χu = policy.gains_data.χl, policy.gains_data.χu
+    ζl, ζu = policy.gains_data.ζl, policy.gains_data.ζu
 
     for (t, d) in enumerate(dynamics)
         # u[t] .= ū[t] + K[t] * (x[t] - x̄[t]) + step_size * k[t]
-        u[t] .= ku[t]
+        u[t] .= α[t]
         u[t] .*= step_size
         u[t] .+= ū[t]
-        mul!(u[t], Ku[t], x[t], 1.0, 1.0)
-        mul!(u[t], Ku[t], x̄[t], -1.0, 1.0)
+        mul!(u[t], β[t], x[t], 1.0, 1.0)
+        mul!(u[t], β[t], x̄[t], -1.0, 1.0)
 
         # for ϕ, note we use ϕ^+ instead of δϕ for update hence different formula
-        ϕ[t] .= kϕ[t]
+        ϕ[t] .= ψ[t]
         ϕ[t] .*= step_size
         ϕ[t] .+= ϕ̄[t]
-        mul!(ϕ[t], Kϕ[t], x[t], 1.0, 1.0)
-        mul!(ϕ[t], Kϕ[t], x̄[t], -1.0, 1.0)
+        mul!(ϕ[t], ω[t], x[t], 1.0, 1.0)
+        mul!(ϕ[t], ω[t], x̄[t], -1.0, 1.0)
 
-        vl[t] .= kvl[t]
+        vl[t] .= χl[t]
         vl[t] .*= step_size
         vl[t] .+= vl̄[t]
-        mul!(vl[t], Kvl[t], x[t], 1.0, 1.0)
-        mul!(vl[t], Kvl[t], x̄[t], -1.0, 1.0)
+        mul!(vl[t], ζl[t], x[t], 1.0, 1.0)
+        mul!(vl[t], ζl[t], x̄[t], -1.0, 1.0)
 
-        vu[t] .= kvu[t]
+        vu[t] .= χu[t]
         vu[t] .*= step_size
         vu[t] .+= vū[t]
-        mul!(vu[t], Kvu[t], x[t], 1.0, 1.0)
-        mul!(vu[t], Kvu[t], x̄[t], -1.0, 1.0)
+        mul!(vu[t], ζu[t], x[t], 1.0, 1.0)
+        mul!(vu[t], ζu[t], x̄[t], -1.0, 1.0)
         
         dynamics!(d, x[t+1], x[t], u[t])
     end

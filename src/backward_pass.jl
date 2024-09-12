@@ -30,14 +30,14 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
     Quu = policy.hamiltonian.hessian_control_control
     Qux = policy.hamiltonian.hessian_control_state
     # Feedback gains (linear feedback policy)
-    Kuϕ = policy.gains_main.Kuϕ
-    kuϕ = policy.gains_main.kuϕ
-    Ku = policy.gains_main.Ku
-    ku = policy.gains_main.ku
-    kvl = policy.gains_main.kvl
-    kvu = policy.gains_main.kvu
-    Kvl = policy.gains_main.Kvl
-    Kvu = policy.gains_main.Kvu
+    α = policy.gains_data.α
+    β = policy.gains_data.β
+    ψ = policy.gains_data.ψ
+    ω = policy.gains_data.ω
+    χl = policy.gains_data.χl
+    ζl = policy.gains_data.ζl
+    χu = policy.gains_data.χu
+    ζu = policy.gains_data.ζu
     # Value function
     Vx = policy.value.gradient
     Vxx = policy.value.hessian
@@ -59,11 +59,11 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
         for t = N-1:-1:1
             num_control = length(u[t])
 
-            bk = bounds[t]
-            il = u[t][bk.indices_lower] - bk.lower[bk.indices_lower]
-            iu = bk.upper[bk.indices_upper] - u[t][bk.indices_upper]
-            σl = vl[t][bk.indices_lower] ./ il
-            σu = vu[t][bk.indices_upper] ./ iu
+            bt = bounds[t]
+            il = u[t][bt.indices_lower] - bt.lower[bt.indices_lower]
+            iu = bt.upper[bt.indices_upper] - u[t][bt.indices_upper]
+            σl = vl[t][bt.indices_lower] ./ il
+            σu = vu[t][bt.indices_upper] ./ iu
 
             # Qx = lx + fx' * Vx
             Qx[t] .= lx[t]
@@ -72,8 +72,8 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
             # Qu = lu + fu' * Vx + μ log(u - ul) + μ log(uu - u)
             Qu[t] .= lu[t]
             mul!(Qu[t], transpose(fu[t]), Vx[t+1], 1.0, 1.0)
-            Qu[t][bk.indices_lower] .-= μ ./ il
-            Qu[t][bk.indices_upper] .+= μ ./ iu
+            Qu[t][bt.indices_lower] .-= μ ./ il
+            Qu[t][bt.indices_upper] .+= μ ./ iu
             
             # Qxx = lxx + fx' * Vxx * fx
             mul!(policy.xx_tmp[t], transpose(fx[t]), Vxx[t+1])
@@ -84,8 +84,8 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
             mul!(policy.ux_tmp[t], transpose(fu[t]), Vxx[t+1])
             mul!(Quu[t], policy.ux_tmp[t], fu[t])
             Quu[t] .+= luu[t]
-            Quu[t][diagind(Quu[t])[bk.indices_lower]] .+= σl
-            Quu[t][diagind(Quu[t])[bk.indices_upper]] .+= σu
+            Quu[t][diagind(Quu[t])[bt.indices_lower]] .+= σl
+            Quu[t][diagind(Quu[t])[bt.indices_upper]] .+= σu
     
             # Qux = lux + fu' * Vxx * fx
             mul!(policy.ux_tmp[t], transpose(fu[t]), Vxx[t+1])
@@ -108,49 +108,68 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
             end
             policy.lhs[t] .= Symmetric(policy.lhs[t])
 
-            policy.rhs_t[t] .= -Qu[t]
-            mul!(policy.rhs_t[t], transpose(hu[t]), ϕ[t], -1.0, 1.0)
-            policy.rhs_b[t] .= -h[t]
+            α[t] .= -Qu[t]
+            mul!(α[t], transpose(hu[t]), ϕ[t], -1.0, 1.0)
+            ψ[t] .= -h[t]
 
-            policy.rhs_x_t[t] .= -Qux[t]
-            policy.rhs_x_b[t] .= -hx[t]
+            β[t] .= -Qux[t]
+            ω[t] .= -hx[t]
             if !options.quasi_newton
-                policy.rhs_x_t[t] .-= vhux[t]
+                β[t] .-= vhux[t]
             end
 
             # inertia calculation and correction
             policy.lhs_tl[t][diagind(policy.lhs_tl[t])] .+= reg
             policy.lhs_br[t][diagind(policy.lhs_br[t])] .-= δ_c
 
-            policy.lhs_bk[t], data.status, reg, δ_c = inertia_correction!(policy.lhs[t], num_control,
-                        μ, reg, data.reg_last, options; rook=true)
+            bk, data.status, reg, δ_c = inertia_correction!(policy.kkt_matrix_ws[t], policy.lhs[t], num_control,
+                        μ, reg, data.reg_last, options)
 
             data.status != 0 && break
 
-            kuϕ[t] .= policy.lhs_bk[t] \ policy.rhs[t]
-            Kuϕ[t] .= policy.lhs_bk[t] \ policy.rhs_x[t]
+            ldiv!(bk, policy.gains_data.gains[t])
 
             # update gains for ineq. dual variables 
-            # TODO: improve, copying and slow
-            kvl[t][bk.indices_lower] .= μ ./ il - vl[t][bk.indices_lower] - σl .* ku[t][bk.indices_lower]
-            kvu[t][bk.indices_upper] .= μ ./ iu - vu[t][bk.indices_upper] + σu .* ku[t][bk.indices_upper]
-            Kvl[t][bk.indices_lower, :] .= -σl .* Ku[t][bk.indices_lower, :]
-            Kvu[t][bk.indices_upper, :] .= σu .* Ku[t][bk.indices_upper, :]
+            χlt = @view χl[t][bt.indices_lower]
+            χlt .= @view α[t][bt.indices_lower]
+            χlt .*= σl
+            χlt .*= -1.0
+            χlt .-= @view vl[t][bt.indices_lower]
+            il .= inv.(il)
+            il .*= μ
+            χlt .+= il
+
+            χut = @view χu[t][bt.indices_upper]
+            χut .= @view α[t][bt.indices_upper]
+            χut .*= σu
+            χut .-= @view vu[t][bt.indices_upper]
+            iu .= inv.(iu)
+            iu .*= μ
+            χut .+= iu
+
+            ζlt = @view ζl[t][bt.indices_lower, :]
+            ζlt .= @view β[t][bt.indices_lower, :]
+            ζlt .*= σl
+            ζlt .*= -1.0
+
+            ζut = @view ζu[t][bt.indices_upper, :]
+            ζut .= @view β[t][bt.indices_upper, :]
+            ζut .*= σu
 
             # Update return function approx. for next timestep 
             # Vxx = Q̂xx + Q̂ux' * Ku + Ku * Q̂ux' + Ku' Q̂uu' * Ku
-            mul!(policy.ux_tmp[t], Quu[t], Ku[t])
-            mul!(Vxx[t], transpose(Ku[t]), Qux[t])
+            mul!(policy.ux_tmp[t], Quu[t], β[t])
+            mul!(Vxx[t], transpose(β[t]), Qux[t])
 
-            mul!(Vxx[t], transpose(Qux[t]), Ku[t], 1.0, 1.0)
+            mul!(Vxx[t], transpose(Qux[t]), β[t], 1.0, 1.0)
             Vxx[t] .+= Qxx[t]
-            mul!(Vxx[t], transpose(Ku[t]), policy.ux_tmp[t], 1.0, 1.0)
+            mul!(Vxx[t], transpose(β[t]), policy.ux_tmp[t], 1.0, 1.0)
             Vxx[t] .= Symmetric(Vxx[t])
 
             # Vx = Q̂x + Ku' * Q̂u + [Q̂uu Ku + Q̂ux]^T ku
             policy.ux_tmp[t] .+= Qux[t]
-            mul!(Vx[t], transpose(policy.ux_tmp[t]), ku[t])
-            mul!(Vx[t], transpose(Ku[t]), Qu[t], 1.0, 1.0)
+            mul!(Vx[t], transpose(policy.ux_tmp[t]), α[t])
+            mul!(Vx[t], transpose(β[t]), Qu[t], 1.0, 1.0)
             Vx[t] .+= Qx[t]
         end
         data.status == 0 && break
