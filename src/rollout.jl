@@ -1,4 +1,4 @@
-function rollout!(policy::PolicyData{T}, problem::ProblemData{T}; step_size::T=1.0, mode=:main) where T
+function rollout!(policy::PolicyData{T}, problem::ProblemData{T}; step_size::T=1.0) where T
     dynamics = problem.model.dynamics
     
     x, u, _ = primal_trajectories(problem, mode=:current)

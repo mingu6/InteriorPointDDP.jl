@@ -8,7 +8,6 @@ function cost(problem::ProblemData{T}; mode=:nominal) where T
     end
 end
 
-# TODO: Why this???
 function cost!(data::SolverData{T}, problem::ProblemData{T}; mode=:nominal) where T
 	if mode == :nominal
 		data.objective = cost(problem.cost_data.costs, problem.nominal_states, problem.nominal_controls)
@@ -32,16 +31,28 @@ function constraint!(problem::ProblemData{T}, μ::T; mode=:nominal) where T
     end
 end
 
-function barrier_objective!(problem::ProblemData, data::SolverData; mode=:nominal)
+function barrier_objective!(problem::ProblemData{T}, data::SolverData{T}, policy::PolicyData{T}; mode=:nominal) where T
     N = problem.horizon
     bounds = problem.bounds
     u = mode == :nominal ? problem.nominal_controls : problem.controls
+
+    bl1 = policy.bl_tmp1
+    bu1 = policy.bu_tmp1
     
     barrier_obj = 0.
     for t = 1:N-1
-        bk = bounds[t]
-        barrier_obj -= sum(log.(u[t][bk.indices_lower] - bk.lower[bk.indices_lower]))
-        barrier_obj -= sum(log.(bk.upper[bk.indices_upper] - u[t][bk.indices_upper]))
+        bt = bounds[t]
+
+        bl1[t] .= u[t][bt.indices_lower]
+        bl1[t] .-= bt.lower[bt.indices_lower]
+        bl1[t] .= log.(bl1[t])
+
+        bu1[t] .= bt.upper[bt.indices_upper]
+        bu1[t] .-= u[t][bt.indices_upper]
+        bu1[t] .= log.(bu1[t])
+
+        barrier_obj -= sum(bl1[t])
+        barrier_obj -= sum(bu1[t])
     end
     
     barrier_obj *= data.μ
@@ -50,7 +61,7 @@ function barrier_objective!(problem::ProblemData, data::SolverData; mode=:nomina
     return barrier_obj
 end
 
-function constraint_violation_1norm(problem::ProblemData; mode=:nominal)
+function constraint_violation_1norm(problem::ProblemData{T}; mode=:nominal) where T
     h = mode == :nominal ? problem.nominal_constraints : problem.constraints
     constr_violation = 0.
     for hk in h

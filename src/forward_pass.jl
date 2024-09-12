@@ -18,7 +18,7 @@ function forward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::Sol
     while data.step_size >= min_step_size
         α = data.step_size
         try
-            rollout!(policy, problem, step_size=α; mode=:main)
+            rollout!(policy, problem, step_size=α)
         catch e
             # reduces step size if NaN or Inf encountered
             e isa DomainError && (data.step_size *= 0.5, continue)
@@ -34,7 +34,7 @@ function forward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::Sol
         
         # used for sufficient decrease from current iterate step acceptance criterion
         θ = constraint_violation_1norm(problem, mode=:current)
-        φ = barrier_objective!(problem, data, mode=:current)
+        φ = barrier_objective!(problem, data, policy, mode=:current)
         
         # check acceptability to filter
         data.status = !any(x -> all([θ, φ] .>= x), data.filter) ? 0 : 3
@@ -74,26 +74,14 @@ function check_fraction_boundary(problem::ProblemData{T}, τ::T) where T
 
     status = 0
     for t = 1:N-1
-        bk = bounds[t]
-        il = bk.indices_lower
-        iu = bk.indices_upper
-        # TODO: copying, slow: improve
-        # equivalent to u - ul < (ū - ul) * (1 - τ)
-        if any(u[t][il] - bk.lower[il] .* τ .< ū[t][il] .* (1. - τ))
-            status = 2
-            break
-        end
-        # equivalent to uu - u < (uu - ū) * (1 - τ)
-        if any(u[t][iu] - bk.upper[iu] .* τ .> ū[t][iu] .* (1. - τ))
-            status = 2
-            break
-        end
+        bt = bounds[t]
+        il = bt.indices_lower
+        iu = bt.indices_upper
 
-        if any(vl[t][il] .< vl̄[t][il] .* (1. - τ))
-            status = 2
-            break
-        end
-        if any(vu[t][iu] .< vū[t][iu] .* (1. - τ))
+        if any(((u[t] - bt.lower) .< (ū[t] - bt.lower)  .* (1. - τ))[il]) ||
+                any(((bt.upper - u[t]) .< (bt.upper - ū[t]) .* (1. - τ))[iu]) ||
+                any((vl[t] .< vl̄[t] .* (1. - τ))[il]) ||
+                any((vu[t] .< vū[t] .* (1. - τ))[iu])
             status = 2
             break
         end
@@ -119,7 +107,7 @@ function estimate_min_step_size(Δφ_L::T, data::SolverData{T}, options::Options
         min_step_size = γ_θ
     end
     min_step_size *= γ_α
-    min_step_size = max(min_step_size, eps(Float64))
+    min_step_size = max(min_step_size, eps(T))
     return min_step_size
 end
 

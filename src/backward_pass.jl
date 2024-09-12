@@ -43,6 +43,11 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
     Vxx = policy.value.hessian
     # Bound constraints
     bounds = problem.bounds
+
+    bl1 = policy.bl_tmp1
+    bl2 = policy.bl_tmp2
+    bu1 = policy.bu_tmp1
+    bu2 = policy.bu_tmp2
     
     x, u, h = primal_trajectories(problem, mode=mode)
     ϕ, vl, vu = dual_trajectories(problem, mode=mode)
@@ -60,10 +65,20 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
             num_control = length(u[t])
 
             bt = bounds[t]
-            il = u[t][bt.indices_lower] - bt.lower[bt.indices_lower]
-            iu = bt.upper[bt.indices_upper] - u[t][bt.indices_upper]
-            σl = vl[t][bt.indices_lower] ./ il
-            σu = vu[t][bt.indices_upper] ./ iu
+
+            bl1[t] .= u[t][bt.indices_lower]
+            bl1[t] .-= bt.lower[bt.indices_lower]
+            bl1[t] .= inv.(bl1[t])
+            bl2[t] .= bl1[t]  # σ_L
+            bl2[t] .*= vl[t][bt.indices_lower]  
+            bl1[t] .*= μ  # μ / (u - ul)
+
+            bu1[t] .= bt.upper[bt.indices_upper]
+            bu1[t] .-= u[t][bt.indices_upper]
+            bu1[t] .= inv.(bu1[t])
+            bu2[t] .= bu1[t]  # σ_U
+            bu2[t] .*= vu[t][bt.indices_upper]  
+            bu1[t] .*= μ  # μ / (uu - u)
 
             # Qx = lx + fx' * Vx
             Qx[t] .= lx[t]
@@ -72,8 +87,8 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
             # Qu = lu + fu' * Vx + μ log(u - ul) + μ log(uu - u)
             Qu[t] .= lu[t]
             mul!(Qu[t], transpose(fu[t]), Vx[t+1], 1.0, 1.0)
-            Qu[t][bt.indices_lower] .-= μ ./ il
-            Qu[t][bt.indices_upper] .+= μ ./ iu
+            Qu[t][bt.indices_lower] .-= bl1[t]
+            Qu[t][bt.indices_upper] .+= bu1[t]
             
             # Qxx = lxx + fx' * Vxx * fx
             mul!(policy.xx_tmp[t], transpose(fx[t]), Vxx[t+1])
@@ -84,8 +99,8 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
             mul!(policy.ux_tmp[t], transpose(fu[t]), Vxx[t+1])
             mul!(Quu[t], policy.ux_tmp[t], fu[t])
             Quu[t] .+= luu[t]
-            Quu[t][diagind(Quu[t])[bt.indices_lower]] .+= σl
-            Quu[t][diagind(Quu[t])[bt.indices_upper]] .+= σu
+            Quu[t][diagind(Quu[t])[bt.indices_lower]] .+= bl2[t]
+            Quu[t][diagind(Quu[t])[bt.indices_upper]] .+= bu2[t]
     
             # Qux = lux + fu' * Vxx * fx
             mul!(policy.ux_tmp[t], transpose(fu[t]), Vxx[t+1])
@@ -130,34 +145,30 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
             ldiv!(bk, policy.gains_data.gains[t])
 
             # update gains for ineq. dual variables 
-            χlt = @view χl[t][bt.indices_lower]
-            χlt .= @view α[t][bt.indices_lower]
-            χlt .*= σl
+            χlt = @views χl[t][bt.indices_lower]
+            χlt .= α[t][bt.indices_lower]
+            χlt .*= bl2[t]
             χlt .*= -1.0
-            χlt .-= @view vl[t][bt.indices_lower]
-            il .= inv.(il)
-            il .*= μ
-            χlt .+= il
+            χlt .-= vl[t][bt.indices_lower]
+            χlt .+= bl1[t]
 
-            χut = @view χu[t][bt.indices_upper]
-            χut .= @view α[t][bt.indices_upper]
-            χut .*= σu
-            χut .-= @view vu[t][bt.indices_upper]
-            iu .= inv.(iu)
-            iu .*= μ
-            χut .+= iu
+            χut = @views χu[t][bt.indices_upper]
+            χut .= α[t][bt.indices_upper]
+            χut .*= bu2[t]
+            χut .-= vu[t][bt.indices_upper]
+            χut .+= bu1[t]
 
-            ζlt = @view ζl[t][bt.indices_lower, :]
-            ζlt .= @view β[t][bt.indices_lower, :]
-            ζlt .*= σl
+            ζlt = @views ζl[t][bt.indices_lower, :]
+            ζlt .= β[t][bt.indices_lower, :]
+            ζlt .*= bl2[t]
             ζlt .*= -1.0
 
-            ζut = @view ζu[t][bt.indices_upper, :]
-            ζut .= @view β[t][bt.indices_upper, :]
-            ζut .*= σu
+            ζut = @views ζu[t][bt.indices_upper, :]
+            ζut .= β[t][bt.indices_upper, :]
+            ζut .*= bu2[t]
 
             # Update return function approx. for next timestep 
-            # Vxx = Q̂xx + Q̂ux' * Ku + Ku * Q̂ux' + Ku' Q̂uu' * Ku
+            # Vxx = Q̂xx + Q̂ux' * β + β * Q̂ux' + β' Q̂uu' * β
             mul!(policy.ux_tmp[t], Quu[t], β[t])
             mul!(Vxx[t], transpose(β[t]), Qux[t])
 
@@ -166,7 +177,7 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
             mul!(Vxx[t], transpose(β[t]), policy.ux_tmp[t], 1.0, 1.0)
             Vxx[t] .= Symmetric(Vxx[t])
 
-            # Vx = Q̂x + Ku' * Q̂u + [Q̂uu Ku + Q̂ux]^T ku
+            # Vx = Q̂x + β' * Q̂u + [Q̂uu β + Q̂ux]^T α
             policy.ux_tmp[t] .+= Qux[t]
             mul!(Vx[t], transpose(policy.ux_tmp[t]), α[t])
             mul!(Vx[t], transpose(β[t]), Qu[t], 1.0, 1.0)

@@ -12,7 +12,7 @@ function Solver(T, dynamics::Vector{Dynamics}, costs::Costs, constraints::Constr
             bounds::Union{Bounds, Nothing}=nothing; options::Union{Options, Nothing}=nothing)
 
     # allocate policy data  
-    policy = policy_data(T, dynamics, constraints)
+    policy = policy_data(T, dynamics, constraints, bounds)
 
     # allocate model data
     problem = problem_data(T, dynamics, costs, constraints, bounds)
@@ -69,8 +69,8 @@ function initialize_trajectory!(solver::Solver{T}, controls::Vector{Vector{T}}, 
         bku = bounds[t].upper[bk.indices_upper]
 
         ū[t] .= uk
-        ū[t][bk.indices_lower] .= max.(uk[bk.indices_lower], bkl + options.κ_1 .* max.(1., bkl))
-        ū[t][bk.indices_upper] .= min.(uk[bk.indices_upper], bku - options.κ_1 .* max.(1., bku))
+        ū[t][bk.indices_lower] .= @views max.(uk[bk.indices_lower], bkl + options.κ_1 .* max.(1., bkl))
+        ū[t][bk.indices_upper] .= @views min.(uk[bk.indices_upper], bku - options.κ_1 .* max.(1., bku))
 
         dynamics!(dynamics[t], x̄[t+1], x̄[t], ū[t])
     end

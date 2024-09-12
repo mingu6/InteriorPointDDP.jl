@@ -1,7 +1,3 @@
-# function solve!(solver::Solver{T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O}, args...; kwargs...) where {T,N,M,NN,MM,MN,NNN,MNN,X,U,D,O<:Costs{T}}
-#     ipddp_solve!(solver, args...; kwargs...)
-# end
-
 function solve!(solver::Solver{T}, args...; kwargs...) where T
     solve!(solver, args...; kwargs...)
 end
@@ -32,7 +28,7 @@ function solve!(solver::Solver{T}) where T
     
     # update performance measures for first iterate (req. for sufficient decrease conditions for step acceptance)
     data.primal_1_curr = constraint_violation_1norm(problem, mode=:nominal)
-    data.barrier_obj_curr = barrier_objective!(problem, data, mode=:nominal)
+    data.barrier_obj_curr = barrier_objective!(problem, data, policy, mode=:nominal)
     
     # filter initialization for constraint violation and threshold for switching rule init. (step acceptance)
     data.max_primal_1 = 1e4 * max(1.0, data.primal_1_curr)
@@ -60,7 +56,7 @@ function solve!(solver::Solver{T}) where T
                 reset_filter!(data)
                 # performance of current iterate updated to account for barrier parameter change
                 constraint!(problem, data.μ; mode=:nominal)
-                data.barrier_obj_curr = barrier_objective!(problem, data, mode=:nominal)
+                data.barrier_obj_curr = barrier_objective!(problem, data, policy, mode=:nominal)
                 data.primal_1_curr = constraint_violation_1norm(problem, mode=:nominal)
                 data.j += 1
                 continue
@@ -72,7 +68,7 @@ function solve!(solver::Solver{T}) where T
             forward_pass!(policy, problem, data, options, verbose=options.verbose)
             data.status != 0 && break
             
-            rescale_duals!(problem, data.μ, options)
+            rescale_duals!(problem, policy, data.μ, options)
             update_nominal_trajectory!(problem)
             (!data.armijo_passed && !data.switching) && update_filter!(data, options)
             data.barrier_obj_curr = data.barrier_obj_next
@@ -120,12 +116,15 @@ function optimality_error(policy::PolicyData{T}, problem::ProblemData{T},
     Qu = policy.hamiltonian.gradient_control
     hu = problem.constraints_data.jacobian_control
 
+    bl1 = policy.bl_tmp1
+    bu1 = policy.bu_tmp1
+
     num_ineq = 0
     num_constr = problem.constraints_data.num_constraints[1]
     
     for t = N-1:-1:1
-        bk = bounds[t]
-        num_ineq += bk.num_lower + bk.num_upper
+        bt = bounds[t]
+        num_ineq += bt.num_lower + bt.num_upper
 
         # dual infeasibility (stationarity)
 
@@ -140,16 +139,18 @@ function optimality_error(policy::PolicyData{T}, problem::ProblemData{T},
 
         # complementary slackness
 
-        (bk.num_upper == 0 && bk.num_lower == 0) && continue
-        vlk = vl[t][bk.indices_lower]
-        vuk = vu[t][bk.indices_upper]
-        # TODO: slow, copies
-        cs_inf = max(cs_inf, norm((u[t][bk.indices_lower] - bk.lower[bk.indices_lower])
-                    .* vlk, Inf))
-        cs_inf = max(cs_inf, norm((bk.upper[bk.indices_upper] - u[t][bk.indices_upper])
-                    .* vuk, Inf))
-        v_norm += sum(vlk)
-        v_norm += sum(vuk)
+        (bt.num_upper == 0 && bt.num_lower == 0) && continue
+        bl1[t] .= u[t][bt.indices_lower]
+        bl1[t] .-= bt.lower[bt.indices_lower]
+        bl1[t] .*= vl[t][bt.indices_lower]
+        cs_inf = max(cs_inf, norm(bl1[t], Inf))
+        v_norm += sum(vl[t][bt.indices_lower])
+
+        bu1[t] .= u[t][bt.indices_upper]
+        bu1[t] .-= bt.upper[bt.indices_upper]
+        bu1[t] .*= vu[t][bt.indices_upper]
+        cs_inf = max(cs_inf, norm(bu1[t], Inf))
+        v_norm += sum(vu[t][bt.indices_upper])
     end
     cs_inf -= μ
     
@@ -158,22 +159,26 @@ function optimality_error(policy::PolicyData{T}, problem::ProblemData{T},
     return dual_inf / scaling_dual, primal_inf, cs_inf / scaling_cs
 end
 
-function rescale_duals!(problem::ProblemData{T}, μ::T, options::Options{T}; mode=:nominal) where T
+function rescale_duals!(problem::ProblemData{T}, policy::PolicyData{T}, μ::T, options::Options{T}; mode=:nominal) where T
     N = problem.horizon
     κ_Σ = options.κ_Σ
     u = mode == :nominal ? problem.nominal_controls : problem.num_controls
     bounds = problem.bounds
     _, vl, vu = dual_trajectories(problem, mode=mode)
+
+    bl1 = policy.bl_tmp1
+    bu1 = policy.bu_tmp1
+
     for t = 1:N-1
-        bk = bounds[t]
+        bt = bounds[t]
 
-        vlk = vl[t][bk.indices_lower]
-        ilk = u[t][bk.indices_lower] - bk.lower[bk.indices_lower]
-        vlk .= max.(min.(vlk, κ_Σ * μ ./ ilk), μ ./ (κ_Σ *  ilk))
+        bl1[t] .= u[t][bt.indices_lower]
+        bl1[t] .-= bt.lower[bt.indices_lower]
+        vl[t][bt.indices_lower] .= max.(min.(vl[t][bt.indices_lower], (κ_Σ * μ) ./ bl1[t]), (μ / κ_Σ) .*  bl1[t])
 
-        vuk = vu[t][bk.indices_upper]
-        iuk = bk.upper[bk.indices_upper] - u[t][bk.indices_upper]
-        vuk .= max.(min.(vuk, κ_Σ * μ ./ iuk), μ ./ (κ_Σ *  iuk))
+        bu1[t] .= bt.upper[bt.indices_upper]
+        bu1[t] .-= u[t][bt.indices_upper]
+        vu[t][bt.indices_upper] .= max.(min.(vu[t][bt.indices_upper], (κ_Σ * μ) ./ bu1[t]), (μ ./ κ_Σ) .*  bu1[t])
     end
 end
 
