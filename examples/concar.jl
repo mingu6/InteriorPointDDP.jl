@@ -7,9 +7,9 @@ T = Float64
 N = 101
 h = 0.05
 r_car = 0.02
-x0 = T[0.0; 0.0; 0.0] 
+x1 = T[0.0; 0.0; 0.0] 
 xN = T[1.0; 1.0; π / 2]
-options = Options{T}(quasi_newton=false, verbose=true, max_iterations=1000)
+options = Options{T}(quasi_newton=false, verbose=true)
 
 Random.seed!(0)
 
@@ -125,4 +125,4 @@ savefig("examples/plots/concar.png")
 # ## benchmark allocations + timing
 using BenchmarkTools
 solver.options.verbose = false
-@benchmark solve!(solver, x1, ū)
+@benchmark solve!($solver, $x1, $ū)

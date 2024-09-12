@@ -17,7 +17,7 @@ Random.seed!(5)
 include("../../examples/visualise/concar.jl")
 
 model = Model(
-    optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_method" => "none")
+    optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_method" => "none", "tol" => 1e-7)
     );
 
 @variable(model, x[1:N, 1:nx]);

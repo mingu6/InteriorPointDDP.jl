@@ -1,19 +1,19 @@
 mutable struct ProblemData{T}
     # current trajectory
-    states#::Vector{VT}
-    controls#::Vector{VT}
-    constraints#::Vector{H} 
-    eq_duals#::Vector{H}
-    ineq_duals_lo#::Vector{U}
-    ineq_duals_up#::Vector{U}
+    states::Vector{Vector{T}}
+    controls::Vector{Vector{T}}
+    constraints::Vector{Vector{T}}
+    eq_duals::Vector{Vector{T}}
+    ineq_duals_lo::Vector{Vector{T}}
+    ineq_duals_up::Vector{Vector{T}}
 
     # nominal trajectory
-    nominal_states#::Vector{X}
-    nominal_controls#::Vector{U}
-    nominal_constraints#::Vector{H}
-    nominal_eq_duals#::Vector{H}
-    nominal_ineq_duals_lo#::Vector{U}
-    nominal_ineq_duals_up#::Vector{U}
+    nominal_states::Vector{Vector{T}}
+    nominal_controls::Vector{Vector{T}}
+    nominal_constraints::Vector{Vector{T}}
+    nominal_eq_duals::Vector{Vector{T}}
+    nominal_ineq_duals_lo::Vector{Vector{T}}
+    nominal_ineq_duals_up::Vector{Vector{T}}
 
     # model data
     model::ModelData{T}

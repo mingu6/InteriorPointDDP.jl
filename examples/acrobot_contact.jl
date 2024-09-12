@@ -102,10 +102,6 @@ v2 = (x_mat[:, 4] - x_mat[:, 2]) ./ h
 u_mat = [map(x -> x[1], u_sol); 0.0]
 λ1 = [map(x -> x[end-1], u_sol); 0.0]
 λ2 = [map(x -> x[end], u_sol); 0.0]
-# plot(range(0, (N-1) * h, length=N), [q1 q2 v1 v2 u_mat λ1 λ2], label=["q1" "q2" "v1" "v2" "u" "λ1" "λ2"])
-# plot(range(0, (N-1) * h, length=N), [v1 v2 λ1 λ2], label=["v1" "v2" "λ1" "λ2"])
-# plot(range(0, (N-1) * h, length=N), [λ1 λ2], label=["λ1" "λ2"])
-# plot(range(0, (N-1) * h, length=N), [q1 q2], label=["q1" "q2"])
 plot(range(0, (N-1) * h, length=N), [q2 λ1 λ2 v2], label=["q2" "λ1" "λ2" "v2"])
 savefig("examples/plots/acrobot_impact.png")
 
@@ -118,4 +114,4 @@ end
 
 using BenchmarkTools
 solver.options.verbose = false
-@benchmark solve!(solver, x1, ū)
+@benchmark solve!($solver, $x1, $ū)

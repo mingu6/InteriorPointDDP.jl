@@ -28,7 +28,6 @@ include("backward_pass.jl")
 include("forward_pass.jl")
 include("print.jl")
 include("solve.jl")
-include("soc.jl")
 
 # costs
 export Cost

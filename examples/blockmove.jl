@@ -8,7 +8,7 @@ h = 0.01
 N = 101
 xN = T[1.0; 0.0]
 x1 = T[0.0; 0.0]
-options = Options{T}(quasi_newton=false, verbose=true)
+options = Options{T}(quasi_newton=false, verbose=true, optimality_tolerance=1e-6)
 
 Random.seed!(0)
 
@@ -66,4 +66,4 @@ println("Total absolute work: ", sum(work))
 
 using BenchmarkTools
 solver.options.verbose = false
-@benchmark solve!(solver, x1, ū)
+@benchmark solve!($solver, $x1, $ū)
