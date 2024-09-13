@@ -100,8 +100,6 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
             mul!(policy.ux_tmp[t], transpose(fu[t]), Vxx[t+1])
             mul!(Quu[t], policy.ux_tmp[t], fu[t])
             Quu[t] .+= luu[t]
-            # Quu[t][diagind(Quu[t])[bt.indices_lower]] .+= bl2[t]
-            # Quu[t][diagind(Quu[t])[bt.indices_upper]] .+= bu2[t]
             for (i1, i) in enumerate(bt.indices_lower)
                 Quu[t][i, i] += bl2[t][i1]
             end

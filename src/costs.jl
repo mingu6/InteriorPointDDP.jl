@@ -18,13 +18,14 @@ function Cost(f::Function, num_state::Int, num_control::Int)
     hessian_control_control = Symbolics.jacobian(gradient_control, u)
     hessian_control_state = Symbolics.jacobian(gradient_control, x)
 
+    evaluate_func = eval(Symbolics.build_function([evaluate], x, u)[2])
     gradient_state_func = eval(Symbolics.build_function(gradient_state, x, u)[2])
     gradient_control_func = eval(Symbolics.build_function(gradient_control, x, u)[2])
     hessian_state_state_func = eval(Symbolics.build_function(hessian_state_state, x, u)[2])
     hessian_control_control_func = eval(Symbolics.build_function(hessian_control_control, x, u)[2])
     hessian_control_state_func = eval(Symbolics.build_function(hessian_control_state, x, u)[2])
 
-    return Cost(f, gradient_state_func, gradient_control_func,
+    return Cost(evaluate_func, gradient_state_func, gradient_control_func,
         hessian_state_state_func, hessian_control_control_func, hessian_control_state_func)
 end
 
@@ -32,11 +33,14 @@ Costs = Vector{Cost}
 
 function cost(costs::Costs, states::Vector{Vector{T}}, controls::Vector{Vector{T}}) where T
     N = length(states)
-    J = 0.0
+    J = T(0.0)
+    Jp = [T(0.0)]
     for t in 1:N-1
-        J += costs[t].evaluate(states[t], controls[t])
+        costs[t].evaluate(Jp, states[t], controls[t])
+        J += Jp[1]
     end
-    J += costs[N].evaluate(states[N], T[])
+    costs[N].evaluate(Jp, states[N], T[])
+    J += Jp[1]
     return J
 end
 
