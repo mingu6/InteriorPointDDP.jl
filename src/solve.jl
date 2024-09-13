@@ -111,7 +111,7 @@ function optimality_error(policy::PolicyData{T}, problem::ProblemData{T},
     bounds = problem.bounds
     h = mode == :nominal ? problem.nominal_constraints : problem.constraints
     u = mode == :nominal ? problem.nominal_controls : problem.controls
-    ϕ, vl, vu = dual_trajectories(problem, mode=mode)
+    ϕ, zl, zu = dual_trajectories(problem, mode=mode)
     
     Qu = policy.hamiltonian.gradient_control
     hu = problem.constraints_data.jacobian_control
@@ -142,15 +142,15 @@ function optimality_error(policy::PolicyData{T}, problem::ProblemData{T},
         (bt.num_upper == 0 && bt.num_lower == 0) && continue
         bl1[t] .= @views u[t][bt.indices_lower]
         bl1[t] .-= @views bt.lower[bt.indices_lower]
-        bl1[t] .*= @views vl[t][bt.indices_lower]
+        bl1[t] .*= @views zl[t][bt.indices_lower]
         cs_inf = max(cs_inf, norm(bl1[t], Inf))
-        v_norm += @views sum(vl[t][bt.indices_lower])
+        v_norm += @views sum(zl[t][bt.indices_lower])
 
         bu1[t] .= @views u[t][bt.indices_upper]
         bu1[t] .-= @views bt.upper[bt.indices_upper]
-        bu1[t] .*= @views vu[t][bt.indices_upper]
+        bu1[t] .*= @views zu[t][bt.indices_upper]
         cs_inf = max(cs_inf, norm(bu1[t], Inf))
-        v_norm += @views sum(vu[t][bt.indices_upper])
+        v_norm += @views sum(zu[t][bt.indices_upper])
     end
     cs_inf -= μ
     
@@ -164,22 +164,35 @@ function rescale_duals!(problem::ProblemData{T}, policy::PolicyData{T}, μ::T, o
     κ_Σ = options.κ_Σ
     u = mode == :nominal ? problem.nominal_controls : problem.num_controls
     bounds = problem.bounds
-    _, vl, vu = dual_trajectories(problem, mode=mode)
+    _, zl, zu = dual_trajectories(problem, mode=mode)
 
     bl1 = policy.bl_tmp1
     bu1 = policy.bu_tmp1
+    bl2 = policy.bl_tmp2
+    bu2 = policy.bu_tmp2
 
     for t = 1:N-1
         bt = bounds[t]
-
+    
+        # z <- max.(min.(z, κ_Σ * μ ./ (u - ul)), μ ./ (κ_Σ .* (u - ul)))
+        
         bl1[t] .= @views u[t][bt.indices_lower]
         bl1[t] .-= @views bt.lower[bt.indices_lower]
-        # TODO: allocs
-        vl[t][bt.indices_lower] .= max.(min.(vl[t][bt.indices_lower], (κ_Σ * μ) ./ bl1[t]), (μ / κ_Σ) .*  bl1[t])
-
-        bu1[t] .= bt.upper[bt.indices_upper]
-        bu1[t] .-= u[t][bt.indices_upper]
-        vu[t][bt.indices_upper] .= max.(min.(vu[t][bt.indices_upper], (κ_Σ * μ) ./ bu1[t]), (μ ./ κ_Σ) .*  bu1[t])
+        bl2[t] .= inv.(bl1[t])
+        bl2[t] .*= κ_Σ * μ
+        zl[t][bt.indices_lower] .= @views min.(zl[t][bt.indices_lower], bl2[t])
+        bl1[t] .*= μ / κ_Σ
+        zl[t][bt.indices_lower] .= @views max.(zl[t][bt.indices_lower], bl1[t])
+        
+        # z <- max.(min.(z, κ_Σ * μ ./ (uu - u)), μ ./ (κ_Σ .* (u u- u)))
+        
+        bu1[t] .= @views bt.upper[bt.indices_upper]
+        bu1[t] .-= @views u[t][bt.indices_upper]
+        bu2[t] .= inv.(bu1[t])
+        bu2[t] .*= κ_Σ * μ
+        zu[t][bt.indices_upper] .= @views min.(zu[t][bt.indices_upper], bu2[t])
+        bu1[t] .*= μ / κ_Σ
+        zu[t][bt.indices_upper] .= @views max.(zu[t][bt.indices_upper], bu1[t])
     end
 end
 
