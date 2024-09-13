@@ -26,7 +26,7 @@ function forward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::Sol
         end
         constraint!(problem, data.μ; mode=:current)
         
-        data.status = check_fraction_boundary(problem, τ)
+        data.status = check_fraction_boundary(problem, policy, τ)
         data.status != 0 && (data.step_size *= 0.5, continue)
 
         Δφ_L, Δφ_Q = expected_decrease_cost(policy, problem, α)
@@ -60,7 +60,7 @@ function forward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::Sol
     data.status != 0 && (verbose && (@warn "Line search failed to find a suitable iterate"))
 end
 
-function check_fraction_boundary(problem::ProblemData{T}, τ::T) where T
+function check_fraction_boundary(problem::ProblemData{T}, policy::PolicyData{T}, τ::T) where T
     N = problem.horizon
 
     u = problem.controls
@@ -77,12 +77,40 @@ function check_fraction_boundary(problem::ProblemData{T}, τ::T) where T
         bt = bounds[t]
         il = bt.indices_lower
         iu = bt.indices_upper
+        tmp = policy.u_tmp[t]
         
-        # TODO: allocs
-        if any(((u[t] - bt.lower) .< (ū[t] - bt.lower)  .* (1. - τ))[il]) ||
-                any(((bt.upper - u[t]) .< (bt.upper - ū[t]) .* (1. - τ))[iu]) ||
-                any((vl[t] .< vl̄[t] .* (1. - τ))[il]) ||
-                any((vu[t] .< vū[t] .* (1. - τ))[iu])
+        tmp .= ū[t]
+        tmp .-= bt.lower
+        tmp .*= (1. - τ)
+        tmp .-= u[t]
+        tmp .+= bt.lower
+        if any(c > 0.0 for c in @view(tmp[il]))
+            status = 2
+            break
+        end
+        
+        tmp .= bt.upper
+        tmp .-= ū[t]
+        tmp .*= (1. - τ)
+        tmp .+= u[t]
+        tmp .-= bt.upper
+        if any(c > 0.0 for c in @view(tmp[iu]))
+            status = 2
+            break
+        end
+        
+        tmp .= vl̄[t]
+        tmp .*= (1. - τ)
+        tmp .-= vl[t]
+        if any(c > 0.0 for c in @view(tmp[il]))
+            status = 2
+            break
+        end
+        
+        tmp .= vū[t]
+        tmp .*= (1. - τ)
+        tmp .-= vu[t]
+        if any(c > 0.0 for c in @view(tmp[iu]))
             status = 2
             break
         end
