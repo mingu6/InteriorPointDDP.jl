@@ -65,10 +65,10 @@ function check_fraction_boundary(problem::ProblemData{T}, policy::PolicyData{T},
 
     u = problem.controls
     ū = problem.nominal_controls
-    vl = problem.ineq_duals_lo
-    vu = problem.ineq_duals_up
-    vl̄ = problem.nominal_ineq_duals_lo
-    vū = problem.nominal_ineq_duals_up
+    zl = problem.ineq_duals_lo
+    zu = problem.ineq_duals_up
+    zl̄ = problem.nominal_ineq_duals_lo
+    zū = problem.nominal_ineq_duals_up
 
     bounds = problem.bounds
 
@@ -99,17 +99,17 @@ function check_fraction_boundary(problem::ProblemData{T}, policy::PolicyData{T},
             break
         end
         
-        tmp .= vl̄[t]
+        tmp .= zl̄[t]
         tmp .*= (1. - τ)
-        tmp .-= vl[t]
+        tmp .-= zl[t]
         if any(c > 0.0 for c in @view(tmp[il]))
             status = 2
             break
         end
         
-        tmp .= vū[t]
+        tmp .= zū[t]
         tmp .*= (1. - τ)
-        tmp .-= vu[t]
+        tmp .-= zu[t]
         if any(c > 0.0 for c in @view(tmp[iu]))
             status = 2
             break
@@ -159,9 +159,9 @@ function rollout!(policy::PolicyData{T}, problem::ProblemData{T}; step_size::T=1
     dynamics = problem.model.dynamics
     
     x, u, _ = primal_trajectories(problem, mode=:current)
-    ϕ, vl, vu = dual_trajectories(problem, mode=:current)
+    ϕ, zl, zu = dual_trajectories(problem, mode=:current)
     x̄, ū, _ = primal_trajectories(problem, mode=:nominal)
-    ϕ̄, vl̄, vū = dual_trajectories(problem, mode=:nominal)
+    ϕ̄, zl̄, zū = dual_trajectories(problem, mode=:nominal)
     
     x[1] .= x̄[1]
 
@@ -185,17 +185,17 @@ function rollout!(policy::PolicyData{T}, problem::ProblemData{T}; step_size::T=1
         mul!(ϕ[t], ω[t], x[t], 1.0, 1.0)
         mul!(ϕ[t], ω[t], x̄[t], -1.0, 1.0)
 
-        vl[t] .= χl[t]
-        vl[t] .*= step_size
-        vl[t] .+= vl̄[t]
-        mul!(vl[t], ζl[t], x[t], 1.0, 1.0)
-        mul!(vl[t], ζl[t], x̄[t], -1.0, 1.0)
+        zl[t] .= χl[t]
+        zl[t] .*= step_size
+        zl[t] .+= zl̄[t]
+        mul!(zl[t], ζl[t], x[t], 1.0, 1.0)
+        mul!(zl[t], ζl[t], x̄[t], -1.0, 1.0)
 
-        vu[t] .= χu[t]
-        vu[t] .*= step_size
-        vu[t] .+= vū[t]
-        mul!(vu[t], ζu[t], x[t], 1.0, 1.0)
-        mul!(vu[t], ζu[t], x̄[t], -1.0, 1.0)
+        zu[t] .= χu[t]
+        zu[t] .*= step_size
+        zu[t] .+= zū[t]
+        mul!(zu[t], ζu[t], x[t], 1.0, 1.0)
+        mul!(zu[t], ζu[t], x̄[t], -1.0, 1.0)
         
         dynamics!(d, x[t+1], x[t], u[t])
     end

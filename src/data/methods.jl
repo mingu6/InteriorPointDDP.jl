@@ -92,7 +92,7 @@ end
 
 function dual_trajectories(problem::ProblemData; mode=:nominal)
     ϕ = mode == :nominal ? problem.nominal_eq_duals : problem.eq_duals
-    vl = mode == :nominal ? problem.nominal_ineq_duals_lo : problem.ineq_duals_lo
-    vu = mode == :nominal ? problem.nominal_ineq_duals_up : problem.ineq_duals_up
-    return ϕ, vl, vu
+    zl = mode == :nominal ? problem.nominal_ineq_duals_lo : problem.ineq_duals_lo
+    zu = mode == :nominal ? problem.nominal_ineq_duals_up : problem.ineq_duals_up
+    return ϕ, zl, zu
 end

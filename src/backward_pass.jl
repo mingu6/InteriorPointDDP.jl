@@ -50,7 +50,7 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
     bu2 = policy.bu_tmp2
     
     x, u, h = primal_trajectories(problem, mode=mode)
-    ϕ, vl, vu = dual_trajectories(problem, mode=mode)
+    ϕ, zl, zu = dual_trajectories(problem, mode=mode)
 
     μ = data.μ
     δ_c = 0.
@@ -71,14 +71,14 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
             bl1[t] .-= @views bt.lower[bt.indices_lower]
             bl1[t] .= inv.(bl1[t])
             bl2[t] .= bl1[t]  # σ_L
-            bl2[t] .*= @views vl[t][bt.indices_lower]  
+            bl2[t] .*= @views zl[t][bt.indices_lower]
             bl1[t] .*= μ  # μ / (u - ul)
 
             bu1[t] .= @views bt.upper[bt.indices_upper]
             bu1[t] .-= @views u[t][bt.indices_upper]
             bu1[t] .= inv.(bu1[t])
             bu2[t] .= bu1[t]  # σ_U
-            bu2[t] .*= @views vu[t][bt.indices_upper]  
+            bu2[t] .*= @views zu[t][bt.indices_upper]
             bu1[t] .*= μ  # μ / (uu - u)
 
             # Qx = lx + fx' * Vx
@@ -168,13 +168,13 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
             χlt .= @views α[t][bt.indices_lower]
             χlt .*= bl2[t]
             χlt .*= -1.0
-            χlt .-= @views vl[t][bt.indices_lower]
+            χlt .-= @views zl[t][bt.indices_lower]
             χlt .+= bl1[t]
 
             χut = @views χu[t][bt.indices_upper]
             χut .= @views α[t][bt.indices_upper]
             χut .*= bu2[t]
-            χut .-= @views vu[t][bt.indices_upper]
+            χut .-= @views zu[t][bt.indices_upper]
             χut .+= bu1[t]
 
             ζlt = @views ζl[t][bt.indices_lower, :]
