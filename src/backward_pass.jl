@@ -88,8 +88,8 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
             # Qu = lu + fu' * Vx + μ log(u - ul) + μ log(uu - u)
             Qu[t] .= lu[t]
             mul!(Qu[t], transpose(fu[t]), Vx[t+1], 1.0, 1.0)
-            Qu[t][bt.indices_lower] .-= bl1[t]
-            Qu[t][bt.indices_upper] .+= bu1[t]
+            @views Qu[t][bt.indices_lower] .-= bl1[t]
+            @views Qu[t][bt.indices_upper] .+= bu1[t]
             
             # Qxx = lxx + fx' * Vxx * fx
             mul!(policy.xx_tmp[t], transpose(fx[t]), Vxx[t+1])
@@ -160,6 +160,10 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
             ldiv!(bk, policy.gains_data.gains[t])
 
             # update gains for ineq. dual variables 
+            # χ_L =  μ inv.(u) - z - σ_L .* α 
+            # ζ_L =  - σ_L .* β 
+            # χ_U =  μ inv.(u) - z - σ_U .* α 
+            # ζ_U =  σ_U .* β 
             χlt = @views χl[t][bt.indices_lower]
             χlt .= @views α[t][bt.indices_lower]
             χlt .*= bl2[t]
