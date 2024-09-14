@@ -57,10 +57,11 @@ end
 function cost_hessian!(hessian_state_state::Vector{Matrix{T}}, hessian_control_control::Vector{Matrix{T}},
             hessian_control_state::Vector{Matrix{T}}, costs::Costs, states::Vector{Vector{T}}, controls::Vector{Vector{T}}) where T
     N = length(costs)
+    tmp = T[]
     for t in 1:N-1
         costs[t].hessian_state_state(hessian_state_state[t], states[t], controls[t])
-        costs[t].hessian_control_control(hessian_control_control[t], states[t], T[])
-        costs[t].hessian_control_state(hessian_control_state[t], states[t], T[])
+        costs[t].hessian_control_control(hessian_control_control[t], states[t], tmp)
+        costs[t].hessian_control_state(hessian_control_state[t], states[t], tmp)
     end
-    costs[N].hessian_state_state(hessian_state_state[N], states[N], T[])
+    costs[N].hessian_state_state(hessian_state_state[N], states[N], tmp)
 end

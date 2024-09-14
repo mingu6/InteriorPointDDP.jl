@@ -77,7 +77,7 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
             bu1[t] .= @views bt.upper[bt.indices_upper]
             bu1[t] .-= @views u[t][bt.indices_upper]
             bu1[t] .= inv.(bu1[t])
-            bu2[t] .= bu1[t]  # σ_U
+            bu2[t] .= bu1[t]  # σ_Uq
             bu2[t] .*= @views zu[t][bt.indices_upper]
             bu1[t] .*= μ  # μ / (uu - u)
 
@@ -161,28 +161,41 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
             # χ_L =  μ inv.(u) - z - σ_L .* α 
             # ζ_L =  - σ_L .* β 
             # χ_U =  μ inv.(u) - z - σ_U .* α 
-            # ζ_U =  σ_U .* β 
-            χlt = @views χl[t][bt.indices_lower]
-            χlt .= @views α[t][bt.indices_lower]
-            χlt .*= bl2[t]
-            χlt .*= -1.0
-            χlt .-= @views zl[t][bt.indices_lower]
-            χlt .+= bl1[t]
-
-            χut = @views χu[t][bt.indices_upper]
-            χut .= @views α[t][bt.indices_upper]
-            χut .*= bu2[t]
-            χut .-= @views zu[t][bt.indices_upper]
-            χut .+= bu1[t]
-
-            ζlt = @views ζl[t][bt.indices_lower, :]
-            ζlt .= @views β[t][bt.indices_lower, :]
-            ζlt .*= bl2[t]
-            ζlt .*= -1.0
-
-            ζut = @views ζu[t][bt.indices_upper, :]
-            ζut .= @views β[t][bt.indices_upper, :]
-            ζut .*= bu2[t]
+            # ζ_U =  σ_U .* β
+                        
+            χlt, χut = χl[t], χu[t]
+            ζlt, ζut = ζl[t], ζu[t]
+            αt, βt = α[t], β[t]
+            bl1t, bl2t = bl1[t], bl2[t]
+            bu1t, bu2t = bu1[t], bu2[t]
+            zlt, zut = zl[t], zu[t]
+            for (i1, i) in enumerate(bt.indices_lower)
+                # feedforward
+                χlti = @views χlt[i, :]
+                χlti .= @views αt[i, :]
+                χlti .*= @views bl2t[i1]
+                χlti .*= -1.0
+                χlti .-= @views zlt[i]
+                χlti .+= @views bl1t[i1]
+                # feedback
+                ζlti = @views ζlt[i, :]
+                ζlti .= @views βt[i, :]
+                ζlti .*= @views bl2t[i1]
+                ζlti .*= -1.0
+            end
+            
+            for (i1, i) in enumerate(bt.indices_upper)
+                # feedforward
+                χuti = @views χut[i, :]
+                χuti .= @views αt[i, :]
+                χuti .*= @views bu2t[i1]
+                χuti .-= @views zut[i]
+                χuti .+= @views bu1t[i1]
+                # feedback
+                ζuti = @views ζut[i, :]
+                ζuti .= @views βt[i, :]
+                ζuti .*= @views bu2t[i1]
+            end
 
             # Update return function approx. for next timestep 
             # Vxx = Q̂xx + Q̂ux' * β + β * Q̂ux' + β' Q̂uu' * β

@@ -61,16 +61,19 @@ function initialize_trajectory!(solver::Solver{T}, controls::Vector{Vector{T}}, 
     ū = solver.problem.nominal_controls
     x̄ = solver.problem.nominal_states
 
-    for (t, uk) in enumerate(controls)
+    for (t, ut) in enumerate(controls)
         # project primal variables within bounds
+        bt = bounds[t]
+        ūt = ū[t]
+        ūt .= ut
 
-        bk = bounds[t]
-        bkl = bounds[t].lower[bk.indices_lower]
-        bku = bounds[t].upper[bk.indices_upper]
+        for i in bt.indices_lower
+            ūt[i] = max(ut[i], bt.lower[i] + options.κ_1 * max(1.0, bt.lower[i]))
+        end
 
-        ū[t] .= uk
-        ū[t][bk.indices_lower] .= @views max.(uk[bk.indices_lower], bkl + options.κ_1 .* max.(1., bkl))
-        ū[t][bk.indices_upper] .= @views min.(uk[bk.indices_upper], bku - options.κ_1 .* max.(1., bku))
+        for i in bt.indices_upper
+            ūt[i] = min(ut[i], bt.upper[i] - options.κ_1 * max(1.0, bt.upper[i]))
+        end
 
         dynamics!(dynamics[t], x̄[t+1], x̄[t], ū[t])
     end

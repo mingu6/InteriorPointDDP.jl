@@ -37,7 +37,7 @@ function forward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::Sol
         φ = barrier_objective!(problem, data, policy, mode=:current)
         
         # check acceptability to filter
-        data.status = !any(x -> all([θ, φ] .>= x), data.filter) ? 0 : 3
+        data.status = !any(x -> (θ >= x[1] && φ >= x[2]), data.filter) ? 0 : 3
         data.status != 0 && (data.step_size *= 0.5, data.l += 1, continue)  # failed, reduce step size
         
         # check for sufficient decrease conditions for the barrier objective/constraint violation
