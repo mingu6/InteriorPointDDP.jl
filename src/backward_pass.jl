@@ -150,8 +150,8 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
                 policy.lhs_br[t][i, i] -= δ_c
             end
 
-            bk, data.status, reg, δ_c = inertia_correction!(policy.kkt_matrix_ws[t], policy.lhs[t], num_control,
-                        μ, reg, data.reg_last, options)
+            bk, data.status, reg, δ_c = inertia_correction!(policy.kkt_matrix_ws[t], policy.lhs[t], policy.D_cache[t],
+                        num_control, μ, reg, data.reg_last, options)
 
             data.status != 0 && break
 

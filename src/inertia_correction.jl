@@ -51,7 +51,7 @@ to `0`.
     throws an error), or a positive tolerance (absolute or relative) is
     specified.
 """
-function inertia(B::BunchKaufman{TS};
+function inertia!(B::BunchKaufman{TS}, d::Vector{TS}, e::Vector{TS};
     atol::TR = TR(0),
     rtol::TR = TR(0)
     ) where TS <: ClosedScalar{TR} where TR <: ClosedReal
@@ -89,7 +89,7 @@ function inertia(B::BunchKaufman{TS};
     c = real_matrix ? TR(1) : (TR <: AbstractFloat ? 1/sqrt(TR(2)) : TR(12//17))
 
     # First pass, estimate largest singular value and group together size-1 blocks
-    D = B.D  # TODO: create cache for this
+    D = get_D!(B, d, e)
     s1 = TR(0)
     i = 1
     while i <= N; @inbounds begin
@@ -204,8 +204,58 @@ function inertia(B::BunchKaufman{TS};
     return np, nn, nz
 end
 
-function inertia_correction!(bk_ws::BunchKaufmanWs{T}, kkt_mat::Matrix{T}, num_controls::Int64, μ::T, 
-                reg::T, reg_last::T, options::Options) where T
+function get_D!(F::BunchKaufman{TS}, d::Vector{TS}, e::Vector{TS},
+            )  where TS <: ClosedScalar{TR} where TR <: ClosedReal
+    # Inputs must be 1-indexed; bounds may not be checked.
+    Base.require_one_based_indexing(F.LD, F.ipiv)
+
+    # Extract necessary variables
+    A, ipiv, rook = F.LD, F.ipiv, F.rook
+
+    # Get size of matrix
+    N = size(A)[1]
+
+    #   Quick return if possible
+    if N == 0; return nothing, e, d; end
+    
+    # d .= @views diag(A, 0)
+    for i in 1:N
+        d[i] = A[i, i]
+    end
+
+    # Main loops
+    upper = (F.uplo == 'U')
+    @inline icond_d = upper ? i -> i > 1 : i -> i < N
+    @inline icond_T = upper ? i -> i >= 1 : i -> i <= N
+    @inline inext = upper ? i -> i - 1 : i -> i + 1
+    #   Convert VALUE
+    i = upper ? N : 1
+    e[N+1-i] = 0
+    while icond_d(i); @inbounds begin
+        if ipiv[i] < 0
+            ix = inext(i)
+            e[i] = A[ix,i]
+            e[ix] = 0
+            if upper; i -= 1; else; i += 1; end
+        else
+            e[i] = 0
+        end
+        if upper; i -= 1; else; i += 1; end
+    end; end
+    
+    if getfield(F, :uplo) == 'L'
+        odl = @views e[1:N - 1]
+        md = @views d[1:N]
+        return Tridiagonal(odl, md, odl)
+    else # 'U'
+        odu = @views e[2:N]
+        md = @views d[1:N]
+        return Tridiagonal(odu, md, odu)
+    end
+end
+
+function inertia_correction!(bk_ws::BunchKaufmanWs{T}, kkt_mat::Matrix{T}, D_cache::Pair{Vector{T}},
+                num_controls::Int64, μ::T, reg::T, reg_last::T, options::Options) where T
     status = 0
     δ_c = 0.0
     Ap, ipiv, info = LAPACK.sytrf_rook!(bk_ws, 'U', kkt_mat)
@@ -213,7 +263,7 @@ function inertia_correction!(bk_ws::BunchKaufmanWs{T}, kkt_mat::Matrix{T}, num_c
     if info > 0
         δ_c = options.δ_c * μ^options.κ_c
     end
-    np, _, _ = inertia(bk; atol=T(1e-12))
+    np, _, _ = inertia!(bk, D_cache[1], D_cache[2]; atol=T(1e-12))
     if np != num_controls || info != 0
         if iszero(reg) # initial setting of regularisation
             reg = (reg_last == 0.0) ? options.reg_1 : max(options.reg_min, options.κ_w_m * reg_last)

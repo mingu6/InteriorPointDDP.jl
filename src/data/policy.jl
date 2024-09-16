@@ -76,6 +76,7 @@ struct PolicyData{T}
     lhs_br::Vector{SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}}
 
     kkt_matrix_ws::Vector{BunchKaufmanWs{T}}
+    D_cache::Vector{Pair{Vector{T}}}
 end
 
 function gains_data(T, constraints::Constraints)
@@ -135,6 +136,7 @@ function policy_data(T, dynamics::Vector{Dynamics}, constraints::Constraints, bo
     lhs_br = [@views lhs[t][c.num_control+1:end, c.num_control+1:end] for (t, c) in enumerate(constraints)]
 
     kkt_matrix_ws = [BunchKaufmanWs(L) for L in lhs]
+    D_cache = [Pair(zeros(T, c.num_constraint + c.num_control), zeros(T, c.num_constraint + c.num_control)) for c in constraints]
 
     if !isnothing(bounds)
         bl_tmp1 = [zeros(T, length(b.indices_lower)) for b in bounds]
@@ -151,5 +153,5 @@ function policy_data(T, dynamics::Vector{Dynamics}, constraints::Constraints, bo
     PolicyData{T}(gains, value, hamiltonian,
         x_tmp, u_tmp, h_tmp, uu_tmp, ux_tmp, xx_tmp, hu_tmp, hx_tmp,
         bl_tmp1, bl_tmp2, bu_tmp1, bu_tmp2,
-        lhs, lhs_tl, lhs_tr, lhs_bl, lhs_br, kkt_matrix_ws)
+        lhs, lhs_tl, lhs_tr, lhs_bl, lhs_br, kkt_matrix_ws, D_cache)
 end
