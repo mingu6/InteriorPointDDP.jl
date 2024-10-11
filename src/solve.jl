@@ -20,6 +20,8 @@ function solve!(solver::Solver{T}) where T
     reset!(data)
     reset_duals!(problem)  # TODO: initialize better, wrap up with initialization of problem data
     
+    time0 = time()
+    
     # automatically select initial perturbation. loosely based on bound of CS condition (duality) for LPs
     cost!(data, problem, mode=:nominal)
     data.μ = options.μ_init
@@ -36,47 +38,45 @@ function solve!(solver::Solver{T}) where T
     reset_filter!(data)
 
     while data.k < options.max_iterations
-        iter_time = @elapsed begin
-            evaluate_derivatives!(problem, mode=:nominal)
-            
-            backward_pass!(policy, problem, data, options, mode=:nominal, verbose=options.verbose)
-            data.status != 0 && break
-            # check (outer) overall problem convergence
+        evaluate_derivatives!(problem, mode=:nominal)
+        
+        backward_pass!(policy, problem, data, options, mode=:nominal, verbose=options.verbose)
+        data.status != 0 && break
+        # check (outer) overall problem convergence
 
-            data.dual_inf, data.primal_inf, data.cs_inf = optimality_error(policy, problem, options, T(0.0), mode=:nominal)
-            opt_err_0 = max(data.dual_inf, data.cs_inf, data.primal_inf)
-            
-            opt_err_0 <= options.optimality_tolerance && break
-            
-            # check (inner) barrier problem convergence and update barrier parameter if so
-            dual_inf_μ, primal_inf_μ, cs_inf_μ = optimality_error(policy, problem, options, data.μ, mode=:nominal)
-            opt_err_μ = max(dual_inf_μ, cs_inf_μ, primal_inf_μ)          
-            if opt_err_μ <= options.κ_ϵ * data.μ
-                data.μ = max(options.optimality_tolerance / 10.0, min(options.κ_μ * data.μ, data.μ ^ options.θ_μ))
-                reset_filter!(data)
-                # performance of current iterate updated to account for barrier parameter change
-                constraint!(problem, data.μ; mode=:nominal)
-                data.barrier_obj_curr = barrier_objective!(problem, data, policy, mode=:nominal)
-                data.primal_1_curr = constraint_violation_1norm(problem, mode=:nominal)
-                data.j += 1
-                continue
-            end
-            
-            options.verbose && iteration_status(data, options)
-            data.p = 0
-            
-            forward_pass!(policy, problem, data, options, verbose=options.verbose)
-            data.status != 0 && break
-            
-            rescale_duals!(problem, policy, data.μ, options)
-            update_nominal_trajectory!(problem)
-            (!data.armijo_passed && !data.switching) && update_filter!(data, options)
-            data.barrier_obj_curr = data.barrier_obj_next
-            data.primal_1_curr = data.primal_1_next
+        data.dual_inf, data.primal_inf, data.cs_inf = optimality_error(policy, problem, options, T(0.0), mode=:nominal)
+        opt_err_0 = max(data.dual_inf, data.cs_inf, data.primal_inf)
+        
+        opt_err_0 <= options.optimality_tolerance && break
+        
+        # check (inner) barrier problem convergence and update barrier parameter if so
+        dual_inf_μ, primal_inf_μ, cs_inf_μ = optimality_error(policy, problem, options, data.μ, mode=:nominal)
+        opt_err_μ = max(dual_inf_μ, cs_inf_μ, primal_inf_μ)          
+        if opt_err_μ <= options.κ_ϵ * data.μ
+            data.μ = max(options.optimality_tolerance / 10.0, min(options.κ_μ * data.μ, data.μ ^ options.θ_μ))
+            reset_filter!(data)
+            # performance of current iterate updated to account for barrier parameter change
+            constraint!(problem, data.μ; mode=:nominal)
+            data.barrier_obj_curr = barrier_objective!(problem, data, policy, mode=:nominal)
+            data.primal_1_curr = constraint_violation_1norm(problem, mode=:nominal)
+            data.j += 1
+            continue
         end
         
+        options.verbose && iteration_status(data, options)
+        data.p = 0
+        
+        forward_pass!(policy, problem, data, options, verbose=options.verbose)
+        data.status != 0 && break
+        
+        rescale_duals!(problem, policy, data.μ, options)
+        update_nominal_trajectory!(problem)
+        (!data.armijo_passed && !data.switching) && update_filter!(data, options)
+        data.barrier_obj_curr = data.barrier_obj_next
+        data.primal_1_curr = data.primal_1_next
+        
         data.k += 1
-        data.wall_time += iter_time
+        data.wall_time = time() - time0
     end
     
     options.verbose && iteration_status(data, options)
