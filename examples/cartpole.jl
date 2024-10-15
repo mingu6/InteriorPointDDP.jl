@@ -7,7 +7,7 @@ using MeshCat
 T = Float64
 h = 0.05
 N = 101
-options = Options{T}(quasi_newton=false, verbose=true, max_iterations=5000, optimality_tolerance=1e-5)
+options = Options{T}(quasi_newton=false, verbose=true)
 visualise = true
 
 Random.seed!(0)
@@ -22,6 +22,8 @@ end
 nq = cartpole.nq
 nu = cartpole.nu
 nx = 2 * nq
+
+# ## Dynamics
 
 x1 = T[0.0; 0.0; 0.0; 0.0]
 xN = T[0.0; π; 0.0; 0.0]
@@ -48,9 +50,10 @@ constraints = [stage_constr for k = 1:N-1]
 # ## Bounds
 
 bound = Bound(
-	-T(5.0) * ones(T, nu),
-	T(5.0) * ones(T, nu)
+	-T(4.0) * ones(T, nu),
+	T(4.0) * ones(T, nu)
 )
+# bound = Bound(T, nu)
 bounds = [bound for k in 1:N-1]
 
 # ## Initialise solver and solve

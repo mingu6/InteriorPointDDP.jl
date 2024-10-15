@@ -60,7 +60,7 @@ dyn_con = (x, y) -> implicit_dynamics(cartpole, x, y) * h
 for k = 1:N-1
     @constraint(model, x[k+1, :] == cartpole_discrete(x[k, :], y[k, :]))
     @constraint(model, dyn_con(x[k, :], y[k, :]) .== 0.0)
-    @constraint(model, 4.0 .>= y[k, 1:nu] .>= -4.0)
+    # @constraint(model, 4.0 .>= y[k, 1:nu] .>= -4.0)
 end
 
 # ## Initialise solver and solve
@@ -69,7 +69,7 @@ ȳ = [1.0e-2 * (rand(ny) .- 0.5) for k = 1:N-1]
 
 x̄ = [x1]
 for k in 2:N
-    push!(x̄, cartpole_discrete(x̄[k-1],  ū[k-1]))
+    push!(x̄, cartpole_discrete(x̄[k-1],  ȳ[k-1]))
 end
 
 for k = 1:N

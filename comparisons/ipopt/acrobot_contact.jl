@@ -31,7 +31,7 @@ qN = [π; 0.0]
 xN = [qN; qN]
 
 model = Model(
-    optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_method" => "none", "tol" => 1e-5)
+    optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_method" => "none", "tol" => 1e-8)
     );
 
 acrobot_discrete = (x, u) -> [x[nq .+ (1:nq)]; u[nu .+ (1:nq)]]

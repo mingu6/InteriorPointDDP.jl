@@ -1,6 +1,6 @@
 Base.@kwdef mutable struct Options{T}
     quasi_newton::Bool = true
-    optimality_tolerance::T = 1.0e-7
+    optimality_tolerance::T = 1.0e-8
     max_iterations::Int = 1000
     reset_cache::Bool = true
     verbose = false

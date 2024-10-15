@@ -34,8 +34,10 @@ num_primal = num_action + num_obstacles + 2  # 2 slacks for box constraints
 
 # ## intermediate waypoints
 
-xy_wp = [T[0.2, 0.6], T[0.7, 0.4]]
-inds_wp = [39, 79]
+# xy_wp = [T[0.2, 0.6], T[0.7, 0.4]]
+# inds_wp = [39, 79]
+xy_wp = []
+inds_wp = []
 
 include("../examples/visualise/concar.jl")
 

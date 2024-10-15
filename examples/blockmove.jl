@@ -8,7 +8,7 @@ h = 0.01
 N = 101
 xN = T[1.0; 0.0]
 x1 = T[0.0; 0.0]
-options = Options{T}(quasi_newton=false, verbose=true, optimality_tolerance=1e-6)
+options = Options{T}(quasi_newton=false, verbose=true, max_iterations=1000, optimality_tolerance=1e-8)
 
 Random.seed!(0)
 
@@ -30,7 +30,7 @@ dynamics = [blockmove_dyn for k = 1:N-1]
 stage_cost = Cost((x, u) -> h * (u[2] + u[3]), 2, 3)
 objective = [
     [stage_cost for k = 1:N-1]...,
-    Cost((x, u) -> 400.0 * dot(x - xN, x - xN), 2, 0),
+    Cost((x, u) -> 500.0 * dot(x - xN, x - xN), 2, 0),
 ]
 
 # ## Constraints

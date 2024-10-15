@@ -7,7 +7,7 @@ using MeshCat
 T = Float64
 h = 0.05
 N = 101
-options = Options{T}(quasi_newton=false, verbose=true, max_iterations=5000, optimality_tolerance=1e-5)
+options = Options{T}(quasi_newton=false, verbose=true)
 visualise = true
 
 Random.seed!(0)
@@ -37,10 +37,10 @@ dynamics = [cartpole_dyn for k = 1:N-1]
 
 # ## Costs
 
-stage = Cost((x, u) -> h * dot(u[1], u[1]), nx, ny)
+stage = Cost((x, y) -> h * dot(y[1], y[1]), nx, ny)
 objective = [
     [stage for k = 1:N-1]...,
-    Cost((x, u) -> 400. * dot(x - xN, x - xN), nx, 0)
+    Cost((x, y) -> 400.0 * dot(x - xN, x - xN), nx, 0)
 ] 
 
 # ## Constraints
@@ -52,9 +52,10 @@ constraints = [stage_constr for k = 1:N-1]
 # ## Bounds
 
 bound = Bound(
-	[-T(5.0) * ones(T, nu); -T(Inf) * ones(T, nq)],
-	[T(5.0) * ones(T, nu); T(Inf) * ones(T, nq)]
+	[-T(4.0) * ones(T, nu); -T(Inf) * ones(T, nq)],
+	[T(4.0) * ones(T, nu); T(Inf) * ones(T, nq)]
 )
+# bound = Bound(T, ny)
 bounds = [bound for k in 1:N-1]
 
 
