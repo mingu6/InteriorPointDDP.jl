@@ -14,6 +14,7 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
     hx = problem.constraints_data.jacobian_state
     hu = problem.constraints_data.jacobian_control
     # Tensor contraction of constraints (DDP)
+    vhxx = problem.constraints_data.vhxx
     vhux = problem.constraints_data.vhux
     vhuu = problem.constraints_data.vhuu
     # Cost gradients
@@ -84,12 +85,14 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
             # Qx = lx + fx' * Vx
             Qx[t] .= lx[t]
             mul!(Qx[t], transpose(fx[t]), Vx[t+1], 1.0, 1.0)
+            mul!(Qx[t], transpose(hx[t]), ϕ[t], 1.0, 1.0)
 
             # Qu = lu + fu' * Vx + μ log(u - ul) + μ log(uu - u)
             Qu[t] .= lu[t]
             mul!(Qu[t], transpose(fu[t]), Vx[t+1], 1.0, 1.0)
             @views Qu[t][bt.indices_lower] .-= bl1[t]
             @views Qu[t][bt.indices_upper] .+= bu1[t]
+            mul!(Qu[t], transpose(hu[t]), ϕ[t], 1.0, 1.0)
             
             # Qxx = lxx + fx' * Vxx * fx
             mul!(policy.xx_tmp[t], transpose(fx[t]), Vxx[t+1])
@@ -119,35 +122,43 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
                 Qux[t] .+= vfux[t]
                 Quu[t] .+= vfuu[t]
             end
+            if !options.quasi_newton
+                Quu[t] .+= vhuu[t]
+                Qux[t] .+= vhux[t]
+                Qxx[t] .+= vhxx[t]
+            end
             # setup linear system in backward pass
             policy.lhs_tl[t] .= Quu[t]
             policy.lhs_tr[t] .= transpose(hu[t])
             fill!(policy.lhs_br[t], 0.0)
-            if !options.quasi_newton
-                policy.lhs_tl[t] .+= vhuu[t]
-            end
+            # if !options.quasi_newton
+            #     policy.lhs_tl[t] .+= vhuu[t]
+            # end
             policy.lhs[t] .= Symmetric(policy.lhs[t])
 
             α[t] .= Qu[t]
             α[t] .*= -1.0
-            mul!(α[t], transpose(hu[t]), ϕ[t], -1.0, 1.0)
+            # mul!(α[t], transpose(hu[t]), ϕ[t], -1.0, 1.0)
             ψ[t] .= h[t]
             ψ[t] .*= -1.0
-
             β[t] .= Qux[t]
             β[t] .*= -1.0
             ω[t] .= hx[t]
             ω[t] .*= -1.0
-            if !options.quasi_newton
-                β[t] .-= vhux[t]
-            end
+            # if !options.quasi_newton
+            #     β[t] .-= vhux[t]
+            # end
 
             # inertia calculation and correction
-            for i in 1:num_control
-                policy.lhs_tl[t][i, i] += reg
+            if reg > 0.0
+                for i in 1:num_control
+                    policy.lhs_tl[t][i, i] += reg
+                end
             end
-            for i in 1:num_constr
-                policy.lhs_br[t][i, i] -= δ_c
+            if δ_c > 0.0
+                for i in 1:num_constr
+                    policy.lhs_br[t][i, i] -= δ_c
+                end
             end
 
             bk, data.status, reg, δ_c = inertia_correction!(policy.kkt_matrix_ws[t], policy.lhs[t], policy.D_cache[t],

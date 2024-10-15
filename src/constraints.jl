@@ -2,6 +2,7 @@ struct Constraint
     evaluate
     jacobian_state
     jacobian_control
+    vhxx
     vhux  # DDP tensor contrcontrol
     vhuu  # DDP tensor contrcontrol
     num_constraint::Int
@@ -30,18 +31,21 @@ function Constraint(f::Function, num_state::Int, num_control::Int; quasi_newton:
     v = Symbolics.variables(:v, 1:num_constraint)  # vector variables for Hessian vector products
 
     if !quasi_newton && num_constraint > 0
+        vhxx = Symbolics.jacobian(jacobian_state' * v, x)
         vhux = Symbolics.jacobian(jacobian_control' * v, x)
         vhuu = Symbolics.jacobian(jacobian_control' * v, u)
+        vhxx_func = eval(Symbolics.build_function(vhxx, x, u, v)[2])
         vhux_func = eval(Symbolics.build_function(vhux, x, u, v)[2])
         vhuu_func = eval(Symbolics.build_function(vhuu, x, u, v)[2])
     else
+        vhxx_func = nothing
         vhux_func = nothing
         vhuu_func = nothing
     end
 
     indices_compl = isnothing(indices_compl) ? Int64[] : indices_compl 
 
-    return Constraint(evaluate_func, jacobian_state_func, jacobian_control_func, vhux_func, vhuu_func,
+    return Constraint(evaluate_func, jacobian_state_func, jacobian_control_func, vhxx_func, vhux_func, vhuu_func,
         num_constraint, num_state, num_control, indices_compl)
 end
 
@@ -49,13 +53,13 @@ function Constraint()
     return Constraint(
         (c, x, u) -> nothing,
         (c, x, u) -> nothing, (c, x, u) -> nothing,
-        (c, x, u, v) -> nothing, (c, x, u, v) -> nothing,
+        (c, x, u, v) -> nothing, (c, x, u, v) -> nothing, (c, x, u, v) -> nothing,
         0, 0, 0, Int64[])
 end
 
 function Constraint(h::Function, hx::Function, hu::Function, num_constraint::Int, num_state::Int, num_control::Int;
-    indices_compl=nothing, vhux::Function=nothing, vhuu::Function=nothing)
-    return Constraint(h, hx, hu, vhux, vhuu,
+    indices_compl=nothing, vhxx::Function=nothing, vhux::Function=nothing, vhuu::Function=nothing)
+    return Constraint(h, hx, hu, vhxx, vhux, vhuu,
         num_constraint, num_state, num_control, indices_compl)
 end
 
@@ -68,19 +72,21 @@ function jacobian!(jacobian_states::Vector{Matrix{T}}, jacobian_controls::Vector
     end
 end
 
-function tensor_contraction!(vhux_cache::Matrix{T}, vhuu_cache::Matrix{T}, constraint::Constraint,
+function tensor_contraction!(vhxx_cache::Matrix{T}, vhux_cache::Matrix{T}, vhuu_cache::Matrix{T}, constraint::Constraint,
             x::Vector{T}, u::Vector{T}, v::Vector{T}) where T
     if !isnothing(constraint.vhuu)
+        constraint.vhxx(vhxx_cache, x, u, v)
         constraint.vhux(vhux_cache, x, u, v)
         constraint.vhuu(vhuu_cache, x, u, v)
     end
 end
 
-function tensor_contraction!(vhux_cache::Vector{Matrix{T}}, vhuu_cache::Vector{Matrix{T}}, constraints::Constraints,
+function tensor_contraction!(vhxx_cache::Vector{Matrix{T}}, vhux_cache::Vector{Matrix{T}}, vhuu_cache::Vector{Matrix{T}}, constraints::Constraints,
             states::Vector{Vector{T}}, controls::Vector{Vector{T}}, v::Vector{Vector{T}}) where T
     N = length(states)
     for t in 1:N-1
         if !isnothing(constraints[t].vhuu)
+            constraints[t].vhxx(vhxx_cache[t], states[t], controls[t], v[t])
             constraints[t].vhux(vhux_cache[t], states[t], controls[t], v[t])
             constraints[t].vhuu(vhuu_cache[t], states[t], controls[t], v[t])
         end

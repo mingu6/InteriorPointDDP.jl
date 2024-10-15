@@ -21,10 +21,11 @@ function evaluate_derivatives!(constraints_data::ConstraintsData{T}, problem::Pr
     ϕ = mode == :nominal ? problem.nominal_eq_duals : problem.eq_duals
     hx = constraints_data.jacobian_state
     hu = constraints_data.jacobian_control
+    vhxx = constraints_data.vhxx
     vhux = constraints_data.vhux
     vhuu = constraints_data.vhuu
     jacobian!(hx, hu, constraints_data.constraints, x, u)
-    tensor_contraction!(vhux, vhuu, constraints_data.constraints, x, u, ϕ)
+    tensor_contraction!(vhxx, vhux, vhuu, constraints_data.constraints, x, u, ϕ)
 end
 
 function evaluate_derivatives!(problem::ProblemData{T}; mode=:nominal) where T

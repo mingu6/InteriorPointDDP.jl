@@ -8,6 +8,7 @@ struct ConstraintsData{T}
     residuals::Vector{Vector{T}}
     jacobian_state::Vector{Matrix{T}} 
     jacobian_control::Vector{Matrix{T}}
+    vhxx::Vector{Matrix{T}}  # DDP tensor contraction
     vhux::Vector{Matrix{T}}  # DDP tensor contraction
     vhuu::Vector{Matrix{T}}  # DDP tensor contraction
 end
@@ -18,11 +19,12 @@ function constraint_data(T, constraints::Constraints)
     residuals = [zeros(T, h.num_constraint) for h in constraints]
     jac_x = [zeros(T, h.num_constraint, h.num_state) for h in constraints]
     jac_u = [zeros(T, h.num_constraint, h.num_control) for h in constraints]
+    vhxx = [zeros(T, h.num_state, h.num_state) for h in constraints]
 	vhux = [zeros(T, h.num_control, h.num_state) for h in constraints]
 	vhuu = [zeros(T, h.num_control, h.num_control) for h in constraints]
     
     return ConstraintsData(constraints, num_constraints, residuals,
-            jac_x, jac_u, vhux, vhuu)
+            jac_x, jac_u, vhxx, vhux, vhuu)
 end
 
 function reset!(data::ConstraintsData{T}) where T 

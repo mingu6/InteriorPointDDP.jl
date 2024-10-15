@@ -36,6 +36,8 @@ function solve!(solver::Solver{T}) where T
     data.max_primal_1 = 1e4 * max(1.0, data.primal_1_curr)
     data.min_primal_1 = 1e-4 * max(1.0, data.primal_1_curr)
     reset_filter!(data)
+    
+    num_bounds = sum(b.num_lower + b.num_upper for b in problem.bounds)
 
     while data.k < options.max_iterations
         evaluate_derivatives!(problem, mode=:nominal)
@@ -52,7 +54,7 @@ function solve!(solver::Solver{T}) where T
         # check (inner) barrier problem convergence and update barrier parameter if so
         dual_inf_μ, primal_inf_μ, cs_inf_μ = optimality_error(policy, problem, options, data.μ, mode=:nominal)
         opt_err_μ = max(dual_inf_μ, cs_inf_μ, primal_inf_μ)          
-        if opt_err_μ <= options.κ_ϵ * data.μ
+        if opt_err_μ <= options.κ_ϵ * data.μ && num_bounds > 0
             data.μ = max(options.optimality_tolerance / 10.0, min(options.κ_μ * data.μ, data.μ ^ options.θ_μ))
             reset_filter!(data)
             # performance of current iterate updated to account for barrier parameter change
@@ -129,7 +131,7 @@ function optimality_error(policy::PolicyData{T}, problem::ProblemData{T},
         # dual infeasibility (stationarity)
 
         policy.u_tmp[t] .= Qu[t]
-        mul!(policy.u_tmp[t], transpose(hu[t]), ϕ[t], 1.0, 1.0)
+        # mul!(policy.u_tmp[t], transpose(hu[t]), ϕ[t], 1.0, 1.0)
         dual_inf = max(dual_inf, norm(policy.u_tmp[t], Inf))
         ϕ_norm += norm(ϕ[t], 1)
 
