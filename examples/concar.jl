@@ -3,22 +3,21 @@ using LinearAlgebra
 using Plots
 using Random
 
+Random.seed!(0)
 T = Float64
 N = 101
 h = 0.05
 r_car = 0.02
-x1 = T[0.0; 0.0; 0.0] 
+x1 = T[0.0; 0.0; 0.0] + rand(3) .* [0.05, 0.05, π / 2]
 xN = T[1.0; 1.0; π / 2]
 options = Options{T}(quasi_newton=false, verbose=true)
-
-Random.seed!(0)
 
 num_state = 3
 num_action = 2
 
 # ## control limits
 
-ul = T[-1.0; -5.0]
+ul = T[-0.1; -5.0]
 uu = T[1.0; 5.0]
 
 # ## obstacles
@@ -31,13 +30,6 @@ xyr_obs = [
     ]
 num_obstacles = length(xyr_obs)
 num_primal = num_action + num_obstacles + 2  # 2 slacks for box constraints
-
-# ## intermediate waypoints
-
-# xy_wp = [T[0.2, 0.6], T[0.7, 0.4]]
-# inds_wp = [39, 79]
-xy_wp = []
-inds_wp = []
 
 include("../examples/visualise/concar.jl")
 
@@ -58,19 +50,14 @@ dynamics = [car for k = 1:N-1]
 
 stage_cost = (x, u) -> begin
     J = 0.0
-    J += 1e-2 * dot(x - xN, x - xN)
-    J += 1e-1 * dot(u[1:2], u[1:2])
+    J += 1e-2 * dot(x[1:2] - xN[1:2], x[1:2] - xN[1:2])
+    J += 1e-1 * dot(u[1:2] .* [1.0, 0.1], u[1:2])
     return J
 end
 objective = [
     [Cost(stage_cost, num_state, num_primal) for k = 1:N-1]...,
-    Cost((x, u) -> 1e3 * dot(x - xN, x - xN), num_state, 0)
+    Cost((x, u) -> 1e3 * dot(x[1:2] - xN[1:2], x[1:2] - xN[1:2]), num_state, 0)
 ]
-waypoint_cost(p) = Cost((x, u) -> begin
-        xy = x[1:2]
-        return 1e3 * dot(xy-p, xy-p) + 1.0e-1 * dot(u[1:2], u[1:2])
-    end,
-    num_state, num_primal)
 
 # ## constraints
 
@@ -104,10 +91,7 @@ bounds = [bound for k in 1:N-1]
 
 # ## Initialise solver and solve
 
-ū = [[T(1.0e-1) * randn(T, 2); T(0.1) * ones(T, num_obstacles); T(0.1) * ones(T, 2)] for k = 1:N-1]
-for (i, k) in enumerate(inds_wp)
-    objective[k] = waypoint_cost(xy_wp[i])
-end
+ū = [[T(1.0e-2) .* (rand(T, 2) .- 0.5); T(0.1) * ones(T, num_obstacles + 2)] for k = 1:N-1]
 solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
 solve!(solver, x1, ū)
 
@@ -120,8 +104,6 @@ plotTrajectory!(x_sol)
 for xyr in xyr_obs
     plotCircle!(xyr[1], xyr[2], xyr[3])
 end
-scatter!(map(x -> x[1], xy_wp), map(x -> x[2], xy_wp),
-         markershape=:star, markersize=5)
 savefig("examples/plots/concar.png")
 
 # ## benchmark allocations + timing
