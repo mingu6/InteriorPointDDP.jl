@@ -8,8 +8,8 @@ T = Float64
 N = 101
 h = 0.05
 r_car = 0.02
-x1 = T[0.0; 0.0; 0.0] + rand(3) .* [0.05, 0.05, π / 2]
-xN = T[1.0; 1.0; π / 2]
+x1 = T[0.0; 0.0; 0.0] + rand(T, 3) .* T[0.05, 0.05, π / 2]
+xN = T[1.0; 1.0; π / 4]
 options = Options{T}(quasi_newton=false, verbose=true)
 
 num_state = 3
@@ -50,13 +50,13 @@ dynamics = [car for k = 1:N-1]
 
 stage_cost = (x, u) -> begin
     J = 0.0
-    J += 1e-2 * dot(x[1:2] - xN[1:2], x[1:2] - xN[1:2])
+    J += 1e-2 * dot(x - xN, x - xN)
     J += 1e-1 * dot(u[1:2] .* [1.0, 0.1], u[1:2])
     return J
 end
 objective = [
     [Cost(stage_cost, num_state, num_primal) for k = 1:N-1]...,
-    Cost((x, u) -> 1e3 * dot(x[1:2] - xN[1:2], x[1:2] - xN[1:2]), num_state, 0)
+    Cost((x, u) -> 1e3 * dot(x - xN, x - xN), num_state, 0)
 ]
 
 # ## constraints
