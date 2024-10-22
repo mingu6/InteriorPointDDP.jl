@@ -27,7 +27,7 @@ x1 = [0.0; 0.0; 0.0; 0.0]
 xN = [0.0; π; 0.0; 0.0]
 
 model = Model(
-    optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_method" => "none", "tol" => 1e-7)
+    optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_method" => "none", "max_refinement_steps" => 0, "min_refinement_steps" => 0)
     );
 
 # ## Costs
@@ -41,6 +41,7 @@ cost = (x, u) -> begin
 		J += objt(x[k, :], u[k, :])
 	end
 	J += objT(x[N, :], 0.0)
+	return J
 end
 
 # ## Dynamics - implicit dynamics with RK2 integration
@@ -60,8 +61,9 @@ dyn_con = (x, y) -> implicit_dynamics(cartpole, x, y) * h
 for k = 1:N-1
     @constraint(model, x[k+1, :] == cartpole_discrete(x[k, :], y[k, :]))
     @constraint(model, dyn_con(x[k, :], y[k, :]) .== 0.0)
-    # @constraint(model, 4.0 .>= y[k, 1:nu] .>= -4.0)
+    @constraint(model, 4.0 .>= y[k, 1:nu] .>= -4.0)
 end
+# @constraint(model, x[N, :] == xN)
 
 # ## Initialise solver and solve
 

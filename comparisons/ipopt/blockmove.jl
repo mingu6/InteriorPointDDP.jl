@@ -27,7 +27,7 @@ function cost(x, u)
 end
 
 model = Model(
-    optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_method" => "none")
+    optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_method" => "none", "max_refinement_steps" => 0, "min_refinement_steps" => 0)
     );
 
 @variable(model, x[1:N, 1:nx]);

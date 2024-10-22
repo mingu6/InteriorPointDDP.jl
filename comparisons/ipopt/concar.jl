@@ -3,21 +3,20 @@ import Ipopt
 using Random
 using Plots
 
+Random.seed!(0)
 N = 101
 h = 0.05
 r_car = 0.02
-x1 = [0.0; 0.0; 0.0] 
+x1 = [0.0; 0.0; 0.0] + rand(3) .* [0.05, 0.05, π / 2]
 xN = [1.0; 1.0; π / 2]
 
 nx = 3  # num. state
 nu = 2  # num. control
 
-Random.seed!(5)
-
 include("../../examples/visualise/concar.jl")
 
 model = Model(
-    optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_method" => "none", "tol" => 1e-7)
+    optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_method" => "none", "max_refinement_steps" => 0, "min_refinement_steps" => 0)
     );
 
 @variable(model, x[1:N, 1:nx]);
@@ -25,7 +24,7 @@ model = Model(
 
 # ## control limits
 
-ul = [-1.0; -5.0]
+ul = [-0.1; -5.0]
 uu = [1.0; 5.0]
 
 # ## obstacles
@@ -37,13 +36,6 @@ xyr_obs = [
     [0.35, 0.4, 0.1]
     ]
 num_obstacles = length(xyr_obs)
-
-# ## intermediate waypoints
-
-# xy_wp = [[0.2, 0.6], [0.7, 0.4]]
-# inds_wp = [39, 79]
-xy_wp = []
-inds_wp = []
 
 
 # ## Dynamics - explicit midpoint for integrator
@@ -79,32 +71,22 @@ for k = 1:N-1
         @constraint(model, (obs[3] + r_car)^2 - obs_dist(obs[1:2])(x[k, :], u[k, :]) <= 0.0)
     end
 end
+# @constraint(model, x[N, :] == xN)
 
 stage_cost = (x, u) -> begin
     J = 0.0
-    J += 1e-2 * (x - xN)'* (x - xN)
-    J += 1e-1 * u[1:2]' * u[1:2]
+    J += 1e-2 * (x[1:2] - xN[1:2])'* (x[1:2] - xN[1:2])
+    J += 1e-1 * (u[1:2] .* [1.0, 0.1])' * u[1:2]
     return J
 end
 
-term_cost = x -> 1e3 * (x - xN)' * (x - xN)
-
-waypoint_cost(p) = (x, u) -> begin
-        xy = x[1:2]
-        return 1e3 * (xy-p)' * (xy-p) + 1.0e-1 * u[1:2]' * u[1:2]
-    end
+term_cost = x -> 1e3 * (x[1:2] - xN[1:2])' * (x[1:2] - xN[1:2])
 
 
 function cost(x, u)
     J = 0.0
-    j = 1
     for k = 1:N-1
-        if j <= length(inds_wp) && k == inds_wp[j]
-            J += waypoint_cost(xy_wp[j])(x[k, :], u[k, :])
-            j += 1
-        else
-            J += stage_cost(x[k, :], u[k, :])
-        end
+        J += stage_cost(x[k, :], u[k, :])
     end
     J += term_cost(x[N, :])
     return J
@@ -112,7 +94,7 @@ end
     
 @objective(model, Min, cost(x, u))
 
-ū = [1.0e-1 * randn(2) for k = 1:N-1]
+ū = [1.0e-2 * (rand(2) .- 0.5) for k = 1:N-1]
 
 x̄ = [x1]
 for k in 2:N
@@ -141,6 +123,4 @@ plotTrajectory!(x_sol)
 for xyr in xyr_obs
     plotCircle!(xyr[1], xyr[2], xyr[3])
 end
-scatter!(map(x -> x[1], xy_wp), map(x -> x[2], xy_wp),
-         markershape=:star, markersize=5)
 savefig("plots/concar.png")

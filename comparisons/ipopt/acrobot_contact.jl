@@ -31,7 +31,7 @@ qN = [π; 0.0]
 xN = [qN; qN]
 
 model = Model(
-    optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_method" => "none", "tol" => 1e-8)
+    optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_method" => "none", "max_refinement_steps" => 0, "min_refinement_steps" => 0)
     );
 
 acrobot_discrete = (x, u) -> [x[nq .+ (1:nq)]; u[nu .+ (1:nq)]]
@@ -72,7 +72,7 @@ end
 
 # ## Constraints
 
-constr = (x, u) -> implicit_contact_dynamics(acrobot_impact, x, u, h, 1e-6)
+constr = (x, u) -> implicit_contact_dynamics(acrobot_impact, x, u, h, 1e-8)
 
 @variable(model, x[1:N, 1:nx]);
 @variable(model, u[1:N-1, 1:ny]);
