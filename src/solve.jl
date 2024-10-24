@@ -102,12 +102,12 @@ function reset_filter!(data::SolverData{T}) where T
 end
 
 function optimality_error(policy::PolicyData{T}, problem::ProblemData{T},
-            options::Options{T}, μ::T; mode=:nominal) where T
+    options::Options{T}, μ::T; mode=:nominal) where T
     dual_inf::T = 0     # dual infeasibility (stationarity of Lagrangian)
     primal_inf::T = 0   # constraint violation (primal infeasibility)
     cs_inf::T = 0       # complementary slackness violation
     ϕ_norm::T = 0       # norm of dual equality
-    v_norm::T = 0       # norm of dual inequality
+    z_norm::T = 0       # norm of dual inequality
     
     N = problem.horizon
     bounds = problem.bounds
@@ -115,49 +115,68 @@ function optimality_error(policy::PolicyData{T}, problem::ProblemData{T},
     u = mode == :nominal ? problem.nominal_controls : problem.controls
     ϕ, zl, zu = dual_trajectories(problem, mode=mode)
     
-    Qu = policy.hamiltonian.gradient_control
+    fx = problem.model.jacobian_state
+    fu = problem.model.jacobian_control
     hu = problem.constraints_data.jacobian_control
-
+    hx = problem.constraints_data.jacobian_state
+    lx = problem.cost_data.gradient_state
+    lu = problem.cost_data.gradient_control
+    Vx = policy.value.gradient
+    
     bl1 = policy.bl_tmp1
     bu1 = policy.bu_tmp1
-
+    
     num_ineq = 0
     num_constr = problem.constraints_data.num_constraints[1]
     
     for t = N-1:-1:1
         bt = bounds[t]
         num_ineq += bt.num_lower + bt.num_upper
-
+        
         # dual infeasibility (stationarity)
-
-        policy.u_tmp[t] .= Qu[t]
-        # mul!(policy.u_tmp[t], transpose(hu[t]), ϕ[t], 1.0, 1.0)
+        
+        policy.u_tmp[t] .= lu[t]
+        mul!(policy.u_tmp[t], transpose(hu[t]), ϕ[t], 1.0, 1.0)
+        mul!(policy.u_tmp[t], transpose(fu[t]), Vx[t+1], 1.0, 1.0)
+        for i in bt.indices_lower
+            policy.u_tmp[t][i] -= zl[t][i]
+        end
+        for i in bt.indices_upper
+            policy.u_tmp[t][i] += zu[t][i]
+        end
         dual_inf = max(dual_inf, norm(policy.u_tmp[t], Inf))
+        
+        policy.x_tmp[t] .= lx[t]
+        mul!(policy.x_tmp[t], transpose(hx[t]), ϕ[t], 1.0, 1.0)
+        mul!(policy.x_tmp[t], transpose(fx[t]), Vx[t+1], 1.0, 1.0)
+        policy.x_tmp[t] .-= Vx[t]
+        dual_inf = max(dual_inf, norm(policy.x_tmp[t], Inf))
+        
         ϕ_norm += norm(ϕ[t], 1)
-
+        
         # primal feasibility (eq. constraint satisfcontrol)
-
+        
         primal_inf = max(primal_inf, norm(h[t], Inf))
-
+        
         # complementary slackness
-
+        
         (bt.num_upper == 0 && bt.num_lower == 0) && continue
         bl1[t] .= @views u[t][bt.indices_lower]
         bl1[t] .-= @views bt.lower[bt.indices_lower]
         bl1[t] .*= @views zl[t][bt.indices_lower]
         cs_inf = max(cs_inf, norm(bl1[t], Inf))
-        v_norm += @views sum(zl[t][bt.indices_lower])
-
+        z_norm += @views sum(zl[t][bt.indices_lower])
+        
         bu1[t] .= @views u[t][bt.indices_upper]
         bu1[t] .-= @views bt.upper[bt.indices_upper]
         bu1[t] .*= @views zu[t][bt.indices_upper]
         cs_inf = max(cs_inf, norm(bu1[t], Inf))
-        v_norm += @views sum(zu[t][bt.indices_upper])
+        z_norm += @views sum(zu[t][bt.indices_upper])
     end
     cs_inf -= μ
     
-    scaling_cs = max(options.s_max, v_norm / max(num_ineq, 1.0))  / options.s_max
-    scaling_dual = max(options.s_max, (ϕ_norm + v_norm) / max(num_ineq + num_constr, 1.0))  / options.s_max
+    scaling_cs = max(options.s_max, z_norm / max(num_ineq, 1.0))  / options.s_max
+    scaling_dual = max(options.s_max, (ϕ_norm + z_norm) / max(num_ineq + num_constr, 1.0))  / options.s_max
     return dual_inf / scaling_dual, primal_inf, cs_inf / scaling_cs
 end
 

@@ -121,8 +121,7 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
                 Qxx[t] .+= vfxx[t]
                 Qux[t] .+= vfux[t]
                 Quu[t] .+= vfuu[t]
-            end
-            if !options.quasi_newton
+
                 Quu[t] .+= vhuu[t]
                 Qux[t] .+= vhux[t]
                 Qxx[t] .+= vhxx[t]
@@ -131,23 +130,16 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
             policy.lhs_tl[t] .= Quu[t]
             policy.lhs_tr[t] .= transpose(hu[t])
             fill!(policy.lhs_br[t], 0.0)
-            # if !options.quasi_newton
-            #     policy.lhs_tl[t] .+= vhuu[t]
-            # end
             policy.lhs[t] .= Symmetric(policy.lhs[t])
 
             α[t] .= Qu[t]
             α[t] .*= -1.0
-            # mul!(α[t], transpose(hu[t]), ϕ[t], -1.0, 1.0)
             ψ[t] .= h[t]
             ψ[t] .*= -1.0
             β[t] .= Qux[t]
             β[t] .*= -1.0
             ω[t] .= hx[t]
             ω[t] .*= -1.0
-            # if !options.quasi_newton
-            #     β[t] .-= vhux[t]
-            # end
 
             # inertia calculation and correction
             if reg > 0.0
