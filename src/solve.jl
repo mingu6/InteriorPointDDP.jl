@@ -9,7 +9,7 @@ end
 
 function solve!(solver::Solver{T}) where T
     (solver.options.verbose && solver.data.k==0) && solver_info()
-	
+
 	policy = solver.policy
     problem = solver.problem
     options = solver.options
@@ -81,11 +81,9 @@ function solve!(solver::Solver{T}) where T
         data.wall_time = time() - time0
     end
     
+    data.k == options.max_iterations && (data.status = 8)
     options.verbose && iteration_status(data, options)
-    if data.k == options.max_iterations 
-        data.status = 8
-        options.verbose && @warn "Maximum solver iterations reached."
-    end
+    options.verbose && on_exit(data)
     return nothing
 end
 
