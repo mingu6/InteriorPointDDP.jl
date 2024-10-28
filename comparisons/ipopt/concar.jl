@@ -7,7 +7,7 @@ using Suppressor
 using Printf
 
 visualise = true
-output = true
+output = false
 benchmark = true
 
 print_level = output ? 5 : 4
