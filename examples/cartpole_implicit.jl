@@ -3,14 +3,16 @@ using LinearAlgebra
 using Random
 using Plots
 using MeshCat
+using BenchmarkTools
+using Printf
+
+visualise = false
+benchmark = true
+verbose = true
 
 T = Float64
 h = 0.05
 N = 101
-options = Options{T}(quasi_newton=false, verbose=true)
-visualise = true
-
-Random.seed!(0)
 
 include("models/cartpole.jl")
 
@@ -25,8 +27,9 @@ nu = cartpole.nu
 nx = 2 * nq
 ny = nu + nq  # torque and acceleration now decision variables/"controls"
 
-x1 = T[0.0; 0.0; 0.0; 0.0]
 xN = T[0.0; π; 0.0; 0.0]
+
+options = Options{T}(quasi_newton=false, verbose=true)
 
 # ## Dynamics - implicit dynamics with RK2 integration
 
@@ -55,26 +58,36 @@ bound = Bound(
 	[-T(4.0) * ones(T, nu); -T(Inf) * ones(T, nq)],
 	[T(4.0) * ones(T, nu); T(Inf) * ones(T, nq)]
 )
-# bound = Bound(T, ny)
 bounds = [bound for k in 1:N-1]
 
-
-# ## Initialise solver and solve
-
-ū = [T(1.0e-2) * (rand(T, ny) .- 0.5) for k = 1:N-1]
 solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
-solve!(solver, x1, ū)
 
-x_sol, u_sol = get_trajectory(solver)
+open("examples/results/cartpole_implicit.txt", "w") do io
+	@printf(io, " seed  iterations  status    objective      primal      time (s)  \n")
+    for seed = 1:50
+        solver.options.verbose = verbose
+        Random.seed!(seed)
+        
+        # ## Initialise solver and solve
+        
+        x1 = T[0.0; 0.0; 0.0; 0.0] + (rand(T, 4) .- T(0.5)) .* T[0.05, 0.2, 0.1, 0.1]
+        ū = [T(1.0e-2) * (rand(T, ny) .- T(0.5)) for k = 1:N-1]
+        solve!(solver, x1, ū)
+        
+        if benchmark
+            solver.options.verbose = false
+            solve_time = @belapsed solve!($solver, $x1, $ū)
+            @printf(io, " %2s     %5s      %5s    %.8f    %.8f    %.5f  \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf, solve_time)
+        else
+            @printf(io, " %2s     %5s      %5s    %.8f    %.8f \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf)
+        end
+    end
+end
+
 
 if visualise
+    x_sol, u_sol = get_trajectory(solver)
+    
 	q_sol = [x[1:nq] for x in x_sol]
 	visualize!(vis, cartpole, q_sol, Δt=h);
 end
-
-# ## Benchmark solver
-
-using BenchmarkTools
-solver.options.verbose = false
-@benchmark solve!($solver, $x1, $ū)
-

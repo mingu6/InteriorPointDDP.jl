@@ -2,13 +2,17 @@ using InteriorPointDDP
 using LinearAlgebra
 using Plots
 using Random
+using BenchmarkTools
+using Printf
 
-Random.seed!(0)
+visualise = false
+benchmark = true
+verbose = true
+
 T = Float64
 N = 101
 h = 0.05
 r_car = 0.02
-x1 = T[0.0; 0.0; 0.0] + rand(T, 3) .* T[0.05, 0.05, π / 2]
 xN = T[1.0; 1.0; π / 4]
 options = Options{T}(quasi_newton=false, verbose=true)
 
@@ -89,24 +93,41 @@ bound = Bound(
 )
 bounds = [bound for k in 1:N-1]
 
-# ## Initialise solver and solve
-
-ū = [[T(1.0e-2) .* (rand(T, 2) .- 0.5); T(0.1) * ones(T, num_obstacles + 2)] for k = 1:N-1]
 solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
-solve!(solver, x1, ū)
+
+timings = Float64[]
+
+# ## Initialise solver and solve
+open("examples/results/concar.txt", "w") do io
+	@printf(io, " seed  iterations  status    objective      primal      time (s)  \n")
+    for seed = 1:50
+        solver.options.verbose = verbose
+        Random.seed!(seed)
+        
+        x1 = T[0.0; 0.0; 0.0] + rand(T, 3) .* T[0.05, 0.05, π / 2]
+        ū = [[T(1.0e-3) .* (rand(T, 2) .- 0.5); T(0.01) * ones(T, num_obstacles + 2)] for k = 1:N-1]
+    
+        solve!(solver, x1, ū)
+        
+        if benchmark
+            solver.options.verbose = false
+            solve_time = @belapsed solve!($solver, $x1, $ū)
+            @printf(io, " %2s     %5s      %5s    %.8f    %.8f    %.5f  \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf, solve_time)
+        else
+            @printf(io, " %2s     %5s      %5s    %.8f    %.8f \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf)
+        end
+    end
+end
 
 # # ## Plot solution
 
-x_sol, u_sol = get_trajectory(solver)
-
-plot()
-plotTrajectory!(x_sol)
-for xyr in xyr_obs
-    plotCircle!(xyr[1], xyr[2], xyr[3])
+if visualise
+    x_sol, u_sol = get_trajectory(solver)
+    
+    plot()
+    plotTrajectory!(x_sol)
+    for xyr in xyr_obs
+        plotCircle!(xyr[1], xyr[2], xyr[3])
+    end
+    savefig("examples/plots/concar.png")
 end
-savefig("examples/plots/concar.png")
-
-# ## benchmark allocations + timing
-using BenchmarkTools
-solver.options.verbose = false
-@benchmark solve!($solver, $x1, $ū)
