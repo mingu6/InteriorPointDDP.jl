@@ -2,6 +2,12 @@ using IterativeLQR
 using LinearAlgebra
 using Plots
 using Random
+using BenchmarkTools
+using Printf
+
+visualise = true
+benchmark = true
+verbose = true
 
 N = 101
 h = 0.01
@@ -14,8 +20,6 @@ options.initial_constraint_penalty = 1e-4
 
 num_state = 2
 num_control = 3  # force and two slack variables to represent abs work
-
-Random.seed!(0)
 
 # ## Dynamics - explicit midpoint for integrator
 
@@ -55,24 +59,35 @@ constraints = [
 
 solver = Solver(dynamics, objective, constraints; options=options)
 
-ū = [[1.0e-2 * randn(1); -0.01 * ones(2)] for k = 1:N-1]
-x̄ = rollout(dynamics, x0, ū)
-
-initialize_controls!(solver, ū)
-initialize_states!(solver, x̄)
-
-solve!(solver)
+open("results/blockmove.txt", "w") do io
+	@printf(io, " seed  iterations  status     objective           primal        time (s)  \n")
+	for seed = 1:50
+		solver.options.verbose = verbose
+		Random.seed!(seed)
+        ū = [[1.0e-0 * (rand(1) .- 0.5); -0.01 * ones(2)] for k = 1:N-1]
+        x̄ = rollout(dynamics, x0, ū)
+        
+        solve!(solver, x̄, ū)
+		
+		if benchmark
+            solver.options.verbose = false
+            solve_time = @belapsed solve!($solver, $x̄, $ū)
+            @printf(io, " %2s     %5s      %5s    %.8e    %.8e    %.5f  \n", seed, solver.data.iterations[1], solver.data.status[1], solver.data.objective[1], solver.data.max_violation[1], solve_time)
+        else
+            @printf(io, " %2s     %5s      %5s    %.8e    %.8e \n", seed, solver.data.iterations[1], solver.data.status[1], solver.data.objective[1], solver.data.max_violation[1])
+        end
+    end
+end
 
 # ## Plot solution
 
-x = map(x -> x[1], solver.problem.nominal_states)
-v = map(x -> x[2], solver.problem.nominal_states)
-u = [map(u -> u[1], solver.problem.nominal_actions[1:end-1]); 0.0]
-work = [abs(vk * uk) for (vk, uk) in zip(v, u)]
-plot(range(0, (N-1) * h, length=N), [x v u work], label=["x" "v" "u" "work"])
-savefig("plots/blockmove.png")
-
-println("Total absolute work: ", sum(work))
-
-using BenchmarkTools
-info = @benchmark solve!($solver, x̄, ū) setup=(x̄=deepcopy(x̄), ū=deepcopy(ū))
+if visualise
+    x = map(x -> x[1], solver.problem.nominal_states)
+    v = map(x -> x[2], solver.problem.nominal_states)
+    u = [map(u -> u[1], solver.problem.nominal_actions[1:end-1]); 0.0]
+    work = [abs(vk * uk) for (vk, uk) in zip(v, u)]
+    plot(range(0, (N-1) * h, length=N), [x v u work], label=["x" "v" "u" "work"])
+    savefig("plots/blockmove.png")
+    
+    println("Total absolute work: ", sum(work))
+end

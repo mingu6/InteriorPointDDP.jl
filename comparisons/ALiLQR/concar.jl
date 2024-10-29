@@ -2,23 +2,23 @@ using IterativeLQR
 using LinearAlgebra
 using Plots
 using Random
+using BenchmarkTools
+using Printf
 
-Random.seed!(0)
+visualise = false
+benchmark = true
+verbose = true
+
 N = 101
 h = 0.05
 r_car = 0.02
-x0 = [0.0; 0.0; 0.0] + rand(3) .* [0.05, 0.05, π / 2]
 xN = [1.0; 1.0; π / 4]
 
 options = Options()
 options.scaling_penalty = 2.0
-options.initial_constraint_penalty = 1.0
-options.objective_tolerance = 1e-5
-options.lagrangian_gradient_tolerance = 1e-5
-options.constraint_tolerance = 1e-3
+options.initial_constraint_penalty = 1e-1
 options.max_iterations = 1000
-options.max_dual_updates = 10
-
+options.max_dual_updates = 30
 
 # ## car 
 num_state = 3
@@ -93,30 +93,43 @@ obs_constr = Constraint(stage_constr_fn, num_state, num_action,
 
 constraints = [[obs_constr for k = 1:N-1]..., Constraint()]
 
-# ## Initialise solver and solve
-
-ū = [1.0e-2 .* (rand(2) .- 0.5) for k = 1:N-1]
-x̄ = rollout(dynamics, x0, ū)
-
 solver = Solver(dynamics, objective, constraints; options=options)
-initialize_controls!(solver, ū) 
-initialize_states!(solver, x̄)
 
-# ## solve
-solve!(solver)
-
-# ## solution
-x_sol, u_sol = get_trajectory(solver)
-
-# ## visualize
-plot()
-plotTrajectory!(x_sol)
-for xyr in xyr_obs
-    plotCircle!(xyr[1], xyr[2], xyr[3])
+open("results/concar.txt", "w") do io
+	@printf(io, " seed  iterations  status     objective           primal        time (s)  \n")
+	for seed = 1:50
+		solver.options.verbose = verbose
+		Random.seed!(seed)
+		
+        # ## Initialise solver and solve
+        
+        x0 = [0.0; 0.0; 0.0] + rand(3) .* [0.05, 0.05, π / 2]
+        ū = [1.0e-3 .* (rand(2) .- 0.5) for k = 1:N-1]
+        x̄ = rollout(dynamics, x0, ū)
+        
+        solve!(solver, x̄, ū)
+		
+		if benchmark
+            solver.options.verbose = false
+            solve_time = @belapsed solve!($solver, $x̄, $ū)
+            @printf(io, " %2s     %5s      %5s    %.8e    %.8e    %.5f  \n", seed, solver.data.iterations[1], solver.data.status[1], solver.data.objective[1], solver.data.max_violation[1], solve_time)
+        else
+            @printf(io, " %2s     %5s      %5s    %.8e    %.8e \n", seed, solver.data.iterations[1], solver.data.status[1], solver.data.objective[1], solver.data.max_violation[1])
+        end
+    end
 end
-savefig("plots/concar.png")
 
-# ## benchmark allocations + timing
-using BenchmarkTools
-solver.options.verbose = false
-info = @benchmark solve!($solver, x̄, ū) setup=(x̄=deepcopy(x̄), ū=deepcopy(ū))
+# ## Plot solution
+
+if visualise
+    # ## solution
+    x_sol, u_sol = get_trajectory(solver)
+    
+    # ## visualize
+    plot()
+    plotTrajectory!(x_sol)
+    for xyr in xyr_obs
+        plotCircle!(xyr[1], xyr[2], xyr[3])
+    end
+    savefig("plots/concar.png")
+end

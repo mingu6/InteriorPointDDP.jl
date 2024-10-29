@@ -3,20 +3,20 @@ using LinearAlgebra
 using Plots
 using Random
 using MeshCat
+using BenchmarkTools
+using Printf
+
+visualise = false
+benchmark = true
+verbose = true
 
 h = 0.05
 N = 101
-visualise = true
 
 options = Options()
-options.scaling_penalty = 1.2
+options.scaling_penalty = 1.3
 options.initial_constraint_penalty = 1e-3
-options.max_iterations = 1000
 options.max_dual_updates = 50
-options.objective_tolerance = 1e-5
-options.lagrangian_gradient_tolerance = 1e-5
-
-Random.seed!(0)
 
 include("../../examples/models/cartpole.jl")
 
@@ -31,7 +31,6 @@ nu = cartpole.nu
 nx = 2 * nq
 ny = nu + nq  # torque and acceleration now decision variables/"controls"
 
-x1 = [0.0; 0.0; 0.0; 0.0]
 xN = [0.0; π; 0.0; 0.0]
 
 # ## Dynamics - implicit dynamics with RK2 integration
@@ -51,36 +50,44 @@ objective = [
 
 # ## Constraints
 
-stage_constr = Constraint((x, y) -> [y[1] - 4.0; -y[1] - 4.0; implicit_dynamics(cartpole, x, y) * h],
+stage_constr = Constraint((x, y) -> [y[1] - 4.0; -y[1] - 4.0; implicit_dynamics(cartpole, x, y)],
                     nx, ny, indices_inequality=collect(1:2))
 
 constraints = [stage_constr for k = 1:N-1]
 
 constraints = [[stage_constr for k = 1:N-1]..., Constraint()]
 
-# ## Initialise solver and solve
-
 solver = Solver(dynamics, objective, constraints; options=options)
-ȳ = [1.0e-2 * (rand(ny) .- 0.5) for k = 1:N-1]
 
-x̄ = rollout(dynamics, x1, ȳ)
+open("results/cartpole_implicit.txt", "w") do io
+	@printf(io, " seed  iterations  status     objective           primal        time (s)  \n")
+	for seed = 1:50
+		solver.options.verbose = verbose
+		Random.seed!(seed)
+		
+		# ## Initialise solver and solve
+		
+		x1 = [0.0; 0.0; 0.0; 0.0] + (rand(4) .- 0.5) .* [0.05, 0.2, 0.1, 0.1]
+		ȳ = [1.0e-2 * (rand(ny) .- 0.5) for k = 1:N-1]
 
-initialize_controls!(solver, ȳ)
-initialize_states!(solver, x̄)
-
-solve!(solver)
+		x̄ = rollout(dynamics, x1, ȳ)
+		solve!(solver, x̄, ȳ)
+        
+        if benchmark
+            solver.options.verbose = false
+            solve_time = @belapsed solve!($solver, $x̄, $ȳ)
+            @printf(io, " %2s     %5s      %5s    %.8e    %.8e    %.5f  \n", seed, solver.data.iterations[1], solver.data.status[1], solver.data.objective[1], solver.data.max_violation[1], solve_time)
+        else
+            @printf(io, " %2s     %5s      %5s    %.8e    %.8e \n", seed, solver.data.iterations[1], solver.data.status[1], solver.data.objective[1], solver.data.max_violation[1])
+        end
+    end
+end
 
 # ## Visualise solution
 
-x_sol, y_sol = get_trajectory(solver)
-
 if visualise
+	x_sol, y_sol = get_trajectory(solver)
+
 	q_sol = [x[1:nq] for x in x_sol]
 	visualize!(vis, cartpole, q_sol, Δt=h);
 end
-
-# ## Benchmark solver
-
-using BenchmarkTools
-solver.options.verbose = false
-info = @benchmark solve!($solver) setup=(initialize_controls!($solver, $ȳ), initialize_states!($solver, $x̄))

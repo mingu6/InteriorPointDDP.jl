@@ -3,20 +3,23 @@ using LinearAlgebra
 using Random
 using Plots
 using MeshCat
+using BenchmarkTools
+using Printf
+
+visualise = true
+benchmark = true
+verbose = true
 
 h = 0.05
 N = 101
-visualise = true
 
 options = Options()
 options.scaling_penalty = 1.2
 options.initial_constraint_penalty = 1e-5
-options.max_iterations = 500
-options.max_dual_updates = 20
+options.max_iterations = 300
+options.max_dual_updates = 30
 options.objective_tolerance = 1e-7
 options.lagrangian_gradient_tolerance = 1e-7
-
-Random.seed!(0)
 
 include("../../examples/models/acrobot.jl")
 
@@ -78,7 +81,7 @@ objective = [
 # ## Constraints - perturb complementarity to make easier
 
 stage_constr = Constraint((x, u) -> [
-            implicit_contact_dynamics(acrobot_impact, x, u, h, 0.0);
+            implicit_contact_dynamics(acrobot_impact, x, u, h, 1e-3);
             -u[nq+2:nq+2+2*nc:end]
             ],
             nx, ny)
@@ -91,31 +94,45 @@ constraints = [[stage_constr for k = 1:N-1]...,
 # ## Initialise solver and solve
 
 solver = Solver(dynamics, objective, constraints; options=options)
-q2_init = LinRange(q1, qN, N)[2:end]
-ū = [[1.0e-3 * randn(nu); q2_init[k]; 0.01 * ones(nc); 0.01 * ones(nc)] for k = 1:N-1]
 
-x̄ = rollout(dynamics, x0, ū)
-
-initialize_controls!(solver, ū)
-initialize_states!(solver, x̄)
-
-solve!(solver)
+open("results/acrobot_contact.txt", "w") do io
+	@printf(io, " seed  iterations  status     objective           primal        time (s)  \n")
+	for seed = 1:50
+		solver.options.verbose = verbose
+		Random.seed!(seed)
+		
+		q2_init = LinRange(q1, qN, N)[2:end]
+		ū = [[1.0e-1 * (rand(nu) .- 0.5); q2_init[k]; 0.01 * ones(nc); 0.01 * ones(nc)] for k = 1:N-1]
+		
+		x̄ = rollout(dynamics, x0, ū)
+		
+		solve!(solver, x̄, ū)
+		
+		if benchmark
+            solver.options.verbose = false
+            solve_time = @belapsed solve!($solver, $x̄, $ū)
+            @printf(io, " %2s     %5s      %5s    %.8e    %.8e    %.5f  \n", seed, solver.data.iterations[1], solver.data.status[1], solver.data.objective[1], solver.data.max_violation[1], solve_time)
+        else
+            @printf(io, " %2s     %5s      %5s    %.8e    %.8e \n", seed, solver.data.iterations[1], solver.data.status[1], solver.data.objective[1], solver.data.max_violation[1])
+        end
+	end
+end
 
 # ## Plot solution
 
-x_sol, u_sol = get_trajectory(solver)
-x_mat = reduce(vcat, transpose.(x_sol))
-q1 = x_mat[:, 1]
-q2 = x_mat[:, 2]
-v1 = (x_mat[:, 3] - x_mat[:, 1]) ./ h
-v2 = (x_mat[:, 4] - x_mat[:, 2]) ./ h
-u_mat = [map(x -> x[1], u_sol); 0.0]
-λ1 = [map(x -> x[end-1], u_sol); 0.0]
-λ2 = [map(x -> x[end], u_sol); 0.0]
-plot(range(0, (N-1) * h, length=N), [q2 λ1 λ2 v2], label=["q2" "λ1" "λ2" "v2"])
-savefig("plots/acrobot_contact.png")
-
 if visualise
+	x_sol, u_sol = get_trajectory(solver)
+	x_mat = reduce(vcat, transpose.(x_sol))
+	q1 = x_mat[:, 1]
+	q2 = x_mat[:, 2]
+	v1 = (x_mat[:, 3] - x_mat[:, 1]) ./ h
+	v2 = (x_mat[:, 4] - x_mat[:, 2]) ./ h
+	u_mat = [map(x -> x[1], u_sol); 0.0]
+	λ1 = [map(x -> x[end-1], u_sol); 0.0]
+	λ2 = [map(x -> x[end], u_sol); 0.0]
+	plot(range(0, (N-1) * h, length=N), [q2 λ1 λ2 v2], label=["q2" "λ1" "λ2" "v2"])
+	savefig("plots/acrobot_contact.png")
+
 	q_sol = state_to_configuration(solver.problem.nominal_states)
 	visualize!(vis, acrobot_impact, q_sol, Δt=h);
 end
