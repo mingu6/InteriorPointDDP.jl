@@ -7,7 +7,7 @@ using BenchmarkTools
 using Printf
 
 visualise = false
-benchmark = true
+benchmark = false
 verbose = true
 
 T = Float64
@@ -90,7 +90,7 @@ bounds = [bound for k in 1:N-1]
 
 solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
 
-timings = Float64[]
+plot()
 
 open("examples/results/acrobot_contact.txt", "w") do io
 	@printf(io, " seed  iterations  status    objective      primal      time (s)  \n")
@@ -102,17 +102,22 @@ open("examples/results/acrobot_contact.txt", "w") do io
 		
 		q2_init = LinRange(q1, qN, N)[2:end]
 		ū = [[T(1.0e-1) * (rand(T, nu) .- 0.5); q2_init[k]; T(0.01) * ones(T, nc); T(0.01) * ones(T, nc)] for k = 1:N-1]
-		solve!(solver, x1, ū)
-				
-		if benchmark
-            solver.options.verbose = false
-            solve_time = @belapsed solve!($solver, $x1, $ū)
-            @printf(io, " %2s     %5s      %5s    %.8f    %.8f    %.5f  \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf, solve_time)
-        else
-            @printf(io, " %2s     %5s      %5s    %.8f    %.8f \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf)
-        end
+		state_diffs = solve!(solver, x1, ū)
+        
+        if solver.data.status == 0
+            plot!(1:solver.data.k+1, state_diffs, yaxis=:log10, yticks=[1e2, 1e0, 1e-2, 1e-4, 1e-6, 1e-8], ylims=(1e-9, 3e2), legend=false, linecolor=1, xtickfontsize=14, ytickfontsize=14)
+		end		
+		# if benchmark
+        #     solver.options.verbose = false
+        #     solve_time = @belapsed solve!($solver, $x1, $ū)
+        #     @printf(io, " %2s     %5s      %5s    %.8f    %.8f    %.5f  \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf, solve_time)
+        # else
+        #     @printf(io, " %2s     %5s      %5s    %.8f    %.8f \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf)
+        # end
 	end
 end
+
+savefig("examples/plots/acrobot_convergence.png")
 
 # ## Plot solution
 
