@@ -72,7 +72,7 @@ for k = 1:N-1
 end
 
 open("results/cartpole.txt", "w") do io
-	@printf(io, " seed  iterations  status    objective       primal      time (s)  \n")
+	@printf(io, " seed  iterations  status     objective           primal        time (s)  \n")
 	for seed = 1:50
 		set_attribute(model, "print_level", print_level)
 		Random.seed!(seed)
@@ -107,9 +107,9 @@ open("results/cartpole.txt", "w") do io
 		if benchmark
             set_attribute(model, "print_level", 0)
             solve_time = @belapsed optimize!($model)
-            @printf(io, " %2s     %5s      %5s     %.8f    %.8f    %.5f  \n", seed, n_iter, succ, objective, constr_viol, solve_time)
+            @printf(io, " %2s     %5s      %5s     %.8e    %.8e    %.5f  \n", seed, n_iter, succ, objective, constr_viol, solve_time)
         else
-            @printf(io, " %2s     %5s      %5s     %.8f    %.8f \n", seed, n_iter, succ, objective, constr_viol)
+            @printf(io, " %2s     %5s      %5s     %.8e    %.8e \n", seed, n_iter, succ, objective, constr_viol)
         end
     end
 end

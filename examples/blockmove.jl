@@ -53,7 +53,7 @@ bounds = [bound for k = 1:N-1]
 solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
 
 open("examples/results/blockmove.txt", "w") do io
-	@printf(io, " seed  iterations  status    objective      primal      time (s)  \n")
+	@printf(io, " seed  iterations  status     objective           primal        time (s)  \n")
     for seed = 1:50
         solver.options.verbose = verbose
         Random.seed!(seed)
@@ -66,9 +66,9 @@ open("examples/results/blockmove.txt", "w") do io
         if benchmark
             solver.options.verbose = false
             solve_time = @belapsed solve!($solver, $x1, $ū)
-            @printf(io, " %2s     %5s      %5s    %.8f    %.8f    %.5f  \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf, solve_time)
+            @printf(io, " %2s     %5s      %5s    %.8e    %.8e    %.5f  \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf, solve_time)
         else
-            @printf(io, " %2s     %5s      %5s    %.8f    %.8f \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf)
+            @printf(io, " %2s     %5s      %5s    %.8e    %.8e \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf)
         end
     end
 end
