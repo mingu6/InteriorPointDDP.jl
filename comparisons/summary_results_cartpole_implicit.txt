@@ -1,0 +1,21 @@
+IPDDP2 
+
+Iterations:  24.25  29.0  33.0 
+Objective:  5.82487268e+00  6.32104303e+00  7.19702941e+00 
+Constraint Violation:  3.68221983e-15  4.37497261e-15  5.15284447e-15 
+Wall Clock (s):  0.01929  0.02288  0.02566 
+
+IPOPT 
+
+Iterations:  30.0  34.5  38.75 
+Objective:  5.82487268e+00  6.32104303e+00  7.19702941e+00 
+Constraint Violation:  0.00000000e+00  0.00000000e+00  0.00000000e+00 
+Wall Clock (s):  0.04169  0.04870  0.05887 
+
+AL-iLQR 
+
+Iterations:  1072.75  1198.0  1274.5 
+Objective:  5.83140795e+00  6.36274581e+00  7.49171810e+00 
+Constraint Violation:  2.51439719e-03  3.45734982e-03  4.02523725e-03 
+Wall Clock (s):  0.45671  0.51780  0.54748 
+

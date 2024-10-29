@@ -1,0 +1,9 @@
+IPDDP2 
+
+Iterations:  557.25  614.5  779.25 
+Objective:  1.37272006e+00  1.37272006e+00  1.37272006e+00 
+Constraint Violation:  3.21447730e-13  4.90810951e-13  6.43982914e-13 
+Wall Clock (s):  1.10970  1.27501  1.63037 
+
+IPOPT 
+
