@@ -4,26 +4,26 @@ using Plots
 using Random
 using Printf
 
-visualise = false
+visualise = true
 benchmark = true
 verbose = true
-quasi_newton = false
+quasi_newton = true
 n_benchmark = 10
 
 T = Float64
 N = 101
 h = 0.05
 r_car = 0.02
-xN = T[1.0; 1.0; π / 4]
+xN = T[1.0; 1.0; π / 4; 0.0]
 options = Options{T}(quasi_newton=quasi_newton, verbose=true)
 
-num_state = 3
+num_state = 4
 num_action = 2
 
 # ## control limits
 
-ul = T[-0.1; -5.0]
-uu = T[1.0; 5.0]
+ul = T[-2.0; -5.0]
+uu = T[2.0; 5.0]
 
 # ## obstacles
 
@@ -31,7 +31,7 @@ xyr_obs = [
     T[0.05, 0.25, 0.1],
     T[0.45, 0.1, 0.15],
     T[0.7, 0.7, 0.2],
-    T[0.35, 0.4, 0.1]
+    T[0.30, 0.4, 0.1]
     ]
 num_obstacles = length(xyr_obs)
 num_primal = num_action + num_obstacles + 2  # 2 slacks for box constraints
@@ -41,7 +41,7 @@ include("../examples/visualise/concar.jl")
 # ## Dynamics - explicit midpoint for integrator
 
 function car_continuous(x, u)
-    [u[1] * cos(x[3]); u[1] * sin(x[3]); u[2]]
+    [x[4] * cos(x[3]); x[4] * sin(x[3]); u[2]; u[1]]
 end
 
 function car_discrete(x, u)
@@ -55,8 +55,8 @@ dynamics = [car for k = 1:N-1]
 
 stage_cost = (x, u) -> begin
     J = 0.0
-    J += 1e-2 * dot(x - xN, x - xN)
-    J += 1e-1 * dot(u[1:2] .* [1.0, 0.1], u[1:2])
+    J += h * dot(x - xN, x - xN)
+    J += h * dot(u[1:2] .* [10.0, 1.0], u[1:2])
     return J
 end
 objective = [
@@ -99,14 +99,14 @@ solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
 
 # ## Initialise solver and solve
 
-fname = quasi_newton ? "examples/results/concar.txt" : "examples/results/concar.txt"
+fname = quasi_newton ? "examples/results/concar_QN.txt" : "examples/results/concar.txt"
 open(fname, "w") do io
-	@printf(io, " seed  iterations  status     objective           primal        wall (s)   solver(s)  \n")
+	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")
     for seed = 1:50
         solver.options.verbose = verbose
         Random.seed!(seed)
         
-        x1 = T[0.0; 0.0; 0.0] + rand(T, 3) .* T[0.05, 0.05, π / 2]
+        x1 = T[0.0; 0.0; 0.0; 0.0] + rand(T, 4) .* T[0.05; 0.05; π / 2; 0.0]
         ū = [[T(1.0e-3) .* (rand(T, 2) .- 0.5); T(0.01) * ones(T, num_obstacles + 2)] for k = 1:N-1]
     
         solve!(solver, x1, ū)
@@ -122,7 +122,7 @@ open(fname, "w") do io
             end
             solver_time /= n_benchmark
             wall_time /= n_benchmark
-            @printf(io, " %2s     %5s      %5s    %.8e    %.8e    %5.1f    %5.1f  \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf, wall_time * 1000, solver_time * 1000)
+            @printf(io, " %2s     %5s      %5s    %.8e    %.8e     %5.1f         %5.1f  \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf, wall_time * 1000, solver_time * 1000)
         else
             @printf(io, " %2s     %5s      %5s    %.8e    %.8e \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf)
         end
@@ -134,7 +134,7 @@ end
 if visualise
     x_sol, u_sol = get_trajectory(solver)
     
-    plot()
+    plot(xlims=(0, 1), ylims=(0, 1))
     plotTrajectory!(x_sol)
     for xyr in xyr_obs
         plotCircle!(xyr[1], xyr[2], xyr[3])

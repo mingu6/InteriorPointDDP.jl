@@ -12,7 +12,7 @@ verbose = true
 N = 101
 h = 0.05
 r_car = 0.02
-xN = [1.0; 1.0; π / 4]
+xN = [1.0; 1.0; π / 4; 0.0]
 
 options = Options()
 options.scaling_penalty = 2.0
@@ -21,13 +21,13 @@ options.max_iterations = 1000
 options.max_dual_updates = 30
 
 # ## car 
-num_state = 3
+num_state = 4
 num_action = 2
 
 # ## control limits
 
-ul = [-0.1; -5.0]
-uu = [1.0; 5.0]
+ul = [-2.0; -5.0]
+uu = [2.0; 5.0]
 
 # ## obstacles
 
@@ -35,7 +35,7 @@ xyr_obs = [
     [0.05, 0.25, 0.1],
     [0.45, 0.1, 0.15],
     [0.7, 0.7, 0.2],
-    [0.35, 0.4, 0.1]
+    [0.30, 0.4, 0.1]
     ]
 num_obstacles = length(xyr_obs)
 
@@ -44,7 +44,7 @@ include("../../examples/visualise/concar.jl")
 # ## Dynamics - explicit midpoint for integrator
 
 function car_continuous(x, u)
-    [u[1] * cos(x[3]); u[1] * sin(x[3]); u[2]]
+    [x[4] * cos(x[3]); x[4] * sin(x[3]); u[2]; u[1]]
 end
 
 function car_discrete(x, u)
@@ -58,8 +58,8 @@ dynamics = [car for k = 1:N-1]
 
 stage_cost = (x, u) -> begin
     J = 0.0
-    J += 1e-2 * dot(x - xN, x - xN)
-    J += 1e-1 * dot(u, u)
+    J += h * dot(x - xN, x - xN)
+    J += h * dot(u[1:2] .* [10.0, 1.0], u[1:2])
     return J
 end
 objective = [
@@ -103,7 +103,7 @@ open("results/concar.txt", "w") do io
 		
         # ## Initialise solver and solve
         
-        x0 = [0.0; 0.0; 0.0] + rand(3) .* [0.05, 0.05, π / 2]
+        x0 = [0.0; 0.0; 0.0; 0.0] + rand(4) .* [0.05; 0.05; π / 2; 0.0]
         ū = [1.0e-3 .* (rand(2) .- 0.5) for k = 1:N-1]
         x̄ = rollout(dynamics, x0, ū)
         
@@ -127,7 +127,7 @@ if visualise
     x_sol, u_sol = get_trajectory(solver)
     
     # ## visualize
-    plot()
+    plot(xlims=(0, 1), ylims=(0, 1))
     plotTrajectory!(x_sol)
     for xyr in xyr_obs
         plotCircle!(xyr[1], xyr[2], xyr[3])
