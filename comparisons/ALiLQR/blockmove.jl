@@ -60,7 +60,7 @@ constraints = [
 solver = Solver(dynamics, objective, constraints; options=options)
 
 open("results/blockmove.txt", "w") do io
-	@printf(io, " seed  iterations  status     objective           primal        time (s)  \n")
+	@printf(io, " seed  iterations  status     objective           primal        wall (ms)  solver (ms)  \n")
 	for seed = 1:50
 		solver.options.verbose = verbose
 		Random.seed!(seed)
@@ -71,8 +71,9 @@ open("results/blockmove.txt", "w") do io
 		
 		if benchmark
             solver.options.verbose = false
-            solve_time = @belapsed solve!($solver, $x̄, $ū)
-            @printf(io, " %2s     %5s      %5s    %.8e    %.8e    %.5f  \n", seed, solver.data.iterations[1], solver.data.status[1], solver.data.objective[1], solver.data.max_violation[1], solve_time)
+            solve_time = @belapsed solve!($solver, $x̄, $ū) samples=10
+            @printf(io, " %2s     %5s      %5s    %.8e    %.8e    %5.1f       %5.1f\n", seed, solver.data.iterations[1], solver.data.status[1], solver.data.objective[1],
+                            solver.data.max_violation[1], solve_time * 1000, 0.0)
         else
             @printf(io, " %2s     %5s      %5s    %.8e    %.8e \n", seed, solver.data.iterations[1], solver.data.status[1], solver.data.objective[1], solver.data.max_violation[1])
         end

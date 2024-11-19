@@ -18,7 +18,7 @@ function forward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::Sol
     while data.step_size >= min_step_size
         α = data.step_size
         try
-            rollout!(policy, problem, step_size=α)
+            rollout!(policy, data, problem, step_size=α)
         catch e
             # reduces step size if NaN or Inf encountered
             e isa DomainError && (data.step_size *= 0.5, continue)
@@ -155,7 +155,7 @@ function expected_decrease_cost(policy::PolicyData{T}, problem::ProblemData{T}, 
     return Δφ_L * step_size, Δφ_Q * step_size^2
 end
 
-function rollout!(policy::PolicyData{T}, problem::ProblemData{T}; step_size::T=1.0) where T
+function rollout!(policy::PolicyData{T}, data::SolverData{T}, problem::ProblemData{T}; step_size::T=1.0) where T
     dynamics = problem.model.dynamics
     
     x, u, _ = primal_trajectories(problem, mode=:current)
@@ -197,6 +197,8 @@ function rollout!(policy::PolicyData{T}, problem::ProblemData{T}; step_size::T=1
         mul!(zu[t], ζu[t], x[t], 1.0, 1.0)
         mul!(zu[t], ζu[t], x̄[t], -1.0, 1.0)
         
+        fn_eval_time_ = time()
         dynamics!(d, x[t+1], x[t], u[t])
+        data.fn_eval_time += time() - fn_eval_time_
     end
 end

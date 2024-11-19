@@ -117,7 +117,9 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
             
             # apply second order terms to Q for full DDP, i.e., Vx * fxx, Vx * fuu, Vx * fxu
             if !options.quasi_newton
+                fn_eval_time_ = time()
                 tensor_contraction!(vfxx[t], vfux[t], vfuu[t], problem.model.dynamics[t], x[t], u[t], Vx[t+1])
+                data.fn_eval_time += time() - fn_eval_time_
                 Qxx[t] .+= vfxx[t]
                 Qux[t] .+= vfux[t]
                 Quu[t] .+= vfuu[t]

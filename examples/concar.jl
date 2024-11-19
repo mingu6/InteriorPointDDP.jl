@@ -2,19 +2,20 @@ using InteriorPointDDP
 using LinearAlgebra
 using Plots
 using Random
-using BenchmarkTools
 using Printf
 
 visualise = false
 benchmark = true
 verbose = true
+quasi_newton = false
+n_benchmark = 10
 
 T = Float64
 N = 101
 h = 0.05
 r_car = 0.02
 xN = T[1.0; 1.0; π / 4]
-options = Options{T}(quasi_newton=false, verbose=true)
+options = Options{T}(quasi_newton=quasi_newton, verbose=true)
 
 num_state = 3
 num_action = 2
@@ -95,11 +96,12 @@ bounds = [bound for k in 1:N-1]
 
 solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
 
-timings = Float64[]
 
 # ## Initialise solver and solve
-open("examples/results/concar.txt", "w") do io
-	@printf(io, " seed  iterations  status     objective           primal        time (s)  \n")
+
+fname = quasi_newton ? "examples/results/concar.txt" : "examples/results/concar.txt"
+open(fname, "w") do io
+	@printf(io, " seed  iterations  status     objective           primal        wall (s)   solver(s)  \n")
     for seed = 1:50
         solver.options.verbose = verbose
         Random.seed!(seed)
@@ -111,8 +113,16 @@ open("examples/results/concar.txt", "w") do io
         
         if benchmark
             solver.options.verbose = false
-            solve_time = @belapsed solve!($solver, $x1, $ū)
-            @printf(io, " %2s     %5s      %5s    %.8e    %.8e    %.5f  \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf, solve_time)
+            solver_time = 0.0
+            wall_time = 0.0
+            for i in 1:n_benchmark
+                solve!(solver, x1, ū)
+                solver_time += solver.data.solver_time
+                wall_time += solver.data.wall_time
+            end
+            solver_time /= n_benchmark
+            wall_time /= n_benchmark
+            @printf(io, " %2s     %5s      %5s    %.8e    %.8e    %5.1f    %5.1f  \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf, wall_time * 1000, solver_time * 1000)
         else
             @printf(io, " %2s     %5s      %5s    %.8e    %.8e \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf)
         end

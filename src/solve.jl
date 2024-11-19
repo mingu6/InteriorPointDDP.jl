@@ -18,15 +18,17 @@ function solve!(solver::Solver{T}) where T
     reset!(problem.model)
     reset!(problem.cost_data)
     reset!(data)
-    reset_duals!(problem)  # TODO: initialize better, wrap up with initialization of problem data
+    reset_duals!(problem)
     
     time0 = time()
     
     # automatically select initial perturbation. loosely based on bound of CS condition (duality) for LPs
+    fn_eval_time_ = time()
     cost!(data, problem, mode=:nominal)
     data.μ = options.μ_init
 
     constraint!(problem, data.μ; mode=:nominal)
+    data.fn_eval_time += time() - fn_eval_time_
     
     # update performance measures for first iterate (req. for sufficient decrease conditions for step acceptance)
     data.primal_1_curr = constraint_violation_1norm(problem, mode=:nominal)
@@ -40,7 +42,9 @@ function solve!(solver::Solver{T}) where T
     num_bounds = sum(b.num_lower + b.num_upper for b in problem.bounds)
 
     while data.k < options.max_iterations
+        fn_eval_time_ = time()
         evaluate_derivatives!(problem, mode=:nominal)
+        data.fn_eval_time += time() - fn_eval_time_
         
         backward_pass!(policy, problem, data, options, mode=:nominal, verbose=options.verbose)
         data.status != 0 && break
@@ -58,15 +62,17 @@ function solve!(solver::Solver{T}) where T
             data.μ = max(options.optimality_tolerance / 10.0, min(options.κ_μ * data.μ, data.μ ^ options.θ_μ))
             reset_filter!(data)
             # performance of current iterate updated to account for barrier parameter change
+            fn_eval_time_ = time()
             constraint!(problem, data.μ; mode=:nominal)
+            data.fn_eval_time += time() - fn_eval_time_
             data.barrier_obj_curr = barrier_objective!(problem, data, policy, mode=:nominal)
+            
             data.primal_1_curr = constraint_violation_1norm(problem, mode=:nominal)
             data.j += 1
             continue
         end
         
         options.verbose && iteration_status(data, options)
-        data.p = 0
         
         forward_pass!(policy, problem, data, options, verbose=options.verbose)
         data.status != 0 && break
@@ -79,6 +85,7 @@ function solve!(solver::Solver{T}) where T
         
         data.k += 1
         data.wall_time = time() - time0
+        data.solver_time = data.wall_time - data.fn_eval_time
     end
     
     data.k == options.max_iterations && (data.status = 8)

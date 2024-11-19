@@ -9,6 +9,7 @@ using Printf
 visualise = true
 output = false
 benchmark = true
+n_benchmark = 10
 
 print_level = output ? 5 : 4
 
@@ -25,7 +26,7 @@ include("ipopt_parse.jl")
 
 model = Model(
             optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_method" => "none", "max_refinement_steps" => 0, 
-                        "min_refinement_steps" => 0, "print_level" => print_level)
+                        "min_refinement_steps" => 0, "print_level" => print_level, "print_timing_statistics" => "yes")
             );
 
 @variable(model, x[1:N, 1:nx]);
@@ -96,7 +97,7 @@ end
 @objective(model, Min, cost(x, u))
 
 open("results/concar.txt", "w") do io
-	@printf(io, " seed  iterations  status     objective           primal        time (s)  \n")
+	@printf(io, " seed  iterations  status     objective           primal        wall (ms)  solver (ms) \n")
 	for seed = 1:50
 		set_attribute(model, "print_level", print_level)
 		Random.seed!(seed)
@@ -129,13 +130,21 @@ open("results/concar.txt", "w") do io
         end
         
         ipopt_out = @capture_out optimize!(model)
-		objective = objective_value(model)
-		objective, constr_viol, n_iter, succ = parse_results_ipopt(ipopt_out)
+		objective, constr_viol, n_iter, succ, _, _ = parse_results_ipopt(ipopt_out)
 		
 		if benchmark
-            set_attribute(model, "print_level", 0)
-            solve_time = @belapsed optimize!($model)
-            @printf(io, " %2s     %5s      %5s     %.8e    %.8e    %.5f  \n", seed, n_iter, succ, objective, constr_viol, solve_time)
+            set_attribute(model, "print_level", 4)
+            solver_time_ = 0.0
+            wall_time_ = 0.0
+            for i = 1:n_benchmark
+                ipopt_out = @capture_out optimize!(model)
+                _, _, _, _, solver_time, wall_time = parse_results_ipopt(ipopt_out)
+                solver_time_ += solver_time
+                wall_time_ += wall_time
+            end
+            solver_time_ /= n_benchmark
+            wall_time_ /= n_benchmark
+            @printf(io, " %2s     %5s      %5s     %.8e    %.8e    %5.1f        %5.1f  \n", seed, n_iter, succ, objective, constr_viol, wall_time_, solver_time_)
         else
             @printf(io, " %2s     %5s      %5s     %.8e    %.8e \n", seed, n_iter, succ, objective, constr_viol)
         end

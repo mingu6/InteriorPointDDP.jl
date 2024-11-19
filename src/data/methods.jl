@@ -56,7 +56,9 @@ function barrier_objective!(problem::ProblemData{T}, data::SolverData{T}, policy
     end
     
     barrier_obj *= data.μ
-    cost!(data, problem, mode=mode) # TODO: allocs
+    fn_eval_time_ = time()
+    cost!(data, problem, mode=mode)
+    data.fn_eval_time += time() - fn_eval_time_
     barrier_obj += data.objective
     return barrier_obj
 end
