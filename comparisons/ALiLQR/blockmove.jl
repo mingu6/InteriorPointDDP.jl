@@ -6,7 +6,7 @@ using BenchmarkTools
 using Printf
 
 visualise = true
-benchmark = true
+benchmark = false
 verbose = true
 
 N = 101
@@ -61,7 +61,7 @@ solver = Solver(dynamics, objective, constraints; options=options)
 
 open("results/blockmove.txt", "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)  solver (ms)  \n")
-	for seed = 1:50
+	for seed = 1:1
 		solver.options.verbose = verbose
 		Random.seed!(seed)
         ū = [[1.0e-0 * (rand(1) .- 0.5); -0.01 * ones(2)] for k = 1:N-1]
@@ -80,15 +80,35 @@ open("results/blockmove.txt", "w") do io
     end
 end
 
-# ## Plot solution
-
-if visualise
-    x = map(x -> x[1], solver.problem.nominal_states)
-    v = map(x -> x[2], solver.problem.nominal_states)
-    u = [map(u -> u[1], solver.problem.nominal_actions[1:end-1]); 0.0]
-    work = [abs(vk * uk) for (vk, uk) in zip(v, u)]
-    plot(range(0, (N-1) * h, length=N), [x v u work], label=["x" "v" "u" "work"])
-    savefig("plots/blockmove.png")
+x_sol, u_sol = get_trajectory(solver)
     
-    println("Total absolute work: ", sum(work))
+x = map(x -> x[1], x_sol)
+v = map(x -> x[2], x_sol)
+F = map(u -> u[1], u_sol)
+s1 = map(u -> u[2], u_sol)
+s2 = map(u -> u[3], u_sol)
+work = [abs(vk * Fk) for (vk, Fk) in zip(v, F)]
+s = [s1k - s2k for (s1k, s2k) in zip(s1, s2)]
+
+using DelimitedFiles
+open("alilqr_bm_xv.txt", "w") do io
+    writedlm(io, [x v])
 end
+
+open("alilqr_bm_Fw.txt", "w") do io
+    writedlm(io, [F work s])
+end
+
+
+# # ## Plot solution
+
+# if visualise
+#     x = map(x -> x[1], solver.problem.nominal_states)
+#     v = map(x -> x[2], solver.problem.nominal_states)
+#     u = [map(u -> u[1], solver.problem.nominal_actions[1:end-1]); 0.0]
+#     work = [abs(vk * uk) for (vk, uk) in zip(v, u)]
+#     plot(range(0, (N-1) * h, length=N), [x v u work], label=["x" "v" "u" "work"])
+#     savefig("plots/blockmove.png")
+    
+#     println("Total absolute work: ", sum(work))
+# end
