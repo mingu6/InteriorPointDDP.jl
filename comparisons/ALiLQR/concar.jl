@@ -5,8 +5,8 @@ using Random
 using BenchmarkTools
 using Printf
 
-visualise = false
-benchmark = true
+visualise = true
+benchmark = false
 verbose = true
 
 N = 101
@@ -95,6 +95,15 @@ constraints = [[obs_constr for k = 1:N-1]..., Constraint()]
 
 solver = Solver(dynamics, objective, constraints; options=options)
 
+# ## Plots
+
+if visualise
+    plot(xlims=(0, 1), ylims=(0, 1), xtickfontsize=14, ytickfontsize=14)
+    for xyr in xyr_obs
+        plotCircle!(xyr[1], xyr[2], xyr[3])
+    end
+end
+
 open("results/concar.txt", "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)  solver (ms)  \n")
 	for seed = 1:50
@@ -108,6 +117,11 @@ open("results/concar.txt", "w") do io
         x̄ = rollout(dynamics, x0, ū)
         
         solve!(solver, x̄, ū)
+        
+        if visualise
+            x_sol, u_sol = get_trajectory(solver)
+            plotTrajectory!(x_sol)
+        end
 		
 		if benchmark
             solver.options.verbose = false
@@ -120,17 +134,4 @@ open("results/concar.txt", "w") do io
     end
 end
 
-# ## Plot solution
-
-if visualise
-    # ## solution
-    x_sol, u_sol = get_trajectory(solver)
-    
-    # ## visualize
-    plot(xlims=(0, 1), ylims=(0, 1))
-    plotTrajectory!(x_sol)
-    for xyr in xyr_obs
-        plotCircle!(xyr[1], xyr[2], xyr[3])
-    end
-    savefig("plots/concar.png")
-end
+visualise && savefig("plots/concar_ALiLQR.pdf")

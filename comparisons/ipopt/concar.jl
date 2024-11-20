@@ -8,7 +8,7 @@ using Printf
 
 visualise = true
 output = false
-benchmark = true
+benchmark = false
 n_benchmark = 10
 
 print_level = output ? 5 : 4
@@ -96,6 +96,15 @@ end
     
 @objective(model, Min, cost(x, u))
 
+# ## Plots
+
+if visualise
+    plot(xlims=(0, 1), ylims=(0, 1), xtickfontsize=14, ytickfontsize=14)
+    for xyr in xyr_obs
+        plotCircle!(xyr[1], xyr[2], xyr[3])
+    end
+end
+
 open("results/concar.txt", "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)  solver (ms) \n")
 	for seed = 1:50
@@ -132,6 +141,13 @@ open("results/concar.txt", "w") do io
         ipopt_out = @capture_out optimize!(model)
 		objective, constr_viol, n_iter, succ, _, _ = parse_results_ipopt(ipopt_out)
 		
+		if visualise
+		    xv = value.(x)
+            x_sol = [xv[k, :] for k in 1:N]
+            
+            plotTrajectory!(x_sol)
+        end
+		
 		if benchmark
             set_attribute(model, "print_level", 4)
             solver_time_ = 0.0
@@ -151,14 +167,4 @@ open("results/concar.txt", "w") do io
     end
 end
 
-if visualise
-    xv = value.(x)
-    x_sol = [xv[k, :] for k in 1:N]
-    
-    plot(xlims=(0, 1), ylims=(0, 1))
-    plotTrajectory!(x_sol)
-    for xyr in xyr_obs
-        plotCircle!(xyr[1], xyr[2], xyr[3])
-    end
-    savefig("plots/concar.png")
-end
+visualise && savefig("plots/concar_IPOPT.pdf")

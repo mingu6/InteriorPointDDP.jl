@@ -5,9 +5,9 @@ using Random
 using Printf
 
 visualise = true
-benchmark = true
+benchmark = false
 verbose = true
-quasi_newton = true
+quasi_newton = false
 n_benchmark = 10
 
 T = Float64
@@ -96,6 +96,14 @@ bounds = [bound for k in 1:N-1]
 
 solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
 
+# ## Plots
+
+if visualise
+    plot(xlims=(0, 1), ylims=(0, 1), xtickfontsize=14, ytickfontsize=14)
+    for xyr in xyr_obs
+        plotCircle!(xyr[1], xyr[2], xyr[3])
+    end
+end
 
 # ## Initialise solver and solve
 
@@ -110,6 +118,11 @@ open(fname, "w") do io
         ū = [[T(1.0e-3) .* (rand(T, 2) .- 0.5); T(0.01) * ones(T, num_obstacles + 2)] for k = 1:N-1]
     
         solve!(solver, x1, ū)
+        
+        if visualise
+            x_sol, u_sol = get_trajectory(solver)
+            plotTrajectory!(x_sol)
+        end
         
         if benchmark
             solver.options.verbose = false
@@ -129,15 +142,4 @@ open(fname, "w") do io
     end
 end
 
-# # ## Plot solution
-
-if visualise
-    x_sol, u_sol = get_trajectory(solver)
-    
-    plot(xlims=(0, 1), ylims=(0, 1))
-    plotTrajectory!(x_sol)
-    for xyr in xyr_obs
-        plotCircle!(xyr[1], xyr[2], xyr[3])
-    end
-    savefig("examples/plots/concar.png")
-end
+visualise && savefig("examples/plots/concar_IPDDP.pdf")
