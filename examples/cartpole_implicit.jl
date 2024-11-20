@@ -7,7 +7,7 @@ using Printf
 
 visualise = false
 benchmark = true
-verbose = false
+verbose = true
 quasi_newton = false
 n_benchmark = 10
 

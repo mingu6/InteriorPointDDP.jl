@@ -6,7 +6,7 @@ using MeshCat
 using Suppressor
 using Printf
 
-visualise = true
+visualise = false
 output = false
 benchmark = true
 n_benchmark = 10
@@ -137,7 +137,7 @@ open("results/acrobot_contact.txt", "w") do io
             end
             solver_time_ /= n_benchmark
             wall_time_ /= n_benchmark
-            @printf(io, " %2s     %5s      %5s     %.8e    %.8e    %5.1f        %5.1f  \n", seed, n_iter, succ, objective, constr_viol, wall_time_, solver_time_)
+            @printf(io, " %2s     %5s      %5s     %.8e    %.8e    %5.1f         %5.1f  \n", seed, n_iter, succ, objective, constr_viol, wall_time_, solver_time_)
         else
             @printf(io, " %2s     %5s      %5s     %.8e    %.8e \n", seed, n_iter, succ, objective, constr_viol)
         end

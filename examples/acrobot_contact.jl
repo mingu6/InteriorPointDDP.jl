@@ -94,7 +94,7 @@ solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
 fname = quasi_newton ? "examples/results/acrobot_contact_QN.txt" : "examples/results/acrobot_contact.txt"
 open(fname, "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (s)   solver(s)  \n")
-	for seed = 1:2
+	for seed = 1:50
 		solver.options.verbose = verbose
 		Random.seed!(seed)
 		
@@ -115,7 +115,7 @@ open(fname, "w") do io
             end
             solver_time /= n_benchmark
             wall_time /= n_benchmark
-            @printf(io, " %2s     %5s      %5s    %.8e    %.8e    %5.1f       %5.1f  \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf, wall_time * 1000, solver_time * 1000)
+            @printf(io, " %2s     %5s      %5s    %.8e    %.8e    %5.1f          %5.1f  \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf, wall_time * 1000, solver_time * 1000)
         else
             @printf(io, " %2s     %5s      %5s    %.8e    %.8e \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf)
         end

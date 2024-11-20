@@ -6,7 +6,7 @@ using MeshCat
 using BenchmarkTools
 using Printf
 
-visualise = true
+visualise = false
 benchmark = true
 verbose = true
 
@@ -96,7 +96,7 @@ solver = Solver(dynamics, objective, constraints; options=options)
 
 open("results/acrobot_contact.txt", "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)  solver (ms)  \n")
-	for seed = 1:2
+	for seed = 1:50
 		solver.options.verbose = verbose
 		Random.seed!(seed)
 		
