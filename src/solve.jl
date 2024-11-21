@@ -41,7 +41,11 @@ function solve!(solver::Solver{T}) where T
     
     num_bounds = sum(b.num_lower + b.num_upper for b in problem.bounds)
 
+    states_iter = []
+    push!(states_iter, deepcopy(problem.nominal_states))
+
     while data.k < options.max_iterations
+    
         fn_eval_time_ = time()
         evaluate_derivatives!(problem, mode=:nominal)
         data.fn_eval_time += time() - fn_eval_time_
@@ -86,12 +90,29 @@ function solve!(solver::Solver{T}) where T
         data.k += 1
         data.wall_time = time() - time0
         data.solver_time = data.wall_time - data.fn_eval_time
+        
+        push!(states_iter, deepcopy(problem.nominal_states))
     end
     
     data.k == options.max_iterations && (data.status = 8)
     options.verbose && iteration_status(data, options)
     options.verbose && on_exit(data)
-    return nothing
+    
+    
+    # compute \|x - x*\|
+    state_diffs = Float64[]
+    
+    optimal_states = problem.nominal_states
+    for states in states_iter[1:end-1]
+        diff_norm = 0.0
+        for i = 1:problem.horizon
+            diff = states[i] - optimal_states[i]
+            diff_norm += dot(diff, diff)
+        end
+        push!(state_diffs, sqrt(diff_norm))
+    end
+    push!(state_diffs, 1e-10)
+    return state_diffs
 end
 
 function update_filter!(data::SolverData{T}, options::Options{T}) where T

@@ -4,9 +4,9 @@ using Plots
 using Random
 using Printf
 
-visualise = true
+visualise = false
 benchmark = false
-verbose = true
+verbose = false
 quasi_newton = false
 n_benchmark = 10
 
@@ -107,6 +107,8 @@ end
 
 # ## Initialise solver and solve
 
+plot()
+
 fname = quasi_newton ? "examples/results/concar_QN.txt" : "examples/results/concar.txt"
 open(fname, "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")
@@ -117,7 +119,12 @@ open(fname, "w") do io
         x1 = T[0.0; 0.0; 0.0; 0.0] + rand(T, 4) .* T[0.05; 0.05; π / 2; 0.0]
         ū = [[T(1.0e-3) .* (rand(T, 2) .- 0.5); T(0.01) * ones(T, num_obstacles + 2)] for k = 1:N-1]
     
-        solve!(solver, x1, ū)
+        state_diffs = solve!(solver, x1, ū)
+        
+        if solver.data.status == 0
+            plot!(1:solver.data.k+1, state_diffs, yaxis=:log10, yticks=[1e2, 1e0, 1e-2, 1e-4, 1e-6, 1e-8],
+                    ylims=(1e-9, 3e2), legend=false, linecolor=1, xtickfontsize=14, ytickfontsize=14)
+		end
         
         if visualise
             x_sol, u_sol = get_trajectory(solver)
@@ -142,5 +149,7 @@ open(fname, "w") do io
         end
     end
 end
+
+savefig("examples/plots/concar_convergence.pdf")
 
 visualise && savefig("examples/plots/concar_IPDDP.pdf")

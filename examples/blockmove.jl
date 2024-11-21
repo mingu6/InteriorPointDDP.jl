@@ -5,8 +5,8 @@ using Plots
 using Printf
 
 visualise = false
-benchmark = true
-verbose = true
+benchmark = false
+verbose = false
 quasi_newton = false
 n_benchmark = 10
 
@@ -53,6 +53,8 @@ bounds = [bound for k = 1:N-1]
 
 solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
 
+plot()
+
 fname = quasi_newton ? "examples/results/blockmove_QN.txt" : "examples/results/blockmove.txt"
 open(fname, "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (s)   solver(s)  \n")
@@ -63,7 +65,12 @@ open(fname, "w") do io
         # ## Initialise solver and solve
         
         ū = [[T(1.0e-0) * (randn(T, 1) .- 0.5); T(0.01) * ones(T, 2)] for k = 1:N-1]
-        solve!(solver, x1, ū)
+        state_diffs = solve!(solver, x1, ū)
+        
+        if solver.data.status == 0
+            plot!(1:solver.data.k+1, state_diffs, yaxis=:log10, yticks=[1e2, 1e0, 1e-2, 1e-4, 1e-6, 1e-8],
+                    ylims=(1e-9, 3e2), legend=false, linecolor=1, xtickfontsize=14, ytickfontsize=14)
+		end
 
         if benchmark
             solver.options.verbose = false
@@ -83,6 +90,8 @@ open(fname, "w") do io
         end
     end
 end
+
+savefig("examples/plots/blockmove_convergence.pdf")
 
 # ## Plot solution
 
