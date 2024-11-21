@@ -26,9 +26,9 @@ h = 0.05
 N = 101
 
 nq = cartpole.nq
-nu = cartpole.nu
+nF = cartpole.nu
 nx = 2 * nq
-ny = nu + nq
+nu = nF + nq
 
 xN = [0.0; π; 0.0; 0.0]
 
@@ -40,8 +40,8 @@ model = Model(
 
 # ## Costs
 
-objt = (x, y) -> h * y[1] * y[1]
-objT = (x, y) -> 400. * (x - xN)' * (x - xN)
+objt = (x, u) -> h * u[1] * u[1]
+objT = (x, u) -> 400. * (x - xN)' * (x - xN)
 
 cost = (x, u) -> begin
 	J = 0.0
@@ -54,21 +54,21 @@ end
 
 # ## Dynamics - implicit dynamics with RK2 integration
 
-f = (x, y) -> [x[nq .+ (1:nq)]; y[nu .+ (1:nq)]]
-cartpole_discrete = (x, y) -> x + h * f(x + 0.5 * h * f(x, y), y)  # Explicit midpoint
-dyn_con = (x, y) -> implicit_dynamics(cartpole, x, y) * h
+f = (x, u) -> [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]]
+cartpole_discrete = (x, u) -> x + h * f(x + 0.5 * h * f(x, u), u)  # Explicit midpoint
+dyn_con = (x, u) -> implicit_dynamics(cartpole, x, u) * h
 
 # ## Constraints
 
 @variable(model, x[1:N, 1:nx]);
-@variable(model, y[1:N-1, 1:ny]);
+@variable(model, u[1:N-1, 1:nu]);
 
 @objective(model, Min, cost(x, y))
 
 for k = 1:N-1
-    @constraint(model, x[k+1, :] == cartpole_discrete(x[k, :], y[k, :]))
-    @constraint(model, dyn_con(x[k, :], y[k, :]) .== 0.0)
-    @constraint(model, 4.0 .>= y[k, 1:nu] .>= -4.0)
+    @constraint(model, x[k+1, :] == cartpole_discrete(x[k, :], u[k, :]))
+    @constraint(model, dyn_con(x[k, :], u[k, :]) .== 0.0)
+    @constraint(model, 4.0 .>= u[k, 1:nF] .>= -4.0)
 end
 
 open("results/cartpole.txt", "w") do io
@@ -81,11 +81,11 @@ open("results/cartpole.txt", "w") do io
         
         x1 = [0.0; 0.0; 0.0; 0.0] + (rand(4) .- 0.5) .* [0.05, 0.2, 0.1, 0.1]
         fix.(x[1, :], x1, force = true)
-        ȳ = [1.0e-2 * (rand(ny) .- 0.5) for k = 1:N-1]
+        ū = [1.0e-2 * (rand(nu) .- 0.5) for k = 1:N-1]
         
         x̄ = [x1]
         for k in 2:N
-            push!(x̄, cartpole_discrete(x̄[k-1],  ȳ[k-1]))
+            push!(x̄, cartpole_discrete(x̄[k-1],  ū[k-1]))
         end
         
         for k = 1:N
@@ -95,8 +95,8 @@ open("results/cartpole.txt", "w") do io
         end
         
         for k = 1:N-1
-            for j = 1:ny
-                set_start_value(y[k, j], ȳ[k][j])
+            for j = 1:nu
+                set_start_value(y[k, j], ū[k][j])
             end
         end
         
@@ -126,9 +126,6 @@ end
 if visualise
     xv = value.(x)
     x_sol = [xv[k, :] for k in 1:N]
-    yv = value.(y)
-    u_sol = [yv[k, 1:nu] for k in 1:N-1]
-    
 	q_sol = [x[1:nq] for x in x_sol]
 	visualize!(vis, cartpole, q_sol, Δt=h);
 end

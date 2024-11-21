@@ -6,7 +6,7 @@ using BenchmarkTools
 using Printf
 
 visualise = true
-benchmark = false
+benchmark = true
 verbose = true
 
 N = 101
@@ -93,6 +93,8 @@ obs_constr = Constraint(stage_constr_fn, num_state, num_action,
 
 constraints = [[obs_constr for k = 1:N-1]..., Constraint()]
 
+# ## Initialise solver
+
 solver = Solver(dynamics, objective, constraints; options=options)
 
 # ## Plots
@@ -107,6 +109,7 @@ end
 open("results/concar.txt", "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)  solver (ms)  \n")
 	for seed = 1:50
+        solver = Solver(dynamics, objective, constraints; options=options)
 		solver.options.verbose = verbose
 		Random.seed!(seed)
 		
@@ -125,7 +128,7 @@ open("results/concar.txt", "w") do io
 		
 		if benchmark
             solver.options.verbose = false
-            solve_time = @belapsed solve!($solver, $x̄, $ū) samples=10
+            solve_time = @belapsed solve!($solver, $x̄, $ū) samples=10 setup=(solver=Solver(dynamics, objective, constraints; options=options))
             @printf(io, " %2s     %5s      %5s    %.8e    %.8e    %5.1f       %5.1f\n", seed, solver.data.iterations[1], solver.data.status[1], solver.data.objective[1],
                             solver.data.max_violation[1], solve_time * 1000, 0.0)
         else

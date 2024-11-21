@@ -1,11 +1,9 @@
 using IterativeLQR 
 using LinearAlgebra
-using Plots
 using Random
 using BenchmarkTools
 using Printf
 
-visualise = true
 benchmark = true
 verbose = true
 
@@ -55,14 +53,16 @@ constraints = [
     Constraint()
 ]
 
-# ## Initialise solver and solve
+# ## Initialise solver
 
 solver = Solver(dynamics, objective, constraints; options=options)
 
 open("results/blockmove.txt", "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)  solver (ms)  \n")
 	for seed = 1:50
+        solver = Solver(dynamics, objective, constraints; options=options)
 		solver.options.verbose = verbose
+		
 		Random.seed!(seed)
         ū = [[1.0e-0 * (rand(1) .- 0.5); -0.01 * ones(2)] for k = 1:N-1]
         x̄ = rollout(dynamics, x0, ū)
@@ -71,24 +71,11 @@ open("results/blockmove.txt", "w") do io
 		
 		if benchmark
             solver.options.verbose = false
-            solve_time = @belapsed solve!($solver, $x̄, $ū) samples=10
+            solve_time = @belapsed solve!($solver, $x̄, $ū) samples=10 setup=(solver=Solver(dynamics, objective, constraints; options=options))
             @printf(io, " %2s     %5s      %5s    %.8e    %.8e    %5.1f       %5.1f\n", seed, solver.data.iterations[1], solver.data.status[1], solver.data.objective[1],
                             solver.data.max_violation[1], solve_time * 1000, 0.0)
         else
             @printf(io, " %2s     %5s      %5s    %.8e    %.8e \n", seed, solver.data.iterations[1], solver.data.status[1], solver.data.objective[1], solver.data.max_violation[1])
         end
     end
-end
-
-# ## Plot solution
-
-if visualise
-    x = map(x -> x[1], solver.problem.nominal_states)
-    v = map(x -> x[2], solver.problem.nominal_states)
-    u = [map(u -> u[1], solver.problem.nominal_actions[1:end-1]); 0.0]
-    work = [abs(vk * uk) for (vk, uk) in zip(v, u)]
-    plot(range(0, (N-1) * h, length=N), [x v u work], label=["x" "v" "u" "work"])
-    savefig("plots/blockmove.png")
-    
-    println("Total absolute work: ", sum(work))
 end

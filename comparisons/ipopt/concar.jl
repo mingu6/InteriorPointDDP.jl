@@ -8,7 +8,7 @@ using Printf
 
 visualise = true
 output = false
-benchmark = false
+benchmark = true
 n_benchmark = 10
 
 print_level = output ? 5 : 4

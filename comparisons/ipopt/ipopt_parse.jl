@@ -1,6 +1,6 @@
 function parse_results_ipopt(output::String)
-    regex_obj = r"Objective...............:   (\d+.\d+e[+]\d+)    (\d+.\d+e[+]\d+)"
-    regex_constr = r"Constraint violation....:   (\d+.\d+e[+]\d+)    (\d+.\d+e[+]\d+)"
+    regex_obj = r"Objective...............:   (\d+.\d+e[+-]\d+)    (\d+.\d+e[+-]\d+)"
+    regex_constr = r"Constraint violation....:   (\d+.\d+e[+-]\d+)    (\d+.\d+e[+-]\d+)"
     regex_niter = r"Number of Iterations....: (\d+)"
     regex_succ = r"EXIT: Optimal Solution Found."
     regex_solver = r"Total seconds in IPOPT[\s\S]*=\s+(\d+.\d+)"
