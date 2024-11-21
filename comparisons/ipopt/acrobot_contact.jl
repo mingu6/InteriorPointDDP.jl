@@ -7,7 +7,7 @@ using Suppressor
 using Printf
 using LaTeXStrings
 
-visualise = false
+visualise = true
 output = false
 benchmark = true
 n_benchmark = 10
@@ -151,9 +151,9 @@ if visualise
 	λ1 = map(x -> x[end-1], u_sol)
 	λ2 = map(x -> x[end], u_sol)
 	u = map(x -> x[1], u_sol)
-	plot(range(0, N-1, N-1), [ϕ1 ϕ2 λ1 λ2], xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$",
+	plot(range(0, h * (N-1), N-1), [ϕ1 ϕ2 λ1 λ2], xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylims=(0,5),
 		legendfontsize=12, linewidth=2, linestyle=[:solid :solid :dot :dot], linecolor=[1 2 1 2], 
-		label=[L"$\phi(q)_1$" L"$\phi(q)_2$" L"$\lambda_1$" L"$\lambda_2$"])
+		background_color_legend = nothing, label=[L"$\phi(q)_1$" L"$\phi(q)_2$" L"$\lambda_1$" L"$\lambda_2$"])
 	savefig("plots/acrobot_contact_IPOPT.pdf")
 	
 	q_sol = state_to_configuration(x_sol)

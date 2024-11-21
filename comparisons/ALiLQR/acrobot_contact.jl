@@ -30,9 +30,9 @@ end
 
 nq = acrobot_impact.nq
 nc = acrobot_impact.nc
-nu = acrobot_impact.nu
+nF = acrobot_impact.nu
 nx = 2 * nq
-ny = nu + nq + 2 * nc
+ny = nF + nq + 2 * nc
 
 q1 = [0.0; 0.0]
 q2 = [0.0; 0.0]
@@ -42,7 +42,7 @@ xN = [qN; qN]
 
 # ## Dynamics - implicit variational integrator (midpoint)
 
-dyn_acrobot = Dynamics((x, u) -> [x[nq .+ (1:nq)]; u[nu .+ (1:nq)]], nx, ny)
+dyn_acrobot = Dynamics((x, u) -> [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]], nx, ny)
 dynamics = [dyn_acrobot for k = 1:N-1]
 
 # ## Costs
@@ -122,10 +122,10 @@ if visualise
 	λ1 = map(x -> x[end-1], u_sol)
 	λ2 = map(x -> x[end], u_sol)
 	u = map(x -> x[1], u_sol)
-	plot(range(0, N-1, N-1), [ϕ1 ϕ2 λ1 λ2], xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$",
-		legendfontsize=12, linewidth=2, linestyle=[:solid :solid :dot :dot :solid], linecolor=[1 2 1 2], 
-		label=[L"$\phi(q)_1$" L"$\phi(q)_2$" L"$\lambda_1$" L"$\lambda_2$"])
-	savefig("plots/acrobot_impact_ALiLQR.pdf")
+	plot(range(0, h * (N-1), N-1), [ϕ1 ϕ2 λ1 λ2], xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylims=(0,5),
+		legendfontsize=12, linewidth=2, linestyle=[:solid :solid :dot :dot], linecolor=[1 2 1 2], 
+		background_color_legend = nothing, label=[L"$\phi(q)_1$" L"$\phi(q)_2$" L"$\lambda_1$" L"$\lambda_2$"])
+	savefig("plots/acrobot_contact_ALiLQR.pdf")
 	
 	q_sol = state_to_configuration(x_sol)
 	visualize!(vis, acrobot_impact, q_sol, Δt=h);

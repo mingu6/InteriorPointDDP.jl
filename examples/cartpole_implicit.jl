@@ -6,7 +6,7 @@ using MeshCat
 using Printf
 
 visualise = false
-benchmark = true
+benchmark = false
 verbose = true
 quasi_newton = false
 n_benchmark = 10
@@ -24,9 +24,9 @@ if visualise
 end
 
 nq = cartpole.nq
-nu = cartpole.nu
+nF = cartpole.nu
 nx = 2 * nq
-ny = nu + nq  # torque and acceleration now decision variables/"controls"
+nu = nF + nq  # torque and acceleration now decision variables/"controls"
 
 xN = T[0.0; π; 0.0; 0.0]
 
@@ -34,30 +34,30 @@ options = Options{T}(quasi_newton=quasi_newton, verbose=false)
 
 # ## Dynamics - implicit dynamics with RK2 integration
 
-f = (x, y) -> [x[nq .+ (1:nq)]; y[nu .+ (1:nq)]]
-cartpole_discrete = (x, y) -> x + h * f(x + 0.5 * h * f(x, y), y)  # Explicit midpoint
-cartpole_dyn = Dynamics(cartpole_discrete, nx, ny)
+f = (x, u) -> [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]]
+cartpole_discrete = (x, u) -> x + h * f(x + 0.5 * h * f(x, u), u)  # Explicit midpoint
+cartpole_dyn = Dynamics(cartpole_discrete, nx, nu)
 dynamics = [cartpole_dyn for k = 1:N-1]
 
 # ## Costs
 
-stage = Cost((x, y) -> h * dot(y[1], y[1]), nx, ny)
+stage = Cost((x, u) -> h * dot(u[1], u[1]), nx, nu)
 objective = [
     [stage for k = 1:N-1]...,
-    Cost((x, y) -> 400.0 * dot(x - xN, x - xN), nx, 0)
+    Cost((x, u) -> 400.0 * dot(x - xN, x - xN), nx, 0)
 ] 
 
 # ## Constraints
 
-stage_constr = Constraint((x, y) -> implicit_dynamics(cartpole, x, y) * h, nx, ny)
+stage_constr = Constraint((x, u) -> implicit_dynamics(cartpole, x, u) * h, nx, nu)
 
 constraints = [stage_constr for k = 1:N-1]
 
 # ## Bounds
 
 bound = Bound(
-	[-T(4.0) * ones(T, nu); -T(Inf) * ones(T, nq)],
-	[T(4.0) * ones(T, nu); T(Inf) * ones(T, nq)]
+	[-T(4.0) * ones(T, nF); -T(Inf) * ones(T, nq)],
+	[T(4.0) * ones(T, nF); T(Inf) * ones(T, nq)]
 )
 bounds = [bound for k in 1:N-1]
 
@@ -73,7 +73,7 @@ open(fname, "w") do io
         # ## Initialise solver and solve
         
         x1 = T[0.0; 0.0; 0.0; 0.0] + (rand(T, 4) .- T(0.5)) .* T[0.05, 0.2, 0.1, 0.1]
-        ū = [T(1.0e-2) * (rand(T, ny) .- T(0.5)) for k = 1:N-1]
+        ū = [T(1.0e-2) * (rand(T, nu) .- T(0.5)) for k = 1:N-1]
         solve!(solver, x1, ū)
         
         if benchmark
@@ -87,7 +87,8 @@ open(fname, "w") do io
             end
             solver_time /= n_benchmark
             wall_time /= n_benchmark
-            @printf(io, " %2s     %5s      %5s    %.8e    %.8e    %5.1f       %5.1f  \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf, wall_time * 1000, solver_time * 1000)
+            @printf(io, " %2s     %5s      %5s    %.8e    %.8e    %5.1f       %5.1f  \n", seed, solver.data.k, solver.data.status == 0,
+                    solver.data.objective, solver.data.primal_inf, wall_time * 1000, solver_time * 1000)
         else
             @printf(io, " %2s     %5s      %5s    %.8e    %.8e \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf)
         end
