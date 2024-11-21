@@ -14,7 +14,7 @@ v_al = alilqr_xv[:, 2]
 N = length(x_ip)
 h = 0.01
 
-plot(range(0, (N-1) * h, length=N), [x_ip v_ip x_al v_al], linecolor=[1 4 1 4], xtickfontsize=14, ytickfontsize=14,
+plot(range(0, (N-1) * h, length=N), [x_ip v_ip x_al v_al], linecolor=[1 4 1 4], xtickfontsize=14, ytickfontsize=14, ylims=(0, 1.8),
     linestyle=[:solid :solid :dot :dot], linewidth=3, legendfontsize=12, legend=:best, background_color_legend = nothing,
     xlabel="\$t\$", xlabelfontsize=14,
     label=["\$y\$ (IPDDP2)" "\$v\$ (IPDDP2)" "\$y\$ (AL-iLQR)" "\$v\$ (AL-iLQR)"])
