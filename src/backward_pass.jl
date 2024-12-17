@@ -132,7 +132,6 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
             policy.lhs_tl[t] .= Quu[t]
             policy.lhs_tr[t] .= transpose(hu[t])
             fill!(policy.lhs_br[t], 0.0)
-            policy.lhs[t] .= Symmetric(policy.lhs[t])
 
             α[t] .= Qu[t]
             α[t] .*= -1.0
