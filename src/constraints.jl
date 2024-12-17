@@ -3,8 +3,8 @@ struct Constraint
     jacobian_state
     jacobian_control
     vhxx
-    vhux  # DDP tensor contrcontrol
-    vhuu  # DDP tensor contrcontrol
+    vhux  # DDP tensor contraction
+    vhuu  # DDP tensor contraction
     num_constraint::Int
     num_state::Int
     num_control::Int
@@ -49,12 +49,12 @@ function Constraint(f::Function, num_state::Int, num_control::Int; quasi_newton:
         num_constraint, num_state, num_control, indices_compl)
 end
 
-function Constraint()
+function Constraint(num_state::Int, num_control::Int)
     return Constraint(
         (c, x, u) -> nothing,
         (c, x, u) -> nothing, (c, x, u) -> nothing,
         (c, x, u, v) -> nothing, (c, x, u, v) -> nothing, (c, x, u, v) -> nothing,
-        0, 0, 0, Int64[])
+        0, num_state, num_control, Int64[])
 end
 
 function Constraint(h::Function, hx::Function, hu::Function, num_constraint::Int, num_state::Int, num_control::Int;

@@ -55,6 +55,8 @@ function problem_data(T, dynamics::Model, costs::Costs, constraints::Constraints
     costs_dat = costs_data(T, dynamics, costs)
     constr_data = constraint_data(T, constraints)
     bounds = isnothing(bounds) ? [Bound(T, d.num_control) for d in dynamics] : bounds
+    @assert all(length(b.lower) == length(b.upper) for b in bounds)
+    @assert all(length(b.lower) == d.num_control for (b, d) in zip(bounds, dynamics))
     
     horizon = length(costs)
     
