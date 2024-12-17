@@ -48,6 +48,7 @@ xyr_obs = [
 num_obstacles = length(xyr_obs)
 
 @variable(model, s_obs[1:N-1, 1:num_obstacles]);  # slacks for obstacle constraints
+@variable(model, s_yz[1:N-1, 1:2]);  # slacks for state boundaries
 
 # ## Dynamics - explicit midpoint for integrator
 
@@ -69,10 +70,11 @@ end
 for k = 1:N-1
     @constraint(model, x[k+1, :] == car_discrete(x[k, :], u[k, :]))
     @constraint(model, ul .<= u[k, :] .<= uu)
-    @constraint(model, [0.0, 0.0] .<= x[k+1, 1:2] .<= [1.0, 1.0])
+    @constraint(model, car_discrete(x[k, :], u[k, :])[1:2] == s_yz[k, :])
+    @constraint(model, [0.0, 0.0] .<= s_yz[k, :] .<= [1.0, 1.0])
     @constraint(model, 0.0 .<= s_obs[k, :])
     for (i, obs) in enumerate(xyr_obs)
-        @constraint(model, (obs[3] + r_car)^2 - obs_dist(obs[1:2])(x[k+1, :]) + s_obs[k, i] <= 0.0)
+        @constraint(model, (obs[3] + r_car)^2 - obs_dist(obs[1:2])(x[k+1, :]) + s_obs[k, i] == 0.0)
     end
 end
 
@@ -135,6 +137,9 @@ open("results/concar.txt", "w") do io
         for k = 1:N-1
             for j = 1:num_obstacles
                 set_start_value(s_obs[k, j], 0.01)
+            end
+            for j = 1:2
+                set_start_value(s_yz[k, j], 0.01)
             end
         end
         
