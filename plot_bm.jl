@@ -14,11 +14,17 @@ v_al = alilqr_xv[:, 2]
 N = length(x_ip)
 h = 0.01
 
-plot(range(0, (N-1) * h, length=N), [x_ip v_ip x_al v_al], linecolor=[1 4 1 4], xtickfontsize=14, ytickfontsize=14, ylims=(0, 1.8),
-    linestyle=[:solid :solid :dot :dot], linewidth=3, legendfontsize=12, legend=:best, background_color_legend = nothing,
+plot(range(0, (N-1) * h, length=N), [x_ip x_al], linecolor=[1 1], xtickfontsize=14, ytickfontsize=14, #ylims=(0, 1.8),
+    linestyle=[:solid :dot], linewidth=3, legendfontsize=16, legend=:best, background_color_legend = nothing,
     xlabel="\$t\$", xlabelfontsize=14,
-    label=["\$y\$ (IPDDP2)" "\$v\$ (IPDDP2)" "\$y\$ (AL-iLQR)" "\$v\$ (AL-iLQR)"])
-savefig("blockmove_yv.pdf")
+    label=["\$y\$ (IPDDP2)" "\$y\$ (AL-iLQR)"])
+savefig("blockmove_y.pdf")
+
+plot(range(0, (N-1) * h, length=N), [v_ip v_al], linecolor=[2 2], xtickfontsize=14, ytickfontsize=14, ylims=(0, 1.9),
+    linestyle=[:solid :dot], linewidth=3, legendfontsize=16, legend=:best, background_color_legend = nothing,
+    xlabel="\$t\$", xlabelfontsize=14,
+    label=["\$v\$ (IPDDP2)" "\$v\$ (AL-iLQR)"])
+savefig("blockmove_v.pdf")
 
 
 ipddp_Fw = readdlm("ipddp_bm_Fw.txt", '\t', Float64, '\n')
@@ -31,8 +37,14 @@ F_al = alilqr_Fw[:, 1]
 w_al = alilqr_Fw[:, 2]
 s_al = alilqr_Fw[:, 3]
 
-plot(range(0, (N-1) * h, length=N-1), [F_ip w_ip F_al w_al s_al], linecolor=[2 3 2 3 7], xtickfontsize=14, ytickfontsize=14,
-    linestyle=[:solid :solid :dot :dot :dot], linewidth=3, legendfontsize=12, legend=:best, background_color_legend = nothing,
+plot(range(0, (N-1) * h, length=N-1), [F_ip F_al], linecolor=[3 3], xtickfontsize=14, ytickfontsize=14,
+    linestyle=[:solid :dot], linewidth=3, legendfontsize=16, legend=:best, background_color_legend = nothing,
     xlabel="\$t\$", xlabelfontsize=14,
-    label=["\$F\$          (IPDDP2)" L"$|Fv|$      (IPDDP2)" "\$F\$          (AL-iLQR)" "\$|Fw|\$     (AL-iLQR)" L"$s^{+} - s^{\_}$ (AL-iLQR)" ])
-savefig("blockmove_Fw.pdf")
+    label=["\$F\$ (IPDDP2)" "\$F\$ (AL-iLQR)"])
+savefig("blockmove_F.pdf")
+
+plot(range(0, (N-1) * h, length=N-1), [w_ip w_al s_al], linecolor=[4 4 5], xtickfontsize=14, ytickfontsize=14, ylims=(-3, 18),
+    linestyle=[:solid :dot :dash], linewidth=3, legendfontsize=16, legend=:topright, background_color_legend = nothing,
+    xlabel="\$t\$", xlabelfontsize=14,
+    label=[ "\$|Fv|\$        (IPDDP2)" "\$|Fv|\$       (AL-iLQR)" L"$s^{+} - s^{\_}$  (AL-iLQR)" ])
+savefig("blockmove_Fv.pdf")
