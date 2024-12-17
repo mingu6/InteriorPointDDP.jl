@@ -7,7 +7,7 @@ using Printf
 using LaTeXStrings
 
 visualise = false
-benchmark = false
+benchmark = true
 verbose = true
 quasi_newton = false
 n_benchmark = 10
@@ -36,7 +36,7 @@ x1 = T[q1; q2]
 qN = T[π; 0.0]
 xN = T[qN; qN]
 
-options = Options{T}(quasi_newton=quasi_newton, verbose=true, κ_μ=0.5, θ_μ=1.2)
+options = Options{T}(quasi_newton=quasi_newton, verbose=true, κ_μ=0.6, θ_μ=1.2)
 		
 # ## Dynamics - implicit variational integrator (midpoint)
 
