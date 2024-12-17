@@ -10,10 +10,9 @@ function forward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::Sol
     θ_prev = data.primal_1_curr
     φ_prev = data.barrier_obj_curr
     θ = θ_prev
-
-    Δφ_L, Δφ_Q = expected_decrease_cost(policy, problem, data.step_size)
-    Δφ = Δφ_L + Δφ_Q
-    min_step_size = estimate_min_step_size(Δφ_L, data, options)
+    
+    Δφ = expected_decrease_cost(policy, problem, data.step_size)
+    min_step_size = estimate_min_step_size(Δφ, data, options)
 
     while data.step_size >= min_step_size
         α = data.step_size
@@ -29,8 +28,7 @@ function forward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::Sol
         data.status = check_fraction_boundary(problem, policy, τ)
         data.status != 0 && (data.step_size *= 0.5, continue)
 
-        Δφ_L, Δφ_Q = expected_decrease_cost(policy, problem, α)
-        Δφ = Δφ_L + Δφ_Q
+        Δφ = expected_decrease_cost(policy, problem, α)
         
         # used for sufficient decrease from current iterate step acceptance criterion
         θ = constraint_violation_1norm(problem, mode=:current)
@@ -141,18 +139,15 @@ function estimate_min_step_size(Δφ_L::T, data::SolverData{T}, options::Options
 end
 
 function expected_decrease_cost(policy::PolicyData{T}, problem::ProblemData{T}, step_size::T) where T
-    Δφ_L = T(0.0)
-    Δφ_Q = T(0.0)
+    Δφ = T(0.0)
     N = problem.horizon
-    Qu = policy.hamiltonian.gradient_control
-    Quu = policy.hamiltonian.hessian_control_control
+    Q̂u = policy.hamiltonian.gradient_control
     gains = policy.gains_data
     
     for t = N-1:-1:1
-        Δφ_L += dot(Qu[t], gains.α[t])
-        Δφ_Q += 0.5 * dot(gains.α[t], Quu[t], gains.α[t])
+        Δφ += dot(Q̂u[t], gains.α[t])
     end
-    return Δφ_L * step_size, Δφ_Q * step_size^2
+    return Δφ * step_size
 end
 
 function rollout!(policy::PolicyData{T}, data::SolverData{T}, problem::ProblemData{T}; step_size::T=1.0) where T

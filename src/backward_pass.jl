@@ -24,12 +24,12 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
     lxx = problem.cost_data.hessian_state_state
     luu = problem.cost_data.hessian_control_control
     lux = problem.cost_data.hessian_control_state
-    # control-Value function approximation
-    Qx = policy.hamiltonian.gradient_state
-    Qu = policy.hamiltonian.gradient_control
-    Qxx = policy.hamiltonian.hessian_state_state
-    Quu = policy.hamiltonian.hessian_control_control
-    Qux = policy.hamiltonian.hessian_control_state
+    # Hamiltonian approximation
+    Q̂x = policy.hamiltonian.gradient_state
+    Q̂u = policy.hamiltonian.gradient_control
+    Q̂xx = policy.hamiltonian.hessian_state_state
+    Q̂uu = policy.hamiltonian.hessian_control_control
+    Q̂ux = policy.hamiltonian.hessian_control_state
     # Feedback gains (linear feedback policy)
     α = policy.gains_data.α
     β = policy.gains_data.β
@@ -40,8 +40,8 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
     χu = policy.gains_data.χu
     ζu = policy.gains_data.ζu
     # Value function
-    Vx = policy.value.gradient
-    Vxx = policy.value.hessian
+    V̂x = policy.value.gradient
+    V̂xx = policy.value.hessian
     # Bound constraints
     bounds = problem.bounds
 
@@ -59,8 +59,8 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
     
     while reg <= options.reg_max
         data.status = 0
-        Vxx[N] .= lxx[N]
-        Vx[N] .= lx[N]
+        V̂xx[N] .= lxx[N]
+        V̂x[N] .= lx[N]
         
         for t = N-1:-1:1
             num_control = length(u[t])
@@ -82,67 +82,68 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
             bu2[t] .*= @views zu[t][bt.indices_upper]
             bu1[t] .*= μ  # μ / (uu - u)
 
-            # Qx = lx + fx' * Vx
-            Qx[t] .= lx[t]
-            mul!(Qx[t], transpose(fx[t]), Vx[t+1], 1.0, 1.0)
-            mul!(Qx[t], transpose(hx[t]), ϕ[t], 1.0, 1.0)
+            # Q̂x = Lx + fx' * V̂x
+            Q̂x[t] .= lx[t]
+            mul!(Q̂x[t], transpose(fx[t]), V̂x[t+1], 1.0, 1.0)
+            mul!(Q̂x[t], transpose(hx[t]), ϕ[t], 1.0, 1.0)
 
-            # Qu = lu + fu' * Vx + μ log(u - ul) + μ log(uu - u)
-            Qu[t] .= lu[t]
-            mul!(Qu[t], transpose(fu[t]), Vx[t+1], 1.0, 1.0)
-            @views Qu[t][bt.indices_lower] .-= bl1[t]
-            @views Qu[t][bt.indices_upper] .+= bu1[t]
-            mul!(Qu[t], transpose(hu[t]), ϕ[t], 1.0, 1.0)
+            # Q̂u = Lu + fu' * V̂x
+            Q̂u[t] .= lu[t]
+            mul!(Q̂u[t], transpose(fu[t]), V̂x[t+1], 1.0, 1.0)
+            @views Q̂u[t][bt.indices_lower] .-= bl1[t]
+            @views Q̂u[t][bt.indices_upper] .+= bu1[t]
+            mul!(Q̂u[t], transpose(hu[t]), ϕ[t], 1.0, 1.0)
             
-            # Qxx = lxx + fx' * Vxx * fx
-            mul!(policy.xx_tmp[t], transpose(fx[t]), Vxx[t+1])
-            mul!(Qxx[t], policy.xx_tmp[t], fx[t])
-            Qxx[t] .+= lxx[t]
+            # Q̂xx = Lxx + fx' * V̂xx * fx + V̂xx ⋅ fxx
+            mul!(policy.xx_tmp[t], transpose(fx[t]), V̂xx[t+1])
+            mul!(Q̂xx[t], policy.xx_tmp[t], fx[t])
+            Q̂xx[t] .+= lxx[t]
     
-            # Quu = luu + fu' * Vxx * fu + Σ
-            mul!(policy.ux_tmp[t], transpose(fu[t]), Vxx[t+1])
-            mul!(Quu[t], policy.ux_tmp[t], fu[t])
-            Quu[t] .+= luu[t]
+            # Q̂uu = ℓuu + ϕ ⋅ huu + Σ + fu' * V̂xx * fu + V̂x ⋅ fuu
+            mul!(policy.ux_tmp[t], transpose(fu[t]), V̂xx[t+1])
+            mul!(Q̂uu[t], policy.ux_tmp[t], fu[t])
+            Q̂uu[t] .+= luu[t]
             for (i1, i) in enumerate(bt.indices_lower)
-                Quu[t][i, i] += bl2[t][i1]
+                Q̂uu[t][i, i] += bl2[t][i1]
             end
             for (i1, i) in enumerate(bt.indices_upper)
-                Quu[t][i, i] += bu2[t][i1]
+                Q̂uu[t][i, i] += bu2[t][i1]
             end
     
-            # Qux = lux + fu' * Vxx * fx
-            mul!(policy.ux_tmp[t], transpose(fu[t]), Vxx[t+1])
-            mul!(Qux[t], policy.ux_tmp[t], fx[t])
-            Qux[t] .+= lux[t]
+            # Q̂xu = Lxu + fu' * V̂xx * fx + V̂x ⋅ fxu
+            mul!(policy.ux_tmp[t], transpose(fu[t]), V̂xx[t+1])
+            mul!(Q̂ux[t], policy.ux_tmp[t], fx[t])
+            Q̂ux[t] .+= lux[t]
             
-            # apply second order terms to Q for full DDP, i.e., Vx * fxx, Vx * fuu, Vx * fxu
+            # apply second order tensor contraction terms to Q̂uu, Q̂ux, Q̂xx
             if !options.quasi_newton
                 fn_eval_time_ = time()
-                tensor_contraction!(vfxx[t], vfux[t], vfuu[t], problem.model.dynamics[t], x[t], u[t], Vx[t+1])
+                tensor_contraction!(vfxx[t], vfux[t], vfuu[t], problem.model.dynamics[t], x[t], u[t], V̂x[t+1])
                 data.fn_eval_time += time() - fn_eval_time_
-                Qxx[t] .+= vfxx[t]
-                Qux[t] .+= vfux[t]
-                Quu[t] .+= vfuu[t]
+                Q̂xx[t] .+= vfxx[t]
+                Q̂ux[t] .+= vfux[t]
+                Q̂uu[t] .+= vfuu[t]
 
-                Quu[t] .+= vhuu[t]
-                Qux[t] .+= vhux[t]
-                Qxx[t] .+= vhxx[t]
+                Q̂uu[t] .+= vhuu[t]
+                Q̂ux[t] .+= vhux[t]
+                Q̂xx[t] .+= vhxx[t]
             end
+            
             # setup linear system in backward pass
-            policy.lhs_tl[t] .= Quu[t]
+            policy.lhs_tl[t] .= Q̂uu[t]
             policy.lhs_tr[t] .= transpose(hu[t])
             fill!(policy.lhs_br[t], 0.0)
 
-            α[t] .= Qu[t]
+            α[t] .= Q̂u[t]
             α[t] .*= -1.0
             ψ[t] .= h[t]
             ψ[t] .*= -1.0
-            β[t] .= Qux[t]
+            β[t] .= Q̂ux[t]
             β[t] .*= -1.0
             ω[t] .= hx[t]
             ω[t] .*= -1.0
 
-            # inertia calculation and correction
+            # inertia calculation and correction (regularisation)
             if reg > 0.0
                 for i in 1:num_control
                     policy.lhs_tl[t][i, i] += reg
@@ -203,19 +204,19 @@ function backward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::So
 
             # Update return function approx. for next timestep 
             # Vxx = Q̂xx + Q̂ux' * β + β * Q̂ux' + β' Q̂uu' * β
-            mul!(policy.ux_tmp[t], Quu[t], β[t])
-            mul!(Vxx[t], transpose(β[t]), Qux[t])
+            mul!(policy.ux_tmp[t], Q̂uu[t], β[t])
+            mul!(V̂xx[t], transpose(β[t]), Q̂ux[t])
 
-            mul!(Vxx[t], transpose(Qux[t]), β[t], 1.0, 1.0)
-            Vxx[t] .+= Qxx[t]
-            mul!(Vxx[t], transpose(β[t]), policy.ux_tmp[t], 1.0, 1.0)
-            Vxx[t] .= Symmetric(Vxx[t])
+            mul!(V̂xx[t], transpose(Q̂ux[t]), β[t], 1.0, 1.0)
+            V̂xx[t] .+= Q̂xx[t]
+            mul!(V̂xx[t], transpose(β[t]), policy.ux_tmp[t], 1.0, 1.0)
+            V̂xx[t] .= Symmetric(V̂xx[t])
 
             # Vx = Q̂x + β' * Q̂u + [Q̂uu β + Q̂ux]^T α
-            policy.ux_tmp[t] .+= Qux[t]
-            mul!(Vx[t], transpose(policy.ux_tmp[t]), α[t])
-            mul!(Vx[t], transpose(β[t]), Qu[t], 1.0, 1.0)
-            Vx[t] .+= Qx[t]
+            policy.ux_tmp[t] .+= Q̂ux[t]
+            mul!(V̂x[t], transpose(policy.ux_tmp[t]), α[t])
+            mul!(V̂x[t], transpose(β[t]), Q̂u[t], 1.0, 1.0)
+            V̂x[t] .+= Q̂x[t]
         end
         data.status == 0 && break
     end

@@ -50,13 +50,13 @@ function solve!(solver::Solver{T}) where T
         data.status != 0 && break
         # check (outer) overall problem convergence
 
-        data.dual_inf, data.primal_inf, data.cs_inf = optimality_error(policy, problem, options, T(0.0), mode=:nominal)
+        data.dual_inf, data.primal_inf, data.cs_inf = optimality_error(policy, problem, data, options, T(0.0), mode=:nominal)
         opt_err_0 = max(data.dual_inf, data.cs_inf, data.primal_inf)
         
         opt_err_0 <= options.optimality_tolerance && break
         
         # check (inner) barrier problem convergence and update barrier parameter if so
-        dual_inf_μ, primal_inf_μ, cs_inf_μ = optimality_error(policy, problem, options, data.μ, mode=:nominal)
+        dual_inf_μ, primal_inf_μ, cs_inf_μ = optimality_error(policy, problem, data, options, data.μ, mode=:nominal)
         opt_err_μ = max(dual_inf_μ, cs_inf_μ, primal_inf_μ)          
         if opt_err_μ <= options.κ_ϵ * data.μ && num_bounds > 0
             data.μ = max(options.optimality_tolerance / 10.0, min(options.κ_μ * data.μ, data.μ ^ options.θ_μ))
@@ -106,7 +106,7 @@ function reset_filter!(data::SolverData{T}) where T
     data.status = 0
 end
 
-function optimality_error(policy::PolicyData{T}, problem::ProblemData{T},
+function optimality_error(policy::PolicyData{T}, problem::ProblemData{T}, data::SolverData{T},
     options::Options{T}, μ::T; mode=:nominal) where T
     dual_inf::T = 0     # dual infeasibility (stationarity of Lagrangian)
     primal_inf::T = 0   # constraint violation (primal infeasibility)
@@ -120,13 +120,11 @@ function optimality_error(policy::PolicyData{T}, problem::ProblemData{T},
     u = mode == :nominal ? problem.nominal_controls : problem.controls
     ϕ, zl, zu = dual_trajectories(problem, mode=mode)
     
-    fx = problem.model.jacobian_state
     fu = problem.model.jacobian_control
     hu = problem.constraints_data.jacobian_control
-    hx = problem.constraints_data.jacobian_state
-    lx = problem.cost_data.gradient_state
     lu = problem.cost_data.gradient_control
-    Vx = policy.value.gradient
+    V̂x = policy.value.gradient
+    Q̂x = policy.hamiltonian.gradient_state
     
     bl1 = policy.bl_tmp1
     bu1 = policy.bu_tmp1
@@ -138,11 +136,11 @@ function optimality_error(policy::PolicyData{T}, problem::ProblemData{T},
         bt = bounds[t]
         num_ineq += bt.num_lower + bt.num_upper
         
-        # dual infeasibility (stationarity)
+        # dual infeasibility (stationarity) - Q̃u in paper
         
         policy.u_tmp[t] .= lu[t]
         mul!(policy.u_tmp[t], transpose(hu[t]), ϕ[t], 1.0, 1.0)
-        mul!(policy.u_tmp[t], transpose(fu[t]), Vx[t+1], 1.0, 1.0)
+        mul!(policy.u_tmp[t], transpose(fu[t]), V̂x[t+1], 1.0, 1.0)
         for i in bt.indices_lower
             policy.u_tmp[t][i] -= zl[t][i]
         end
@@ -151,10 +149,8 @@ function optimality_error(policy::PolicyData{T}, problem::ProblemData{T},
         end
         dual_inf = max(dual_inf, norm(policy.u_tmp[t], Inf))
         
-        policy.x_tmp[t] .= lx[t]
-        mul!(policy.x_tmp[t], transpose(hx[t]), ϕ[t], 1.0, 1.0)
-        mul!(policy.x_tmp[t], transpose(fx[t]), Vx[t+1], 1.0, 1.0)
-        policy.x_tmp[t] .-= Vx[t]
+        policy.x_tmp[t] .= Q̂x[t]
+        policy.x_tmp[t] .-= V̂x[t]
         dual_inf = max(dual_inf, norm(policy.x_tmp[t], Inf))
         
         ϕ_norm += norm(ϕ[t], 1)
