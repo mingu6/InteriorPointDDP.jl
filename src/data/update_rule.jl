@@ -18,13 +18,13 @@ struct Hamiltonian{T}
 end
 
 """
-    Store all gains
+    Store all update rule parameters
 """
-struct Gains{T}
+struct UpdateRuleParameters{T}
     # data
 
-    gains::Vector{Matrix{T}}
-    gains_ineq::Vector{Matrix{T}}
+    eq::Vector{Matrix{T}}
+    ineq::Vector{Matrix{T}}
 
     # views into feedforward/feedback
 
@@ -42,11 +42,10 @@ struct Gains{T}
 end
 
 """
-    Policy Data
+    Update Rule Data
 """
-struct PolicyData{T}
-    # policy u = ū + K * (x - x̄) + k
-    gains_data::Gains{T}
+struct UpdateRuleData{T}
+    parameters::UpdateRuleParameters{T}
 
     # value function approximation
     value::Value{T}
@@ -79,45 +78,45 @@ struct PolicyData{T}
     D_cache::Vector{Pair{Vector{T}}}
 end
 
-function gains_data(T, constraints::Constraints)
+function update_rule_parameters(T, constraints::Constraints)
     N = length(constraints) + 1
 
-    gains = [zeros(T, c.num_control + c.num_constraint, c.num_state + 1) for c in constraints]
-    gains_ineq = [zeros(T, 2 * c.num_control, c.num_state + 1) for c in constraints]
+    eq = [zeros(T, c.num_control + c.num_constraint, c.num_state + 1) for c in constraints]
+    ineq = [zeros(T, 2 * c.num_control, c.num_state + 1) for c in constraints]
 
-    α = [@views gains[t][1:constraints[t].num_control, 1] for t in 1:N-1]
-    β = [@views gains[t][1:constraints[t].num_control, 2:end] for t in 1:N-1]
+    α = [@views eq[t][1:constraints[t].num_control, 1] for t in 1:N-1]
+    β = [@views eq[t][1:constraints[t].num_control, 2:end] for t in 1:N-1]
 
-	ψ = [@views gains[t][constraints[t].num_control+1:end, 1] for t in 1:N-1]
-    ω = [@views gains[t][constraints[t].num_control+1:end, 2:end] for t in 1:N-1]
+	ψ = [@views eq[t][constraints[t].num_control+1:end, 1] for t in 1:N-1]
+    ω = [@views eq[t][constraints[t].num_control+1:end, 2:end] for t in 1:N-1]
 
-    χl = [@views gains_ineq[t][1:constraints[t].num_control, 1] for t in 1:N-1]
-    ζl = [@views gains_ineq[t][1:constraints[t].num_control, 2:end] for t in 1:N-1]
+    χl = [@views ineq[t][1:constraints[t].num_control, 1] for t in 1:N-1]
+    ζl = [@views ineq[t][1:constraints[t].num_control, 2:end] for t in 1:N-1]
     
-    χu = [@views gains_ineq[t][constraints[t].num_control+1:end, 1] for t in 1:N-1]
-    ζu = [@views gains_ineq[t][constraints[t].num_control+1:end, 2:end] for t in 1:N-1]
+    χu = [@views ineq[t][constraints[t].num_control+1:end, 1] for t in 1:N-1]
+    ζu = [@views ineq[t][constraints[t].num_control+1:end, 2:end] for t in 1:N-1]
 
-    return Gains(gains, gains_ineq, α, β, ψ, ω, χl, ζl, χu, ζu)
+    return UpdateRuleParameters(eq, ineq, α, β, ψ, ω, χl, ζl, χu, ζu)
 end
 
-function policy_data(T, dynamics::Vector{Dynamics}, constraints::Constraints, bounds::Bounds)
-    gains = gains_data(T, constraints)
+function update_rule_data(T, dynamics::Vector{Dynamics}, constraints::Constraints, bounds::Bounds)
+    parameters = update_rule_parameters(T, constraints)
 
     # value function approximation
-    P = [[zeros(T, d.num_state, d.num_state) for d in dynamics]..., 
+    V̂xx = [[zeros(T, d.num_state, d.num_state) for d in dynamics]..., 
             zeros(T, dynamics[end].num_next_state, dynamics[end].num_next_state)]
-    p =  [[zeros(T, d.num_state) for d in dynamics]..., 
+    V̂x =  [[zeros(T, d.num_state) for d in dynamics]..., 
             zeros(T, dynamics[end].num_next_state)]
-    value = Value(p, P)
+    value = Value(V̂x, V̂xx)
 
     # control-value function approximation
-    Qx = [zeros(T, d.num_state) for d in dynamics]
-    Qu = [zeros(T, d.num_control) for d in dynamics]
-    Qxx = [zeros(T, d.num_state, d.num_state) for d in dynamics]
-    Quu = [zeros(T, d.num_control, d.num_control) for d in dynamics]
-    Qux = [zeros(T, d.num_control, d.num_state) for d in dynamics]
+    Q̂x = [zeros(T, d.num_state) for d in dynamics]
+    Q̂u = [zeros(T, d.num_control) for d in dynamics]
+    Q̂xx = [zeros(T, d.num_state, d.num_state) for d in dynamics]
+    Q̂uu = [zeros(T, d.num_control, d.num_control) for d in dynamics]
+    Q̂ux = [zeros(T, d.num_control, d.num_state) for d in dynamics]
 
-    hamiltonian = Hamiltonian(Qx, Qu, Qxx, Quu, Qux)
+    hamiltonian = Hamiltonian(Q̂x, Q̂u, Q̂xx, Q̂uu, Q̂ux)
 
     x_tmp = [[zeros(T, d.num_state) for d in dynamics]..., zeros(T, dynamics[end].num_next_state)]
     u_tmp = [zeros(T, d.num_control) for d in dynamics]
@@ -150,7 +149,7 @@ function policy_data(T, dynamics::Vector{Dynamics}, constraints::Constraints, bo
         bu_tmp2 = [zeros(T, 0) for b in bounds]
     end
 
-    PolicyData{T}(gains, value, hamiltonian,
+    UpdateRuleData{T}(parameters, value, hamiltonian,
         x_tmp, u_tmp, h_tmp, uu_tmp, ux_tmp, xx_tmp, hu_tmp, hx_tmp,
         bl_tmp1, bl_tmp2, bu_tmp1, bu_tmp2,
         lhs, lhs_tl, lhs_tr, lhs_bl, lhs_br, kkt_matrix_ws, D_cache)

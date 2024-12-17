@@ -3,7 +3,7 @@
 """
 mutable struct Solver{T}
     problem::ProblemData{T}
-	policy::PolicyData{T}
+    update_rule::UpdateRuleData{T}
 	data::SolverData{T}
     options::Options{T}
 end
@@ -11,8 +11,8 @@ end
 function Solver(T, dynamics::Vector{Dynamics}, costs::Costs, constraints::Constraints,
             bounds::Union{Bounds, Nothing}=nothing; options::Union{Options, Nothing}=nothing)
 
-    # allocate policy data  
-    policy = policy_data(T, dynamics, constraints, bounds)
+    # allocate update rule data  
+    update_rule = update_rule_data(T, dynamics, constraints, bounds)
 
     # allocate model data
     problem = problem_data(T, dynamics, costs, constraints, bounds)
@@ -22,7 +22,7 @@ function Solver(T, dynamics::Vector{Dynamics}, costs::Costs, constraints::Constr
 
     options = isnothing(options) ? Options{T}() : options
 
-	Solver(problem, policy, data, options)
+	Solver(problem, update_rule, data, options)
 end
 
 function Solver(T, dynamics::Vector{Dynamics}, costs::Costs,
@@ -31,8 +31,8 @@ function Solver(T, dynamics::Vector{Dynamics}, costs::Costs,
     constraint = Constraint()
     constraints = [constraint for t = 1:N-1]
     
-    # allocate policy data  
-    policy = policy_data(T, dynamics, constraints)
+    # allocate update rule data  
+    update_rule = update_rule_data(T, dynamics, constraints)
 
     # allocate model data
     problem = problem_data(T, dynamics, costs, constraints, bounds)
@@ -42,7 +42,7 @@ function Solver(T, dynamics::Vector{Dynamics}, costs::Costs,
 
     options = isnothing(options) ? Options{T}() : options
 
-	Solver(T, problem, policy, data, options)
+	Solver(T, problem, update_rule, data, options)
 end
 
 function get_trajectory(solver::Solver{T}) where T

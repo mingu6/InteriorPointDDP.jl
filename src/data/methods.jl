@@ -31,13 +31,13 @@ function constraint!(problem::ProblemData{T}, μ::T; mode=:nominal) where T
     end
 end
 
-function barrier_objective!(problem::ProblemData{T}, data::SolverData{T}, policy::PolicyData{T}; mode=:nominal) where T
+function barrier_objective!(problem::ProblemData{T}, data::SolverData{T}, update_rule::UpdateRuleData{T}; mode=:nominal) where T
     N = problem.horizon
     bounds = problem.bounds
     u = mode == :nominal ? problem.nominal_controls : problem.controls
 
-    bl1 = policy.bl_tmp1
-    bu1 = policy.bu_tmp1
+    bl1 = update_rule.bl_tmp1
+    bu1 = update_rule.bu_tmp1
     
     barrier_obj = 0.
     for t = 1:N-1

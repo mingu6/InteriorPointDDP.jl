@@ -1,4 +1,4 @@
-function forward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::SolverData{T},
+function forward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T}, data::SolverData{T},
             options::Options{T}; verbose=false) where T
     data.l = 0  # line search iteration counter
     data.status = 0
@@ -11,13 +11,13 @@ function forward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::Sol
     φ_prev = data.barrier_obj_curr
     θ = θ_prev
     
-    Δφ = expected_decrease_cost(policy, problem, data.step_size)
+    Δφ = expected_decrease_cost(update_rule, problem, data.step_size)
     min_step_size = estimate_min_step_size(Δφ, data, options)
 
     while data.step_size >= min_step_size
         α = data.step_size
         try
-            rollout!(policy, data, problem, step_size=α)
+            rollout!(update_rule, data, problem, step_size=α)
         catch e
             # reduces step size if NaN or Inf encountered
             e isa DomainError && (data.step_size *= 0.5, continue)
@@ -25,14 +25,14 @@ function forward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::Sol
         end
         constraint!(problem, data.μ; mode=:current)
         
-        data.status = check_fraction_boundary(problem, policy, τ)
+        data.status = check_fraction_boundary(problem, update_rule, τ)
         data.status != 0 && (data.step_size *= 0.5, continue)
 
-        Δφ = expected_decrease_cost(policy, problem, α)
+        Δφ = expected_decrease_cost(update_rule, problem, α)
         
         # used for sufficient decrease from current iterate step acceptance criterion
         θ = constraint_violation_1norm(problem, mode=:current)
-        φ = barrier_objective!(problem, data, policy, mode=:current)
+        φ = barrier_objective!(problem, data, update_rule, mode=:current)
         
         # check acceptability to filter
         data.status = !any(x -> (θ >= x[1] && φ >= x[2]), data.filter) ? 0 : 3
@@ -58,7 +58,7 @@ function forward_pass!(policy::PolicyData{T}, problem::ProblemData{T}, data::Sol
     data.status != 0 && (verbose && (@warn "Line search failed to find a suitable iterate"))
 end
 
-function check_fraction_boundary(problem::ProblemData{T}, policy::PolicyData{T}, τ::T) where T
+function check_fraction_boundary(problem::ProblemData{T}, update_rule::UpdateRuleData{T}, τ::T) where T
     N = problem.horizon
 
     u = problem.controls
@@ -75,7 +75,7 @@ function check_fraction_boundary(problem::ProblemData{T}, policy::PolicyData{T},
         bt = bounds[t]
         il = bt.indices_lower
         iu = bt.indices_upper
-        tmp = policy.u_tmp[t]
+        tmp = update_rule.u_tmp[t]
         
         tmp .= ū[t]
         tmp .-= bt.lower
@@ -138,19 +138,19 @@ function estimate_min_step_size(Δφ_L::T, data::SolverData{T}, options::Options
     return min_step_size
 end
 
-function expected_decrease_cost(policy::PolicyData{T}, problem::ProblemData{T}, step_size::T) where T
+function expected_decrease_cost(update_rule::UpdateRuleData{T}, problem::ProblemData{T}, step_size::T) where T
     Δφ = T(0.0)
     N = problem.horizon
-    Q̂u = policy.hamiltonian.gradient_control
-    gains = policy.gains_data
+    Q̂u = update_rule.hamiltonian.gradient_control
+    parameters = update_rule.parameters
     
     for t = N-1:-1:1
-        Δφ += dot(Q̂u[t], gains.α[t])
+        Δφ += dot(Q̂u[t], parameters.α[t])
     end
     return Δφ * step_size
 end
 
-function rollout!(policy::PolicyData{T}, data::SolverData{T}, problem::ProblemData{T}; step_size::T=1.0) where T
+function rollout!(update_rule::UpdateRuleData{T}, data::SolverData{T}, problem::ProblemData{T}; step_size::T=1.0) where T
     dynamics = problem.model.dynamics
     
     x, u, _ = primal_trajectories(problem, mode=:current)
@@ -160,10 +160,10 @@ function rollout!(policy::PolicyData{T}, data::SolverData{T}, problem::ProblemDa
     
     x[1] .= x̄[1]
 
-    α, ψ = policy.gains_data.α, policy.gains_data.ψ
-    β, ω = policy.gains_data.β, policy.gains_data.ω
-    χl, χu = policy.gains_data.χl, policy.gains_data.χu
-    ζl, ζu = policy.gains_data.ζl, policy.gains_data.ζu
+    α, ψ = update_rule.parameters.α, update_rule.parameters.ψ
+    β, ω = update_rule.parameters.β, update_rule.parameters.ω
+    χl, χu = update_rule.parameters.χl, update_rule.parameters.χu
+    ζl, ζu = update_rule.parameters.ζl, update_rule.parameters.ζu
 
     for (t, d) in enumerate(dynamics)
         # u[t] .= ū[t] + β[t] * (x[t] - x̄[t]) + step_size * α[t]

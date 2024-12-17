@@ -1,6 +1,5 @@
 name = "InteriorPointDDP"
 uuid = "ac7c0669-fec3-40a7-96c9-a64efa85c273"
-authors = ["mingu6 <mingda.xu@anu.edu.au>"]
 version = "0.5.0"
 
 [deps]
