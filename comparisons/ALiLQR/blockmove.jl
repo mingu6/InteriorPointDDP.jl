@@ -4,7 +4,7 @@ using Random
 using BenchmarkTools
 using Printf
 
-benchmark = true
+benchmark = false
 verbose = true
 
 N = 101
@@ -19,14 +19,11 @@ options.initial_constraint_penalty = 1e-4
 num_state = 2
 num_control = 3  # force and two slack variables to represent abs work
 
-# ## Dynamics - explicit midpoint for integrator
+# ## Dynamics - Forward Euler
 
-function blockmove_continuous(x, u)
-    return [x[2], u[1]]
-end
-blockmove_discrete = (x, u) -> x + h * blockmove_continuous(x + 0.5 * h * blockmove_continuous(x, u), u)
+f = (x, u) -> x + h * [x[2], u[1]]  # forward Euler
 
-blockmove_dyn = Dynamics(blockmove_discrete, num_state, num_control)
+blockmove_dyn = Dynamics(f, num_state, num_control)
 dynamics = [blockmove_dyn for k = 1:N-1]
 
 # ## Costs

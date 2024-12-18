@@ -38,17 +38,24 @@ num_primal = num_action + num_obstacles + 2  # 2 slacks for box constraints
 
 include("../examples/visualise/concar.jl")
 
-# ## Dynamics - explicit midpoint for integrator
+# ## Dynamics - RK4
 
-function car_continuous(x, u)
+# continuous time dynamics
+function g(x, u)
     [x[4] * cos(x[3]); x[4] * sin(x[3]); u[2]; u[1]]
 end
 
-function car_discrete(x, u)
-    x + h * car_continuous(x + 0.5 * h * car_continuous(x, u), u)
+function RK4(x, u, g)
+    k1 = g(x, u)
+    k2 = g(x + h * 0.5 * k1, u)
+    k3 = g(x + h * 0.5 * k2, u)
+    k4 = g(x + h * k3, u)
+    return x + h / 6 * (k1 + k2 + k3 + k4)
 end
 
-car = Dynamics(car_discrete, num_state, num_primal)
+f = (x, u) -> RK4(x, u, g)
+
+car = Dynamics(f, num_state, num_primal)
 dynamics = [car for k = 1:N-1]
 
 # ## objective - waypoint constraints -> high cost
@@ -67,7 +74,7 @@ objective = [
 # ## constraints
 
 obs_dist(obs_xy) = (x, u) -> begin
-    xp = car_discrete(x, u)[1:2]
+    xp = f(x, u)[1:2]
     xy_diff = xp[1:2]- obs_xy
     return dot(xy_diff, xy_diff)
 end
@@ -78,7 +85,7 @@ stage_constr_fn = (x, u) -> begin
     [(obs[3] + r_car)^2 - obs_dist(obs[1:2])(x, u) + u[num_action + i]
         for (i, obs) in enumerate(xyr_obs)];
     # bound constraints, car must stay within [0, 1] x [0, 1] box
-    car_discrete(x, u)[1:2] - u[end-1:end]
+    f(x, u)[1:2] - u[end-1:end]
 ]
 end
 
@@ -114,7 +121,7 @@ open(fname, "w") do io
         solver.options.verbose = verbose
         Random.seed!(seed)
         
-        x1 = T[0.0; 0.0; 0.0; 0.0] + rand(T, 4) .* T[0.05; 0.05; π / 2; 0.0]
+        x1 = rand(T, 4) .* T[0.05; 0.05; π / 2; 0.0]
         ū = [[T(1.0e-3) .* (rand(T, 2) .- 0.5); T(0.01) * ones(T, num_obstacles + 2)] for k = 1:N-1]
     
         solve!(solver, x1, ū)

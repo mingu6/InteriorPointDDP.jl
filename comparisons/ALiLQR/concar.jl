@@ -6,7 +6,7 @@ using BenchmarkTools
 using Printf
 
 visualise = true
-benchmark = true
+benchmark = false
 verbose = true
 
 N = 101
@@ -41,17 +41,24 @@ num_obstacles = length(xyr_obs)
 
 include("../../examples/visualise/concar.jl")
 
-# ## Dynamics - explicit midpoint for integrator
+# ## Dynamics - RK4
 
-function car_continuous(x, u)
+# continuous time dynamics
+function g(x, u)
     [x[4] * cos(x[3]); x[4] * sin(x[3]); u[2]; u[1]]
 end
 
-function car_discrete(x, u)
-    x + h * car_continuous(x + 0.5 * h * car_continuous(x, u), u)
+function RK4(x, u, g)
+    k1 = g(x, u)
+    k2 = g(x + h * 0.5 * k1, u)
+    k3 = g(x + h * 0.5 * k2, u)
+    k4 = g(x + h * k3, u)
+    return x + h / 6 * (k1 + k2 + k3 + k4)
 end
 
-car = Dynamics(car_discrete, num_state, num_action)
+f = (x, u) -> RK4(x, u, g)
+
+car = Dynamics(f, num_state, num_action)
 dynamics = [car for k = 1:N-1] 
 
 # ## objective 
@@ -69,7 +76,7 @@ objective = [
 
 # ## constraints - waypoints are constraints for iLQR
 
-obs_dist(obs_xy) = (x, u) -> begin
+obs_dist(obs_xy) = (x) -> begin
     xy_diff = x[1:2] - obs_xy
     return dot(xy_diff, xy_diff)
 end
@@ -78,14 +85,15 @@ stage_constr_fn = (x, u) -> begin
     ul - u; ## control limit (lower)
     u - uu; ## control limit (upper)
     # obstacle avoidance constraints i.e., d_thresh^2 - d_obs^2 <= 0 
-    [(obs[3] + r_car)^2 - obs_dist(obs[1:2])(x, u)
+    [(obs[3] + r_car)^2 - obs_dist(obs[1:2])(f(x, u))
         for (i, obs) in enumerate(xyr_obs)];
     # bound constraints, car must stay within [0, 1] x [0, 1] box
-    -x[1];
-    -x[2];
-    x[1] - 1.0;
-    x[2] - 1.0;
+    -f(x, u)[1];
+    -f(x, u)[2];
+    f(x, u)[1] - 1.0;
+    f(x, u)[2] - 1.0;
 ]
+
 end
 
 obs_constr = Constraint(stage_constr_fn, num_state, num_action,
@@ -115,7 +123,7 @@ open("results/concar.txt", "w") do io
 		
         # ## Initialise solver and solve
         
-        x0 = [0.0; 0.0; 0.0; 0.0] + rand(4) .* [0.05; 0.05; π / 2; 0.0]
+        x0 = rand(4) .* [0.05; 0.05; π / 2; 0.0]
         ū = [1.0e-3 .* (rand(2) .- 0.5) for k = 1:N-1]
         x̄ = rollout(dynamics, x0, ū)
         

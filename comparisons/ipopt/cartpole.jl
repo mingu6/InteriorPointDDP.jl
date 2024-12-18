@@ -8,7 +8,7 @@ using Printf
 
 visualise = false
 output = false
-benchmark = true
+benchmark = false
 n_benchmark = 10
 
 print_level = output ? 5 : 4
@@ -52,10 +52,9 @@ cost = (x, u) -> begin
 	return J
 end
 
-# ## Dynamics - implicit dynamics with RK2 integration
+# ## Dynamics - forward Euler
 
-f = (x, u) -> [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]]
-cartpole_discrete = (x, u) -> x + h * f(x + 0.5 * h * f(x, u), u)  # Explicit midpoint
+f = (x, u) -> x + h * [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]]  # forward Euler
 dyn_con = (x, u) -> implicit_dynamics(cartpole, x, u) * h
 
 # ## Constraints
@@ -63,10 +62,10 @@ dyn_con = (x, u) -> implicit_dynamics(cartpole, x, u) * h
 @variable(model, x[1:N, 1:nx]);
 @variable(model, u[1:N-1, 1:nu]);
 
-@objective(model, Min, cost(x, y))
+@objective(model, Min, cost(x, u))
 
 for k = 1:N-1
-    @constraint(model, x[k+1, :] == cartpole_discrete(x[k, :], u[k, :]))
+    @constraint(model, x[k+1, :] == f(x[k, :], u[k, :]))
     @constraint(model, dyn_con(x[k, :], u[k, :]) .== 0.0)
     @constraint(model, 4.0 .>= u[k, 1:nF] .>= -4.0)
 end
@@ -79,13 +78,13 @@ open("results/cartpole.txt", "w") do io
 		
         # ## Initialise variables and solve
         
-        x1 = [0.0; 0.0; 0.0; 0.0] + (rand(4) .- 0.5) .* [0.05, 0.2, 0.1, 0.1]
+        x1 = (rand(4) .- 0.5) .* [0.1, 0.1, 0.1, 0.1]
         fix.(x[1, :], x1, force = true)
-        ū = [1.0e-2 * (rand(nu) .- 0.5) for k = 1:N-1]
+        ū = [1.0e-1 * (rand(nu) .- 0.5) for k = 1:N-1]
         
         x̄ = [x1]
         for k in 2:N
-            push!(x̄, cartpole_discrete(x̄[k-1],  ū[k-1]))
+            push!(x̄, f(x̄[k-1],  ū[k-1]))
         end
         
         for k = 1:N
@@ -96,7 +95,7 @@ open("results/cartpole.txt", "w") do io
         
         for k = 1:N-1
             for j = 1:nu
-                set_start_value(y[k, j], ū[k][j])
+                set_start_value(u[k, j], ū[k][j])
             end
         end
         

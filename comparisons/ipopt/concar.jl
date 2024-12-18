@@ -8,7 +8,7 @@ using Printf
 
 visualise = true
 output = false
-benchmark = true
+benchmark = false
 n_benchmark = 10
 
 print_level = output ? 5 : 4
@@ -50,15 +50,22 @@ num_obstacles = length(xyr_obs)
 @variable(model, s_obs[1:N-1, 1:num_obstacles]);  # slacks for obstacle constraints
 @variable(model, s_yz[1:N-1, 1:2]);  # slacks for state boundaries
 
-# ## Dynamics - explicit midpoint for integrator
+# ## Dynamics - RK4
 
-function car_continuous(x, u)
+# continuous time dynamics
+function g(x, u)
     [x[4] * cos(x[3]); x[4] * sin(x[3]); u[2]; u[1]]
 end
 
-function car_discrete(x, u)
-    x + h * car_continuous(x + 0.5 * h * car_continuous(x, u), u)
+function RK4(x, u, g)
+    k1 = g(x, u)
+    k2 = g(x + h * 0.5 * k1, u)
+    k3 = g(x + h * 0.5 * k2, u)
+    k4 = g(x + h * k3, u)
+    return x + h / 6 * (k1 + k2 + k3 + k4)
 end
+
+f = (x, u) -> RK4(x, u, g)
 
 # ## constraints
 
@@ -68,9 +75,9 @@ obs_dist(obs_xy) = (x) -> begin
 end
 
 for k = 1:N-1
-    @constraint(model, x[k+1, :] == car_discrete(x[k, :], u[k, :]))
+    @constraint(model, x[k+1, :] == f(x[k, :], u[k, :]))
     @constraint(model, ul .<= u[k, :] .<= uu)
-    @constraint(model, car_discrete(x[k, :], u[k, :])[1:2] == s_yz[k, :])
+    @constraint(model, f(x[k, :], u[k, :])[1:2] == s_yz[k, :])
     @constraint(model, [0.0, 0.0] .<= s_yz[k, :] .<= [1.0, 1.0])
     @constraint(model, 0.0 .<= s_obs[k, :])
     for (i, obs) in enumerate(xyr_obs)
@@ -112,14 +119,14 @@ open("results/concar.txt", "w") do io
 	for seed = 1:50
 		set_attribute(model, "print_level", print_level)
 		Random.seed!(seed)
-        x1 = [0.0; 0.0; 0.0; 0.0] + rand(4) .* [0.05; 0.05; π / 2; 0.0]
+        x1 = rand(4) .* [0.05; 0.05; π / 2; 0.0]
         fix.(x[1, :], x1, force = true)
         
         ū = [1.0e-3 * (rand(2) .- 0.5) for k = 1:N-1]
         
         x̄ = [x1]
         for k in 2:N
-            push!(x̄, car_discrete(x̄[k-1],  ū[k-1]))
+            push!(x̄, f(x̄[k-1],  ū[k-1]))
         end
         
         for k = 1:N

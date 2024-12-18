@@ -32,11 +32,10 @@ xN = T[0.0; π; 0.0; 0.0]
 
 options = Options{T}(quasi_newton=quasi_newton, verbose=false)
 
-# ## Dynamics - implicit dynamics with RK2 integration
+# ## Dynamics - forward Euler
 
-f = (x, u) -> [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]]
-cartpole_discrete = (x, u) -> x + h * f(x + 0.5 * h * f(x, u), u)  # Explicit midpoint
-cartpole_dyn = Dynamics(cartpole_discrete, nx, nu)
+f = (x, u) -> x + h * [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]]
+cartpole_dyn = Dynamics(f, nx, nu)
 dynamics = [cartpole_dyn for k = 1:N-1]
 
 # ## Costs
@@ -72,8 +71,8 @@ open(fname, "w") do io
         
         # ## Initialise solver and solve
         
-        x1 = T[0.0; 0.0; 0.0; 0.0] + (rand(T, 4) .- T(0.5)) .* T[0.05, 0.2, 0.1, 0.1]
-        ū = [T(1.0e-2) * (rand(T, nu) .- T(0.5)) for k = 1:N-1]
+        x1 = (rand(T, 4) .- T(0.5)) .* T[0.1, 0.1, 0.1, 0.1]
+        ū = [T(1.0e-1) * (rand(T, nu) .- T(0.5)) for k = 1:N-1]
         solve!(solver, x1, ū)
         
         if benchmark

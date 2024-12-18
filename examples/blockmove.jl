@@ -5,7 +5,7 @@ using Plots
 using Printf
 
 visualise = false
-benchmark = true
+benchmark = false
 verbose = true
 quasi_newton = false
 n_benchmark = 10
@@ -21,14 +21,11 @@ options = Options{T}(quasi_newton=quasi_newton, verbose=true)
 num_state = 2  # position and velocity
 num_control = 3  # pushing force, 2x slacks for + and - components of abs work
 
-# ## Dynamics - explicit midpoint for integrator
+# ## Dynamics - forward Euler
 
-function blockmove_continuous(x, u)
-    return [x[2], u[1]]
-end
-blockmove_discrete = (x, u) -> x + h * blockmove_continuous(x + 0.5 * h * blockmove_continuous(x, u), u)
+f = (x, u) -> x + h * [x[2], u[1]]
 
-blockmove_dyn = Dynamics(blockmove_discrete, num_state, num_control)
+blockmove_dyn = Dynamics(f, num_state, num_control)
 dynamics = [blockmove_dyn for k = 1:N-1]
 
 # ## Costs

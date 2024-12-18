@@ -7,7 +7,7 @@ using BenchmarkTools
 using Printf
 
 visualise = false
-benchmark = true
+benchmark = false
 verbose = true
 
 h = 0.05
@@ -33,11 +33,10 @@ nu = nF + nq  # torque and acceleration now decision variables/"controls"
 
 xN = [0.0; π; 0.0; 0.0]
 
-# ## Dynamics - implicit dynamics with RK2 integration
+# ## Dynamics - forward Euler
 
-f = (x, u) -> [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]]
-cartpole_discrete = (x, u) -> x + h * f(x + 0.5 * h * f(x, u), u)  # Explicit midpoint
-cartpole_dyn = Dynamics(cartpole_discrete, nx, nu)
+f = (x, u) -> x + h * [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]]  # forward Euler
+cartpole_dyn = Dynamics(f, nx, nu)
 dynamics = [cartpole_dyn for k = 1:N-1]
 
 # ## Costs
@@ -68,8 +67,8 @@ open("results/cartpole_implicit.txt", "w") do io
 		solver.options.verbose = verbose
 		
 		Random.seed!(seed)
-		x1 = [0.0; 0.0; 0.0; 0.0] + (rand(4) .- 0.5) .* [0.05, 0.2, 0.1, 0.1]
-		ū = [1.0e-2 * (rand(nu) .- 0.5) for k = 1:N-1]
+		x1 = (rand(4) .- 0.5) .* [0.1, 0.1, 0.1, 0.1]
+		ū = [1.0e-1 * (rand(nu) .- 0.5) for k = 1:N-1]
 		x̄ = rollout(dynamics, x1, ū)
 		
 		solve!(solver, x̄, ū)

@@ -7,7 +7,7 @@ using Printf
 
 visualise = true
 output = false
-benchmark = true
+benchmark = false
 n_benchmark = 10
 
 print_level = output ? 5 : 4
@@ -27,10 +27,7 @@ model = Model(
                         "min_refinement_steps" => 0, "print_level" => print_level, "print_timing_statistics" => "yes")
             );
 
-function blockmove_continuous(x, u)
-    return [x[2], u[1]]
-end
-blockmove_discrete = (x, u) -> x + h * blockmove_continuous(x + 0.5 * h * blockmove_continuous(x, u), u)
+f = (x, u) -> x + h * [x[2], u[1]]  # forward Euler
 
 function cost(x, u)
     J = 0.0
@@ -48,7 +45,7 @@ end
 
 fix.(x[1, :], x1, force = true)
 for k = 1:N-1
-    @constraint(model, x[k+1, :] == blockmove_discrete(x[k, :], u[k, :]))
+    @constraint(model, x[k+1, :] == f(x[k, :], u[k, :]))
     @constraint(model, u[k, 2] - u[k, 3] == u[k, 1] * x[k, 2])
     @constraint(model, -10.0 <= u[k, 1] <= 10.0)
     @constraint(model, u[k, 2:3] .>= 0.0)
@@ -65,7 +62,7 @@ open("results/blockmove.txt", "w") do io
         ū = [[1.0e-0 * (randn(1) .- 0.5); 0.01 * ones(2)] for k = 1:N-1]
         x̄ = [x1]
         for k in 2:N
-            push!(x̄, blockmove_discrete(x̄[k-1],  ū[k-1]))
+            push!(x̄, f(x̄[k-1],  ū[k-1]))
         end
         
         for k = 1:N
