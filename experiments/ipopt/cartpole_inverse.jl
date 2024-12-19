@@ -70,7 +70,7 @@ for k = 1:N-1
     @constraint(model, 4.0 .>= u[k, 1:nF] .>= -4.0)
 end
 
-open("results/cartpole.txt", "w") do io
+open("results/cartpole_inverse.txt", "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)  solver (ms) \n")
 	for seed = 1:50
 		set_attribute(model, "print_level", print_level)

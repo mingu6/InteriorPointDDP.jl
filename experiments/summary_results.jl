@@ -58,7 +58,7 @@ function print_summary_results(io, fname, alg_name)
     @printf(io, "\n")
 end
 
-fnames_in = ["ipddp2results/concar.txt", "ipddp2/results/concar_QN.txt", "ipopt/results/concar.txt", "ALiLQR/results/concar.txt"]
+fnames_in = ["ipddp2/results/concar.txt", "ipddp2/results/concar_QN.txt", "ipopt/results/concar.txt", "ALiLQR/results/concar.txt"]
 names = ["IPDDP2", "IPDDP2 (QN)", "IPOPT", "AL-iLQR"]
 
 open("summary_results_concar.txt", "w") do io
@@ -67,7 +67,7 @@ open("summary_results_concar.txt", "w") do io
     end
 end
 
-fnames_in = ["ipddp2/results/cartpole_implicit.txt", "ipddp2/results/cartpole_implicit_QN.txt", "ipopt/results/cartpole.txt", "ALiLQR/results/cartpole_implicit.txt"]
+fnames_in = ["ipddp2/results/cartpole_inverse.txt", "ipddp2/results/cartpole_inverse_QN.txt", "ipopt/results/cartpole_inverse.txt", "ALiLQR/results/cartpole_inverse.txt"]
 
 open("summary_results_cartpole_implicit.txt", "w") do io
     for (fname, name) in zip(fnames_in, names)

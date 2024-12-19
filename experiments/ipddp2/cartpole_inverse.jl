@@ -62,7 +62,7 @@ bounds = [bound for k in 1:N-1]
 
 solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
 
-fname = quasi_newton ? "results/cartpole_implicit_QN.txt" : "results/cartpole_implicit.txt"
+fname = quasi_newton ? "results/cartpole_inverse_QN.txt" : "results/cartpole_inverse.txt"
 open(fname, "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")
     for seed = 1:50

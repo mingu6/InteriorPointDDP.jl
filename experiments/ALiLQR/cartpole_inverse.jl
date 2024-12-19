@@ -60,7 +60,7 @@ constraints = [[stage_constr for k = 1:N-1]..., Constraint()]
 		
 solver = Solver(dynamics, objective, constraints; options=options)
 
-open("results/cartpole_implicit.txt", "w") do io
+open("results/cartpole_inverse.txt", "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)  solver (ms)  \n")
 	for seed = 1:50
 		solver = Solver(dynamics, objective, constraints; options=options)
