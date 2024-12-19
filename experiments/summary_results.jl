@@ -69,7 +69,7 @@ end
 
 fnames_in = ["ipddp2/results/cartpole_inverse.txt", "ipddp2/results/cartpole_inverse_QN.txt", "ipopt/results/cartpole_inverse.txt", "ALiLQR/results/cartpole_inverse.txt"]
 
-open("summary_results_cartpole_implicit.txt", "w") do io
+open("summary_results_cartpole_inverse.txt", "w") do io
     for (fname, name) in zip(fnames_in, names)
         print_summary_results(io, fname, name)
     end
