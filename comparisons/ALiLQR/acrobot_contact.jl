@@ -7,8 +7,8 @@ using BenchmarkTools
 using Printf
 using LaTeXStrings
 
-visualise = true
-benchmark = true
+visualise = false
+benchmark = false
 verbose = true
 
 h = 0.05
@@ -32,7 +32,7 @@ nq = acrobot_impact.nq
 nc = acrobot_impact.nc
 nF = acrobot_impact.nu
 nx = 2 * nq
-ny = nF + nq + 2 * nc
+nu = nF + nq + 2 * nc
 
 q1 = [0.0; 0.0]
 q2 = [0.0; 0.0]
@@ -42,7 +42,7 @@ xN = [qN; qN]
 
 # ## Dynamics - implicit variational integrator (midpoint)
 
-dyn_acrobot = Dynamics((x, u) -> [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]], nx, ny)
+dyn_acrobot = Dynamics((x, u) -> [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]], nx, nu)
 dynamics = [dyn_acrobot for k = 1:N-1]
 
 # ## Costs
@@ -64,7 +64,7 @@ function objN(x, u)
 	return J
 end
 
-stage = Cost(objk, nx, ny)
+stage = Cost(objk, nx, nu)
 objective = [
     [stage for k = 1:N-1]...,
     Cost(objN, nx, 0),
@@ -73,12 +73,12 @@ objective = [
 # ## Constraints - perturb complementarity to make easier
 
 stage_constr = Constraint((x, u) -> [
-            implicit_contact_dynamics(acrobot_impact, x, u, h, 1e-2);
+            implicit_contact_dynamics(acrobot_impact, x, u, h, 1e-4);
             u[1] - 10.0;
             -u[1] - 10.0;
             -u[nq+2:nq+2+2*nc:end]
             ],
-            nx, ny)
+            nx, nu)
 
 constraints = [[stage_constr for k = 1:N-1]...,
                 Constraint()
@@ -96,7 +96,7 @@ open("results/acrobot_contact.txt", "w") do io
 		
 		Random.seed!(seed)
 		q2_init = LinRange(q1, qN, N)[2:end]
-		ū = [[1.0e-2 * (rand(nu) .- 0.5); q2_init[k]; 0.01 * ones(nc); 0.01 * ones(nc)] for k = 1:N-1]
+		ū = [[1.0e-2 * (rand(nF) .- 0.5); q2_init[k]; 0.01 * ones(nc); 0.01 * ones(nc)] for k = 1:N-1]
 		x̄ = rollout(dynamics, x0, ū)
 		
 		solve!(solver, x̄, ū)
