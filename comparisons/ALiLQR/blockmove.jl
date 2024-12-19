@@ -26,7 +26,7 @@ num_control = 3  # force and two slack variables to represent abs work
 function blockmove_continuous(x, u)
     return [x[2], u[1]]
 end
-blockmove_discrete = (x, u) -> x + h * blockmove_continuous(x + 0.5 * h * blockmove_continuous(x, u), u)
+blockmove_discrete = (x, u) -> x + h * blockmove_continuous(x, u)
 
 blockmove_dyn = Dynamics(blockmove_discrete, num_state, num_control)
 dynamics = [blockmove_dyn for k = 1:N-1]
