@@ -1,4 +1,4 @@
- seed  iterations  status     objective           primal        wall (s)   solver(s)  
+ seed  iterations  status     objective           primal        wall (ms)   solver(ms)  
   1       352      false    1.25837755e+01    3.57129519e-15    241.1       223.1  
   2       407      false    7.83311557e+00    1.57726433e-01    291.3       268.8  
   3        77       true    9.65239453e-01    4.87918591e-15     56.5        52.6  

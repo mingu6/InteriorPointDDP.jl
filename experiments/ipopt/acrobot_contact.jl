@@ -28,13 +28,11 @@ end
 
 nq = acrobot_impact.nq
 nc = acrobot_impact.nc
-nF = acrobot_impact.nu
+nτ = acrobot_impact.nu
 nx = 2 * nq
-nu = nF + nq + 2 * nc
+nu = nτ + nq + 2 * nc
 
-q1 = [0.0; 0.0]
-q2 = [0.0; 0.0]
-x1 = [q1; q2]
+x1 = [0.0; 0.0; 0.0; 0.0]
 qN = [π; 0.0]
 xN = [qN; qN]
 
@@ -43,24 +41,25 @@ model = Model(
                         "min_refinement_steps" => 0, "print_level" => print_level, "print_timing_statistics" => "yes")
             );
 
-acrobot_discrete = (x, u) -> [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]]
+f = (x, u) -> [x[nq .+ (1:nq)]; u[nτ .+ (1:nq)]]
 
 # ## Costs
 
 function objt(x, u)
-	J = 0.01 * h * u[1] * u[1]
+	τ = u[1]
+	J = 0.01 * h * τ * τ
 	return J
 end
 
-function objT(x, u)
+function objN(x, u)
 	J = 0.0 
 	
-	q1 = x[1:acrobot_impact.nq] 
-	q2 = x[acrobot_impact.nq .+ (1:acrobot_impact.nq)] 
-	v1 = (q2 - q1) ./ h
+	q⁻ = x[1:acrobot_impact.nq] 
+	q = x[acrobot_impact.nq .+ (1:acrobot_impact.nq)] 
+	q̇ᵐ⁻ = (q - q⁻) ./ h
 
-	J += 200.0 *  v1' * v1
-    J += 500.0 * (q2 - qN)' * (q2 - qN)
+	J += 200.0 * q̇ᵐ⁻' * q̇ᵐ⁻
+	J += 500.0 * (q - qN)' * (q - qN)
 	return J
 end
 
@@ -69,7 +68,7 @@ cost = (x, u) -> begin
 	for k in 1:N-1
 		J += objt(x[k, :], u[k, :])
 	end
-	J += objT(x[N, :], 0.0)
+	J += objN(x[N, :], 0.0)
 end
 
 # ## Constraints
@@ -83,9 +82,9 @@ constr = (x, u) -> implicit_contact_dynamics(acrobot_impact, x, u, h, 1e-4)
 
 fix.(x[1, :], x1, force = true)
 for k = 1:N-1
-    @constraint(model, x[k+1, :] == acrobot_discrete(x[k, :], u[k, :]))
+    @constraint(model, x[k+1, :] == f(x[k, :], u[k, :]))
     @constraint(model, constr(x[k, :], u[k, :]) .== 0.0)
-    @constraint(model, u[k, (nF + nq) .+ (1:2*nc)] .>= 0.0)
+    @constraint(model, u[k, (nτ + nq) .+ (1:2*nc)] .>= 0.0)
     @constraint(model, 10.0 .>= u[k, 1] .>= -10.0)
 end
 
@@ -97,12 +96,12 @@ open("results/acrobot_contact.txt", "w") do io
 		
 		# ## Initialise variables and solve
 		
-		q2_init = LinRange(q1, qN, N)[2:end]
-		ū = [[1.0e-2 * (rand(nF) .- 0.5); q2_init[k]; 0.01 * ones(nc); 0.01 * ones(nc)] for k = 1:N-1]
+		q_init = LinRange([0.0; 0.0], qN, N)[2:end]
+		ū = [[1.0e-2 * (rand(nτ) .- 0.5); q_init[k]; 0.01 * ones(nc); 0.01 * ones(nc)] for k = 1:N-1]
 		
 		x̄ = [x1]
 		for k in 2:N
-		    push!(x̄, acrobot_discrete(x̄[k-1],  ū[k-1]))
+		    push!(x̄, f(x̄[k-1],  ū[k-1]))
 		end
 		
 		for k = 1:N
@@ -139,23 +138,26 @@ open("results/acrobot_contact.txt", "w") do io
 	end
 end
 
-if visualise
-	xv = value.(x)
-	x_sol = [xv[k, :] for k in 1:N]
-	uv = value.(u)
-	u_sol = [uv[k, :] for k in 1:N-1]
-	
-	q_e = map(u -> u[nF + 2], u_sol)
-	ϕ1 = map(qe -> π / 2 - qe, q_e)
-	ϕ2 = map(qe -> qe + π / 2, q_e)
-	λ1 = map(x -> x[end-1], u_sol)
-	λ2 = map(x -> x[end], u_sol)
-	u = map(x -> x[1], u_sol)
-	plot(range(0, h * (N-1), N-1), [ϕ1 ϕ2 λ1 λ2], xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylims=(0,5),
-		legendfontsize=12, linewidth=2, linestyle=[:solid :solid :dot :dot], linecolor=[1 2 1 2], 
-		background_color_legend = nothing, label=[L"$\phi(q)_1$" L"$\phi(q)_2$" L"$\lambda_1$" L"$\lambda_2$"])
-	savefig("plots/acrobot_contact_IPOPT.pdf")
-	
+# ## Plot solution
+
+xv = value.(x)
+x_sol = [xv[k, :] for k in 1:N]
+uv = value.(u)
+u_sol = [uv[k, :] for k in 1:N-1]
+
+θe = map(x -> x[4], x_sol[1:end-1])
+s1 = map(θ -> π / 2 - θ, θe)
+s2 = map(θ -> θ + π / 2, θe)
+λ1 = map(u -> u[4], u_sol)
+λ2 = map(u -> u[5], u_sol)
+plot(range(0, h * (N-1), N-1), [s1 s2 λ1 λ2], xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylims=(0,6),
+legendfontsize=12, linewidth=2, xlabelfontsize=14, linestyle=[:solid :solid :dot :dot], linecolor=[1 2 1 2], 
+background_color_legend = nothing, label=[L"$s_t^{(1)}$" L"$s_t^{(2)}$" L"$\lambda^{(1)}_t$" L"$\lambda^{(2)}_t$"])
+savefig("plots/acrobot_contact_IPOPT.pdf")
+
+# ## Visualise trajectory using MeshCat
+
+if visualise	
 	q_sol = state_to_configuration(x_sol)
 	visualize!(vis, acrobot_impact, q_sol, Δt=h);
 end
