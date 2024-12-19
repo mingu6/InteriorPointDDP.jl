@@ -104,10 +104,10 @@ solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
 
 # ## Plots
 
-plot(xlims=(0, 1), ylims=(0, 1), xtickfontsize=14, ytickfontsize=14)
-for xyr in xyr_obs
-    plotCircle!(xyr[1], xyr[2], xyr[3])
-end
+# plot(xlims=(0, 1), ylims=(0, 1), xtickfontsize=14, ytickfontsize=14)
+# for xyr in xyr_obs
+#     plotCircle!(xyr[1], xyr[2], xyr[3])
+# end
 
 # ## Initialise solver and solve
 
@@ -121,10 +121,15 @@ open(fname, "w") do io
         x1 = rand(T, 4) .* T[0.05; 0.05; π / 2; 0.0]
         ū = [[T(1.0e-3) .* (rand(T, 2) .- 0.5); T(0.01) * ones(T, num_obstacles + 2)] for k = 1:N-1]
     
-        solve!(solver, x1, ū)
+        state_diffs = solve!(solver, x1, ū)
+		
+		if solver.data.status == 0
+            plot!(1:solver.data.k+1, state_diffs, yaxis=:log10, yticks=[1e2, 1e0, 1e-2, 1e-4, 1e-6, 1e-8],
+                    ylims=(1e-9, 3e2), legend=false, linecolor=1, xtickfontsize=14, ytickfontsize=14)
+		end
         
-        x_sol, u_sol = get_trajectory(solver)
-        plotTrajectory!(x_sol)
+        # x_sol, u_sol = get_trajectory(solver)
+        # plotTrajectory!(x_sol)
         
         if benchmark
             solver.options.verbose = false
@@ -145,4 +150,6 @@ open(fname, "w") do io
     end
 end
 
-savefig("plots/concar_IPDDP.pdf")
+savefig("plots/concar_convergence.pdf")
+
+# savefig("plots/concar_IPDDP.pdf")
