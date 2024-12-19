@@ -17,11 +17,11 @@ print_level = output ? 5 : 4
 h = 0.05
 N = 101
 
-include("../../examples/models/acrobot.jl")
+include("../models/acrobot.jl")
 include("ipopt_parse.jl")
 
 if visualise
-	include("../../examples/visualise/visualise_acrobot.jl")
+	include("../visualise/visualise_acrobot.jl")
 	!@isdefined(vis) && (vis = Visualizer())
 	render(vis)
 end

@@ -58,7 +58,7 @@ function print_summary_results(io, fname, alg_name)
     @printf(io, "\n")
 end
 
-fnames_in = ["../examples/results/concar.txt", "../examples/results/concar_QN.txt", "ipopt/results/concar.txt", "ALiLQR/results/concar.txt"]
+fnames_in = ["ipddp2results/concar.txt", "ipddp2/results/concar_QN.txt", "ipopt/results/concar.txt", "ALiLQR/results/concar.txt"]
 names = ["IPDDP2", "IPDDP2 (QN)", "IPOPT", "AL-iLQR"]
 
 open("summary_results_concar.txt", "w") do io
@@ -67,7 +67,7 @@ open("summary_results_concar.txt", "w") do io
     end
 end
 
-fnames_in = ["../examples/results/cartpole_implicit.txt", "../examples/results/cartpole_implicit_QN.txt", "ipopt/results/cartpole.txt", "ALiLQR/results/cartpole_implicit.txt"]
+fnames_in = ["ipddp2/results/cartpole_implicit.txt", "ipddp2/results/cartpole_implicit_QN.txt", "ipopt/results/cartpole.txt", "ALiLQR/results/cartpole_implicit.txt"]
 
 open("summary_results_cartpole_implicit.txt", "w") do io
     for (fname, name) in zip(fnames_in, names)
@@ -75,7 +75,7 @@ open("summary_results_cartpole_implicit.txt", "w") do io
     end
 end
 
-fnames_in = ["../examples/results/blockmove.txt", "../examples/results/blockmove_QN.txt", "ipopt/results/blockmove.txt", "ALiLQR/results/blockmove.txt"]
+fnames_in = ["ipddp2/results/blockmove.txt", "ipddp2/results/blockmove_QN.txt", "ipopt/results/blockmove.txt", "ALiLQR/results/blockmove.txt"]
 
 open("summary_results_blockmove.txt", "w") do io
     for (fname, name) in zip(fnames_in, names)
@@ -83,7 +83,7 @@ open("summary_results_blockmove.txt", "w") do io
     end
 end
 
-fnames_in = ["../examples/results/acrobot_contact.txt", "../examples/results/acrobot_contact_QN.txt", "ipopt/results/acrobot_contact.txt", "ALiLQR/results/acrobot_contact.txt"]
+fnames_in = ["ipddp2/results/acrobot_contact.txt", "ipddp2/results/acrobot_contact_QN.txt", "ipopt/results/acrobot_contact.txt", "ALiLQR/results/acrobot_contact.txt"]
 
 open("summary_results_acrobot_contact.txt", "w") do io
     for (fname, name) in zip(fnames_in, names)

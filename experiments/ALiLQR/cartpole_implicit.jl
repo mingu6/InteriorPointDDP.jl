@@ -18,10 +18,10 @@ options.scaling_penalty = 1.3
 options.initial_constraint_penalty = 1e-3
 options.max_dual_updates = 50
 
-include("../../examples/models/cartpole.jl")
+include("../models/cartpole.jl")
 
 if visualise
-	include("../../examples/visualise/visualise_cartpole.jl")
+	include("../visualise/visualise_cartpole.jl")
 	!@isdefined(vis) && (vis = Visualizer())
 	render(vis)
 end

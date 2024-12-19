@@ -5,7 +5,6 @@ using Random
 using BenchmarkTools
 using Printf
 
-visualise = true
 benchmark = false
 verbose = true
 
@@ -39,7 +38,7 @@ xyr_obs = [
     ]
 num_obstacles = length(xyr_obs)
 
-include("../../examples/visualise/concar.jl")
+include("../visualise/concar.jl")
 
 # ## Dynamics - RK4
 
@@ -107,11 +106,9 @@ solver = Solver(dynamics, objective, constraints; options=options)
 
 # ## Plots
 
-if visualise
-    plot(xlims=(0, 1), ylims=(0, 1), xtickfontsize=14, ytickfontsize=14)
-    for xyr in xyr_obs
-        plotCircle!(xyr[1], xyr[2], xyr[3])
-    end
+plot(xlims=(0, 1), ylims=(0, 1), xtickfontsize=14, ytickfontsize=14)
+for xyr in xyr_obs
+    plotCircle!(xyr[1], xyr[2], xyr[3])
 end
 
 open("results/concar.txt", "w") do io
@@ -129,10 +126,8 @@ open("results/concar.txt", "w") do io
         
         solve!(solver, x̄, ū)
         
-        if visualise
-            x_sol, u_sol = get_trajectory(solver)
-            plotTrajectory!(x_sol)
-        end
+        x_sol, u_sol = get_trajectory(solver)
+        plotTrajectory!(x_sol)
 		
 		if benchmark
             solver.options.verbose = false
@@ -145,4 +140,4 @@ open("results/concar.txt", "w") do io
     end
 end
 
-visualise && savefig("plots/concar_ALiLQR.pdf")
+savefig("plots/concar_ALiLQR.pdf")

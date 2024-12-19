@@ -14,10 +14,10 @@ n_benchmark = 10
 print_level = output ? 5 : 4
 
 include("ipopt_parse.jl")
-include("../../examples/models/cartpole.jl")
+include("../models/cartpole.jl")
 
 if visualise
-    include("../../examples/visualise/visualise_cartpole.jl")
+    include("../visualise/visualise_cartpole.jl")
     !@isdefined(vis) && (vis = Visualizer())
     render(vis)
 end

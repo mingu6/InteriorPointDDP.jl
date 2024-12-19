@@ -6,7 +6,6 @@ using BenchmarkTools
 using Suppressor
 using Printf
 
-visualise = true
 output = false
 benchmark = false
 n_benchmark = 10
@@ -21,7 +20,7 @@ xN = [1.0; 1.0; π / 4; 0.0]
 nx = 4  # num. state
 nu = 2  # num. control
 
-include("../../examples/visualise/concar.jl")
+include("../visualise/concar.jl")
 include("ipopt_parse.jl")
 
 model = Model(
@@ -107,11 +106,9 @@ end
 
 # ## Plots
 
-if visualise
-    plot(xlims=(0, 1), ylims=(0, 1), xtickfontsize=14, ytickfontsize=14)
-    for xyr in xyr_obs
-        plotCircle!(xyr[1], xyr[2], xyr[3])
-    end
+plot(xlims=(0, 1), ylims=(0, 1), xtickfontsize=14, ytickfontsize=14)
+for xyr in xyr_obs
+    plotCircle!(xyr[1], xyr[2], xyr[3])
 end
 
 open("results/concar.txt", "w") do io
@@ -153,12 +150,11 @@ open("results/concar.txt", "w") do io
         ipopt_out = @capture_out optimize!(model)
 		objective, constr_viol, n_iter, succ, _, _ = parse_results_ipopt(ipopt_out)
 		
-		if visualise
-		    xv = value.(x)
-            x_sol = [xv[k, :] for k in 1:N]
-            
-            plotTrajectory!(x_sol)
-        end
+		# visualise trajectories
+		
+		xv = value.(x)
+        x_sol = [xv[k, :] for k in 1:N]
+        plotTrajectory!(x_sol)
 		
 		if benchmark
             set_attribute(model, "print_level", 4)
@@ -179,4 +175,4 @@ open("results/concar.txt", "w") do io
     end
 end
 
-visualise && savefig("plots/concar_IPOPT.pdf")
+savefig("plots/concar_IPOPT.pdf")

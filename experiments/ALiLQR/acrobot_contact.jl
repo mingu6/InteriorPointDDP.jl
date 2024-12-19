@@ -20,10 +20,10 @@ options.initial_constraint_penalty = 1.0
 options.max_iterations = 100
 options.max_dual_updates = 50
 
-include("../../examples/models/acrobot.jl")
+include("../models/acrobot.jl")
 
 if visualise
-	include("../../examples/visualise/visualise_acrobot.jl")
+	include("../visualise/visualise_acrobot.jl")
 	!@isdefined(vis) && (vis = Visualizer())
 	render(vis)
 end

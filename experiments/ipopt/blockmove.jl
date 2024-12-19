@@ -5,7 +5,6 @@ using Plots
 using Suppressor
 using Printf
 
-visualise = true
 output = false
 benchmark = false
 n_benchmark = 10
@@ -97,22 +96,4 @@ open("results/blockmove.txt", "w") do io
             @printf(io, " %2s     %5s      %5s     %.8e    %.8e \n", seed, n_iter, succ, objective, constr_viol)
         end
     end
-end
-
-# ## Plot solution
-
-if visualise
-    xv = value.(x)
-	x_sol = [xv[k, :] for k in 1:N]
-	uv = value.(u)
-	u_sol = [uv[k, :] for k in 1:N-1]
-    
-    x = map(x -> x[1], x_sol)
-    v = map(x -> x[2], x_sol)
-    u = [map(u -> u[1], u_sol); 0.0]
-    work = [abs(vk * uk) for (vk, uk) in zip(v, u)]
-    plot(range(0, (N-1) * h, length=N), [x v u work], label=["x" "v" "u" "work"])
-    savefig("plots/blockmove.png")
-    
-    println("Total absolute work: ", sum(work))
 end

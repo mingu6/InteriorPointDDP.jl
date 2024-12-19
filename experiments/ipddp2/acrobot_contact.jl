@@ -16,10 +16,10 @@ T = Float64
 h = 0.05
 N = 101
 
-include("models/acrobot.jl")
+include("../models/acrobot.jl")
 
 if visualise
-	include("visualise/visualise_acrobot.jl")
+	include("../visualise/visualise_acrobot.jl")
 	!@isdefined(vis) && (vis = Visualizer())
 	render(vis)
 end
@@ -85,7 +85,7 @@ bounds = [bound for k in 1:N-1]
 
 solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
 
-fname = quasi_newton ? "examples/results/acrobot_contact_QN.txt" : "examples/results/acrobot_contact.txt"
+fname = quasi_newton ? "results/acrobot_contact_QN.txt" : "results/acrobot_contact.txt"
 open(fname, "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (s)   solver(s)  \n")
 	for seed = 1:1
@@ -129,7 +129,7 @@ if visualise
 	plot(range(0, h * (N-1), N-1), [ϕ1 ϕ2 λ1 λ2], xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylims=(0,6),
 		legendfontsize=12, linewidth=2, xlabelfontsize=14, linestyle=[:solid :solid :dot :dot], linecolor=[1 2 1 2], 
 		background_color_legend = nothing, label=[L"$s_t^{(1)}$" L"$s_t^{(2)}$" L"$\lambda^{(1)}_t$" L"$\lambda^{(2)}_t$"])
-	savefig("examples/plots/acrobot_contact_IPDDP.pdf")
+	savefig("plots/acrobot_contact_IPDDP.pdf")
 	
 	q_sol = state_to_configuration(x_sol)
 	visualize!(vis, acrobot_impact, q_sol, Δt=h);

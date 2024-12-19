@@ -2,6 +2,7 @@ using InteriorPointDDP
 using LinearAlgebra
 using Random
 using Plots
+using MeshCat
 using Printf
 
 visualise = false
@@ -11,46 +12,57 @@ quasi_newton = false
 n_benchmark = 10
 
 T = Float64
-h = 0.01
+h = 0.05
 N = 101
-xN = T[1.0; 0.0]
-x1 = T[0.0; 0.0]
 
-options = Options{T}(quasi_newton=quasi_newton, verbose=true)
-    
-num_state = 2  # position and velocity
-num_control = 3  # pushing force, 2x slacks for + and - components of abs work
+include("../models/cartpole.jl")
+
+if visualise
+	include("../visualise/visualise_cartpole.jl")
+	!@isdefined(vis) && (vis = Visualizer())
+	render(vis)
+end
+
+nq = cartpole.nq
+nF = cartpole.nu
+nx = 2 * nq
+nu = nF + nq  # torque and acceleration now decision variables/"controls"
+
+xN = T[0.0; π; 0.0; 0.0]
+
+options = Options{T}(quasi_newton=quasi_newton, verbose=false)
 
 # ## Dynamics - forward Euler
 
-f = (x, u) -> x + h * [x[2], u[1]]
-
-blockmove_dyn = Dynamics(f, num_state, num_control)
-dynamics = [blockmove_dyn for k = 1:N-1]
+f = (x, u) -> x + h * [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]]
+cartpole_dyn = Dynamics(f, nx, nu)
+dynamics = [cartpole_dyn for k = 1:N-1]
 
 # ## Costs
 
-stage_cost = Cost((x, u) -> h * (u[2] + u[3]), 2, 3)
+stage = Cost((x, u) -> h * dot(u[1], u[1]), nx, nu)
 objective = [
-    [stage_cost for k = 1:N-1]...,
-    Cost((x, u) -> 500.0 * dot(x - xN, x - xN), 2, 0),
-]
+    [stage for k = 1:N-1]...,
+    Cost((x, u) -> 400.0 * dot(x - xN, x - xN), nx, 0)
+] 
 
 # ## Constraints
 
-stage_constr = Constraint((x, u) -> [
-    u[2] - u[3] - u[1] * x[2]
-], 2, 3)
+stage_constr = Constraint((x, u) -> implicit_dynamics(cartpole, x, u) * h, nx, nu)
+
 constraints = [stage_constr for k = 1:N-1]
 
 # ## Bounds
 
-bound = Bound(T[-10.0, 0.0, 0.0], T[10.0, Inf, Inf])
-bounds = [bound for k = 1:N-1]
+bound = Bound(
+	[-T(4.0) * ones(T, nF); -T(Inf) * ones(T, nq)],
+	[T(4.0) * ones(T, nF); T(Inf) * ones(T, nq)]
+)
+bounds = [bound for k in 1:N-1]
 
 solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
 
-fname = quasi_newton ? "examples/results/blockmove_QN.txt" : "examples/results/blockmove.txt"
+fname = quasi_newton ? "results/cartpole_implicit_QN.txt" : "results/cartpole_implicit.txt"
 open(fname, "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (s)   solver(s)  \n")
     for seed = 1:50
@@ -59,9 +71,10 @@ open(fname, "w") do io
         
         # ## Initialise solver and solve
         
-        ū = [[T(1.0e-0) * (randn(T, 1) .- 0.5); T(0.01) * ones(T, 2)] for k = 1:N-1]
+        x1 = (rand(T, 4) .- T(0.5)) .* T[0.1, 0.1, 0.1, 0.1]
+        ū = [T(1.0e-1) * (rand(T, nu) .- T(0.5)) for k = 1:N-1]
         solve!(solver, x1, ū)
-
+        
         if benchmark
             solver.options.verbose = false
             solver_time = 0.0
@@ -81,17 +94,11 @@ open(fname, "w") do io
     end
 end
 
-# ## Plot solution
+# ## Visualise solution
 
 if visualise
     x_sol, u_sol = get_trajectory(solver)
     
-    x = map(x -> x[1], x_sol)
-    v = map(x -> x[2], x_sol)
-    u = [map(u -> u[1], u_sol); 0.0]
-    work = [abs(vk * uk) for (vk, uk) in zip(v, u)]
-    plot(range(0, (N-1) * h, length=N), [x v u work], label=["x" "v" "u" "work"])
-    savefig("examples/plots/blockmove.png")
-    
-    println("Total absolute work: ", sum(work))
+	q_sol = [x[1:nq] for x in x_sol]
+	visualize!(vis, cartpole, q_sol, Δt=h);
 end

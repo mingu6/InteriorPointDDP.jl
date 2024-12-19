@@ -4,7 +4,6 @@ using Plots
 using Random
 using Printf
 
-visualise = true
 benchmark = false
 verbose = true
 quasi_newton = false
@@ -36,7 +35,7 @@ xyr_obs = [
 num_obstacles = length(xyr_obs)
 num_primal = num_action + num_obstacles + 2  # 2 slacks for box constraints
 
-include("../examples/visualise/concar.jl")
+include("../visualise/concar.jl")
 
 # ## Dynamics - RK4
 
@@ -105,16 +104,14 @@ solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
 
 # ## Plots
 
-if visualise
-    plot(xlims=(0, 1), ylims=(0, 1), xtickfontsize=14, ytickfontsize=14)
-    for xyr in xyr_obs
-        plotCircle!(xyr[1], xyr[2], xyr[3])
-    end
+plot(xlims=(0, 1), ylims=(0, 1), xtickfontsize=14, ytickfontsize=14)
+for xyr in xyr_obs
+    plotCircle!(xyr[1], xyr[2], xyr[3])
 end
 
 # ## Initialise solver and solve
 
-fname = quasi_newton ? "examples/results/concar_QN.txt" : "examples/results/concar.txt"
+fname = quasi_newton ? "results/concar_QN.txt" : "results/concar.txt"
 open(fname, "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")
     for seed = 1:50
@@ -126,10 +123,8 @@ open(fname, "w") do io
     
         solve!(solver, x1, ū)
         
-        if visualise
-            x_sol, u_sol = get_trajectory(solver)
-            plotTrajectory!(x_sol)
-        end
+        x_sol, u_sol = get_trajectory(solver)
+        plotTrajectory!(x_sol)
         
         if benchmark
             solver.options.verbose = false
@@ -150,4 +145,4 @@ open(fname, "w") do io
     end
 end
 
-visualise && savefig("examples/plots/concar_IPDDP.pdf")
+savefig("plots/concar_IPDDP.pdf")
