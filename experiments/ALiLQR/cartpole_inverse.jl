@@ -7,7 +7,7 @@ using BenchmarkTools
 using Printf
 
 visualise = false
-benchmark = false
+benchmark = true
 verbose = true
 
 h = 0.05

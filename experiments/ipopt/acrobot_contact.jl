@@ -7,9 +7,9 @@ using Suppressor
 using Printf
 using LaTeXStrings
 
-visualise = true
+visualise = false
 output = false
-benchmark = true
+benchmark = false
 n_benchmark = 10
 
 print_level = output ? 5 : 4

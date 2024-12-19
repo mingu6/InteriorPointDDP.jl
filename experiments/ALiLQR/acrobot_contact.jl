@@ -7,8 +7,8 @@ using BenchmarkTools
 using Printf
 using LaTeXStrings
 
-visualise = true
-benchmark = true
+visualise = false
+benchmark = false
 verbose = true
 
 h = 0.05
