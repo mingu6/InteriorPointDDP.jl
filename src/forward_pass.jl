@@ -27,8 +27,6 @@ function forward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T}, 
         
         data.status = check_fraction_boundary(problem, update_rule, τ)
         data.status != 0 && (data.step_size *= 0.5, continue)
-
-        Δφ = expected_decrease_cost(update_rule, problem, α)
         
         # used for sufficient decrease from current iterate step acceptance criterion
         θ = constraint_violation_1norm(problem, mode=:current)
@@ -40,8 +38,8 @@ function forward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T}, 
         
         # check for sufficient decrease conditions for the barrier objective/constraint violation
         data.switching = (Δφ < 0.0) && 
-            ((-Δφ) ^ options.s_φ * α^(1-options.s_φ)  > options.δ * θ_prev ^ options.s_θ)
-        data.armijo_passed = φ - φ_prev - 10. * eps(Float64) * abs(φ_prev) <= options.η_φ * Δφ
+            ((-α * Δφ) ^ options.s_φ * α^(1-options.s_φ)  > options.δ * θ_prev ^ options.s_θ)
+        data.armijo_passed = φ - φ_prev - 10. * eps(Float64) * abs(φ_prev) <= options.η_φ * α * Δφ
         if (θ <= data.min_primal_1) && data.switching
             data.status = data.armijo_passed ? 0 : 4  #  sufficient decrease of barrier objective
         else
