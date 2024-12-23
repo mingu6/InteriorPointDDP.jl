@@ -74,11 +74,11 @@ function check_fraction_boundary(problem::ProblemData{T}, update_rule::UpdateRul
         # iu = bt.indices_upper
         # tmp = update_rule.u_tmp2[t]
         
-        u_tmp2[t] .= il̄[t]
-        u_tmp2[t] .*= (1. - τ)
-        u_tmp2[t] .-= il[t]
+        # u_tmp2[t] .= il̄[t]
+        # u_tmp2[t] .*= (1. - τ)
+        # u_tmp2[t] .-= il[t]
 
-        if any(u_tmp2[t] .> 0.0)
+        if any(c * (1. - τ) > d for (c, d) in zip(il̄[t], il[t]))
             status = 2
             break
         end
@@ -93,7 +93,8 @@ function check_fraction_boundary(problem::ProblemData{T}, update_rule::UpdateRul
         # u_tmp2[t] .-= iu[t]
 
         # if any(u_tmp2[t] .> 0.0)
-        if any(iū[t] .* (1. - τ) .> iu[t])
+        # if any(iū[t] .* (1. - τ) .> iu[t])
+        if any(c * (1. - τ) > d for (c, d) in zip(iū[t], iu[t]))
             status = 2
             break
         end
@@ -108,20 +109,20 @@ function check_fraction_boundary(problem::ProblemData{T}, update_rule::UpdateRul
         #     break
         # end
 
-        u_tmp2[t] .= zl̄[t]
-        u_tmp2[t] .*= (1. - τ)
-        u_tmp2[t] .-= zl[t]
+        # u_tmp2[t] .= zl̄[t]
+        # u_tmp2[t] .*= (1. - τ)
+        # u_tmp2[t] .-= zl[t]
 
-        if any(u_tmp2[t] .> 0.0)
+        if any(c * (1. - τ) > d for (c, d) in zip(zl̄[t], zl[t]))
             status = 2
             break
         end
         
-        u_tmp2[t] .= zū[t]
-        u_tmp2[t] .*= (1. - τ)
-        u_tmp2[t] .-= zu[t]
+        # u_tmp2[t] .= zū[t]
+        # u_tmp2[t] .*= (1. - τ)
+        # u_tmp2[t] .-= zu[t]
 
-        if any(u_tmp2[t] .> 0.0)
+        if any(c * (1. - τ) > d for (c, d) in zip(zū[t], zu[t]))
             status = 2
             break
         end
@@ -194,33 +195,41 @@ function rollout!(update_rule::UpdateRuleData{T}, data::SolverData{T}, problem::
     β, ω = update_rule.parameters.β, update_rule.parameters.ω
     χl, χu = update_rule.parameters.χl, update_rule.parameters.χu
     ζl, ζu = update_rule.parameters.ζl, update_rule.parameters.ζu
+    
+    δx = update_rule.x_tmp
 
     for (t, d) in enumerate(dynamics)
+        δx[t] .= x[t]
+        δx[t] .-= x̄[t]
         # u[t] .= ū[t] + β[t] * (x[t] - x̄[t]) + step_size * α[t]
         u[t] .= α[t]
         u[t] .*= step_size
         u[t] .+= ū[t]
-        mul!(u[t], β[t], x[t], 1.0, 1.0)
-        mul!(u[t], β[t], x̄[t], -1.0, 1.0)
+        mul!(u[t], β[t], δx[t], 1.0, 1.0)
+        # mul!(u[t], β[t], x[t], 1.0, 1.0)
+        # mul!(u[t], β[t], x̄[t], -1.0, 1.0)
 
         # ϕ[t] .= ϕ̄[t] + ω[t] * (x[t] - x̄[t]) + step_size * ψ[t]
         ϕ[t] .= ψ[t]
         ϕ[t] .*= step_size
         ϕ[t] .+= ϕ̄[t]
-        mul!(ϕ[t], ω[t], x[t], 1.0, 1.0)
-        mul!(ϕ[t], ω[t], x̄[t], -1.0, 1.0)
+        mul!(ϕ[t], ω[t], δx[t], 1.0, 1.0)
+        # mul!(ϕ[t], ω[t], x[t], 1.0, 1.0)
+        # mul!(ϕ[t], ω[t], x̄[t], -1.0, 1.0)
 
         zl[t] .= χl[t]
         zl[t] .*= step_size
         zl[t] .+= zl̄[t]
-        mul!(zl[t], ζl[t], x[t], 1.0, 1.0)
-        mul!(zl[t], ζl[t], x̄[t], -1.0, 1.0)
+        mul!(zl[t], ζl[t], δx[t], 1.0, 1.0)
+        # mul!(zl[t], ζl[t], x[t], 1.0, 1.0)
+        # mul!(zl[t], ζl[t], x̄[t], -1.0, 1.0)
 
         zu[t] .= χu[t]
         zu[t] .*= step_size
         zu[t] .+= zū[t]
-        mul!(zu[t], ζu[t], x[t], 1.0, 1.0)
-        mul!(zu[t], ζu[t], x̄[t], -1.0, 1.0)
+        mul!(zu[t], ζu[t], δx[t], 1.0, 1.0)
+        # mul!(zu[t], ζu[t], x[t], 1.0, 1.0)
+        # mul!(zu[t], ζu[t], x̄[t], -1.0, 1.0)
         
         fn_eval_time_ = time()
         dynamics!(d, x[t+1], x[t], u[t])
