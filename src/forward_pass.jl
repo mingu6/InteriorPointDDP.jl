@@ -59,57 +59,88 @@ end
 function check_fraction_boundary(problem::ProblemData{T}, update_rule::UpdateRuleData{T}, τ::T) where T
     N = problem.horizon
 
-    u = problem.controls
-    ū = problem.nominal_controls
-    zl = problem.ineq_duals_lo
-    zu = problem.ineq_duals_up
-    zl̄ = problem.nominal_ineq_duals_lo
-    zū = problem.nominal_ineq_duals_up
+    _, u, _, il, iu = primal_trajectories(problem, mode=:current)
+    _, zl, zu = dual_trajectories(problem, mode=:current)
+    _, ū, _, il̄, iū = primal_trajectories(problem, mode=:nominal)
+    _, zl̄, zū = dual_trajectories(problem, mode=:nominal)
 
-    bounds = problem.bounds
+    # bounds = problem.bounds
+    u_tmp2 = update_rule.u_tmp2
 
     status = 0
     for t = 1:N-1
-        bt = bounds[t]
-        il = bt.indices_lower
-        iu = bt.indices_upper
-        tmp = update_rule.u_tmp[t]
+        # bt = bounds[t]
+        # il = bt.indices_lower
+        # iu = bt.indices_upper
+        # tmp = update_rule.u_tmp2[t]
         
-        tmp .= ū[t]
-        tmp .-= bt.lower
-        tmp .*= (1. - τ)
-        tmp .-= u[t]
-        tmp .+= bt.lower
-        if any(c > 0.0 for c in @view(tmp[il]))
+        u_tmp2[t] .= il̄[t]
+        u_tmp2[t] .*= (1. - τ)
+        u_tmp2[t] .-= il[t]
+
+        if any(u_tmp2[t] .> 0.0)
+            status = 2
+            break
+        end
+
+        # if any(c > 0.0 for c in @view(tmp[il]))
+        #     status = 2
+        #     break
+        # end
+
+        # u_tmp2[t] .= iū[t]
+        # u_tmp2[t] .*= (1. - τ)
+        # u_tmp2[t] .-= iu[t]
+
+        # if any(u_tmp2[t] .> 0.0)
+        if any(iū[t] .* (1. - τ) .> iu[t])
             status = 2
             break
         end
         
-        tmp .= bt.upper
-        tmp .-= ū[t]
-        tmp .*= (1. - τ)
-        tmp .+= u[t]
-        tmp .-= bt.upper
-        if any(c > 0.0 for c in @view(tmp[iu]))
+        # tmp .= bt.upper
+        # tmp .-= ū[t]
+        # tmp .*= (1. - τ)
+        # tmp .+= u[t]
+        # tmp .-= bt.upper
+        # if any(c > 0.0 for c in @view(tmp[iu]))
+        #     status = 2
+        #     break
+        # end
+
+        u_tmp2[t] .= zl̄[t]
+        u_tmp2[t] .*= (1. - τ)
+        u_tmp2[t] .-= zl[t]
+
+        if any(u_tmp2[t] .> 0.0)
             status = 2
             break
         end
         
-        tmp .= zl̄[t]
-        tmp .*= (1. - τ)
-        tmp .-= zl[t]
-        if any(c > 0.0 for c in @view(tmp[il]))
+        u_tmp2[t] .= zū[t]
+        u_tmp2[t] .*= (1. - τ)
+        u_tmp2[t] .-= zu[t]
+
+        if any(u_tmp2[t] .> 0.0)
             status = 2
             break
         end
+
+        # tmp .= zl̄[t]
+        # tmp .*= (1. - τ)
+        # tmp .-= zl[t]
+        # if any(c > 0.0 for c in @view(tmp[il]))
+        #     status = 2
+        #     break
+        # end
         
-        tmp .= zū[t]
-        tmp .*= (1. - τ)
-        tmp .-= zu[t]
-        if any(c > 0.0 for c in @view(tmp[iu]))
-            status = 2
-            break
-        end
+        # tmp .= zū[t]
+        # tmp .*= (1. - τ)
+        # tmp .-= zu[t]
+        # if any(c > 0.0 for c in @view(tmp[iu]))
+        #     status = 2
+        #     break
+        # end
     end
     return status
 end
@@ -150,10 +181,11 @@ end
 
 function rollout!(update_rule::UpdateRuleData{T}, data::SolverData{T}, problem::ProblemData{T}; step_size::T=1.0) where T
     dynamics = problem.model.dynamics
+    bounds = problem.bounds
     
-    x, u, _ = primal_trajectories(problem, mode=:current)
+    x, u, _, il, iu = primal_trajectories(problem, mode=:current)
     ϕ, zl, zu = dual_trajectories(problem, mode=:current)
-    x̄, ū, _ = primal_trajectories(problem, mode=:nominal)
+    x̄, ū, _, _, _ = primal_trajectories(problem, mode=:nominal)
     ϕ̄, zl̄, zū = dual_trajectories(problem, mode=:nominal)
     
     x[1] .= x̄[1]
@@ -192,6 +224,11 @@ function rollout!(update_rule::UpdateRuleData{T}, data::SolverData{T}, problem::
         
         fn_eval_time_ = time()
         dynamics!(d, x[t+1], x[t], u[t])
+        # evaluate inequality constraints
+        il[t] .= u[t]
+        il[t] .-= bounds[t].lower
+        iu[t] .= bounds[t].upper
+        iu[t] .-= u[t]
         data.fn_eval_time += time() - fn_eval_time_
     end
 end

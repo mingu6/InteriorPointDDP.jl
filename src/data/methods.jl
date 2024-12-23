@@ -34,25 +34,35 @@ end
 function barrier_objective!(problem::ProblemData{T}, data::SolverData{T}, update_rule::UpdateRuleData{T}; mode=:nominal) where T
     N = problem.horizon
     bounds = problem.bounds
-    u = mode == :nominal ? problem.nominal_controls : problem.controls
-
-    bl1 = update_rule.bl_tmp1
-    bu1 = update_rule.bu_tmp1
+    # u = mode == :nominal ? problem.nominal_controls : problem.controls
+    _, u, _, il, iu = primal_trajectories(problem, mode=mode)
+    # bl1 = update_rule.bl_tmp1
+    # bu1 = update_rule.bu_tmp1
+    u_tmp1 = update_rule.u_tmp1
     
     barrier_obj = 0.
     for t = 1:N-1
-        bt = bounds[t]
+        # bt = bounds[t]
 
-        bl1[t] .= @views u[t][bt.indices_lower]
-        bl1[t] .-= @views bt.lower[bt.indices_lower]
-        bl1[t] .= log.(bl1[t])
+        # bl1[t] .= @views u[t][bt.indices_lower]
+        # bl1[t] .-= @views bt.lower[bt.indices_lower]
+        # bl1[t] .= log.(bl1[t])
+        u_tmp1[t] .= log.(il[t])
+        for i in bounds[t].indices_lower
+            barrier_obj -= u_tmp1[t][i]
+        end
 
-        bu1[t] .= @views bt.upper[bt.indices_upper]
-        bu1[t] .-= @views u[t][bt.indices_upper]
-        bu1[t] .= log.(bu1[t])
+        u_tmp1[t] .= log.(iu[t])
+        for i in bounds[t].indices_upper
+            barrier_obj -= u_tmp1[t][i]
+        end
 
-        barrier_obj -= sum(bl1[t])
-        barrier_obj -= sum(bu1[t])
+        # bu1[t] .= @views bt.upper[bt.indices_upper]
+        # bu1[t] .-= @views u[t][bt.indices_upper]
+        # bu1[t] .= log.(bu1[t])
+
+        # barrier_obj -= sum(bl1[t])
+        # barrier_obj -= sum(bu1[t])
     end
     
     barrier_obj *= data.μ
@@ -79,6 +89,8 @@ function update_nominal_trajectory!(data::ProblemData)
         t == N && continue
         data.nominal_controls[t] .= data.controls[t]
         data.nominal_constraints[t] .= data.constraints[t]
+        data.nominal_ineq_lo[t] .= data.ineq_lo[t]
+        data.nominal_ineq_up[t] .= data.ineq_up[t]
         data.nominal_eq_duals[t] .= data.eq_duals[t]
         data.nominal_ineq_duals_lo[t] .= data.ineq_duals_lo[t]
         data.nominal_ineq_duals_up[t] .= data.ineq_duals_up[t]
@@ -89,7 +101,9 @@ function primal_trajectories(problem::ProblemData; mode=:nominal)
     x = mode == :nominal ? problem.nominal_states : problem.states
     u = mode == :nominal ? problem.nominal_controls : problem.controls
     h = mode == :nominal ? problem.nominal_constraints : problem.constraints
-    return x, u, h
+    il = mode == :nominal ? problem.nominal_ineq_lo : problem.ineq_lo
+    iu = mode == :nominal ? problem.nominal_ineq_up : problem.ineq_up
+    return x, u, h, il, iu
 end
 
 function dual_trajectories(problem::ProblemData; mode=:nominal)

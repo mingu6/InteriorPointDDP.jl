@@ -3,6 +3,8 @@ mutable struct ProblemData{T}
     states::Vector{Vector{T}}
     controls::Vector{Vector{T}}
     constraints::Vector{Vector{T}}
+    ineq_lo::Vector{Vector{T}}
+    ineq_up::Vector{Vector{T}}
     eq_duals::Vector{Vector{T}}
     ineq_duals_lo::Vector{Vector{T}}
     ineq_duals_up::Vector{Vector{T}}
@@ -11,6 +13,8 @@ mutable struct ProblemData{T}
     nominal_states::Vector{Vector{T}}
     nominal_controls::Vector{Vector{T}}
     nominal_constraints::Vector{Vector{T}}
+    nominal_ineq_lo::Vector{Vector{T}}
+    nominal_ineq_up::Vector{Vector{T}}
     nominal_eq_duals::Vector{Vector{T}}
     nominal_ineq_duals_lo::Vector{Vector{T}}
     nominal_ineq_duals_up::Vector{Vector{T}}
@@ -39,6 +43,8 @@ function problem_data(T, dynamics::Model, costs::Costs, constraints::Constraints
             zeros(T, dynamics[end].num_next_state)]
     controls = [zeros(T, d.num_control) for d in dynamics]
     constr = [zeros(T, h.num_constraint) for h in constraints]
+    ineq_lo = [ones(T, d.num_control) for d in dynamics]
+    ineq_up = [ones(T, d.num_control) for d in dynamics]
     eq_duals = [zeros(T, h.num_constraint) for h in constraints]
     ineq_duals_lo = [ones(T, d.num_control) for d in dynamics]
     ineq_duals_up = [ones(T, d.num_control) for d in dynamics]
@@ -47,6 +53,8 @@ function problem_data(T, dynamics::Model, costs::Costs, constraints::Constraints
                 zeros(T, dynamics[end].num_next_state)]
     nominal_controls = [zeros(T, d.num_control) for d in dynamics]
     nominal_constr = [zeros(T, h.num_constraint) for h in constraints]
+    nominal_ineq_lo = [ones(T, d.num_control) for d in dynamics]
+    nominal_ineq_up = [ones(T, d.num_control) for d in dynamics]
     nominal_eq_duals = [zeros(T, h.num_constraint) for h in constraints]
     nominal_ineq_duals_lo = [ones(T, d.num_control) for d in dynamics]
     nominal_ineq_duals_up = [ones(T, d.num_control) for d in dynamics]
@@ -60,8 +68,9 @@ function problem_data(T, dynamics::Model, costs::Costs, constraints::Constraints
     
     horizon = length(costs)
     
-    ProblemData(states, controls, constr, eq_duals, ineq_duals_lo, ineq_duals_up,
-        nominal_states, nominal_controls, nominal_constr, nominal_eq_duals,
-        nominal_ineq_duals_lo, nominal_ineq_duals_up,
+    ProblemData(states, controls, constr, ineq_lo, ineq_up,
+        eq_duals, ineq_duals_lo, ineq_duals_up,
+        nominal_states, nominal_controls, nominal_constr, nominal_ineq_lo, nominal_ineq_up,
+        nominal_eq_duals, nominal_ineq_duals_lo, nominal_ineq_duals_up,
         model, costs_dat, constr_data, bounds, horizon)
 end

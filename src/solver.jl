@@ -57,23 +57,48 @@ function initialize_trajectory!(solver::Solver{T}, controls::Vector{Vector{T}}, 
     bounds = solver.problem.bounds
     dynamics = solver.problem.model.dynamics
     options = solver.options
+
     solver.problem.nominal_states[1] .= x1
     ū = solver.problem.nominal_controls
     x̄ = solver.problem.nominal_states
+    ūl = solver.problem.nominal_ineq_lo
+    ūu = solver.problem.nominal_ineq_up
+
+    u_tmp1 = solver.update_rule.u_tmp1
+    u_tmp2 = solver.update_rule.u_tmp2
 
     for (t, ut) in enumerate(controls)
         # project primal variables within bounds
-        bt = bounds[t]
-        ūt = ū[t]
-        ūt .= ut
 
-        for i in bt.indices_lower
-            ūt[i] = max(ut[i], bt.lower[i] + options.κ_1 * max(1.0, bt.lower[i]))
-        end
+        # bt = bounds[t]
+        # ūt = ū[t]
+        # ūt .= ut
 
-        for i in bt.indices_upper
-            ūt[i] = min(ut[i], bt.upper[i] - options.κ_1 * max(1.0, bt.upper[i]))
-        end
+        # for i in bt.indices_lower
+        #     ūt[i] = max(ut[i], bt.lower[i] + options.κ_1 * max(1.0, bt.lower[i]))
+        # end
+
+        # for i in bt.indices_upper
+        #     ūt[i] = min(ut[i], bt.upper[i] - options.κ_1 * max(1.0, bt.upper[i]))
+        # end
+
+        u_tmp1[t] .= max.(bounds[t].lower, 1.0)
+        # println("pppp t", t, " ", u_tmp1[t])
+        u_tmp1[t] .*= options.κ_1
+        u_tmp1[t] .+= bounds[t].lower
+        ū[t] .= max.(controls[t], u_tmp1[t])
+
+        u_tmp1[t] .= max.(bounds[t].upper, 1.0)
+        u_tmp1[t] .*= -options.κ_1
+        u_tmp1[t] .+= bounds[t].upper
+        replace!(u_tmp1[t], NaN=>Inf)
+        ū[t] .= min.(ū[t], u_tmp1[t])
+        # initialise inequality constraints
+
+        ūl[t] .= ū[t]
+        ūl[t] .-= bounds[t].lower
+        ūu[t] .= bounds[t].upper
+        ūu[t] .-= ū[t]
 
         dynamics!(dynamics[t], x̄[t+1], x̄[t], ū[t])
     end

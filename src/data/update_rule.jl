@@ -22,7 +22,6 @@ end
 """
 struct UpdateRuleParameters{T}
     # data
-
     eq::Vector{Matrix{T}}
     ineq::Vector{Matrix{T}}
 
@@ -52,10 +51,12 @@ struct UpdateRuleData{T}
 
     # control-value (Q) function approximation
     hamiltonian::Hamiltonian{T}
+    Q̃u::Vector{Vector{T}}
 
     # pre-allocated memory
     x_tmp::Vector{Vector{T}}
-    u_tmp::Vector{Vector{T}}
+    u_tmp1::Vector{Vector{T}}
+    u_tmp2::Vector{Vector{T}}
     h_tmp::Vector{Vector{T}}
 	uu_tmp::Vector{Matrix{T}}
 	ux_tmp::Vector{Matrix{T}}
@@ -117,9 +118,11 @@ function update_rule_data(T, dynamics::Vector{Dynamics}, constraints::Constraint
     Q̂ux = [zeros(T, d.num_control, d.num_state) for d in dynamics]
 
     hamiltonian = Hamiltonian(Q̂x, Q̂u, Q̂xx, Q̂uu, Q̂ux)
+    Q̃u = [zeros(T, d.num_control) for d in dynamics]
 
     x_tmp = [[zeros(T, d.num_state) for d in dynamics]..., zeros(T, dynamics[end].num_next_state)]
-    u_tmp = [zeros(T, d.num_control) for d in dynamics]
+    u_tmp1 = [zeros(T, d.num_control) for d in dynamics]
+    u_tmp2 = [zeros(T, d.num_control) for d in dynamics]
 	h_tmp = [zeros(T, c.num_constraint) for c in constraints]
 	uu_tmp = [zeros(T, d.num_control, d.num_control) for d in dynamics]
 	ux_tmp = [zeros(T, d.num_control, d.num_state) for d in dynamics]
@@ -149,8 +152,8 @@ function update_rule_data(T, dynamics::Vector{Dynamics}, constraints::Constraint
         bu_tmp2 = [zeros(T, 0) for b in bounds]
     end
 
-    UpdateRuleData{T}(parameters, value, hamiltonian,
-        x_tmp, u_tmp, h_tmp, uu_tmp, ux_tmp, xx_tmp, hu_tmp, hx_tmp,
+    UpdateRuleData{T}(parameters, value, hamiltonian, Q̃u,
+        x_tmp, u_tmp1, u_tmp2, h_tmp, uu_tmp, ux_tmp, xx_tmp, hu_tmp, hx_tmp,
         bl_tmp1, bl_tmp2, bu_tmp1, bu_tmp2,
         lhs, lhs_tl, lhs_tr, lhs_bl, lhs_br, kkt_matrix_ws, D_cache)
 end
