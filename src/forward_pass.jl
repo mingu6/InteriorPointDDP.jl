@@ -11,7 +11,7 @@ function forward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T}, 
     φ_prev = data.barrier_obj_curr
     θ = θ_prev
     
-    Δφ = expected_decrease_cost(update_rule, problem, data.step_size)
+    Δφ = expected_decrease_cost(update_rule, problem)
     min_step_size = estimate_min_step_size(Δφ, data, options)
 
     while data.step_size >= min_step_size
@@ -106,7 +106,7 @@ function estimate_min_step_size(Δφ_L::T, data::SolverData{T}, options::Options
     return min_step_size
 end
 
-function expected_decrease_cost(update_rule::UpdateRuleData{T}, problem::ProblemData{T}, step_size::T) where T
+function expected_decrease_cost(update_rule::UpdateRuleData{T}, problem::ProblemData{T}) where T
     Δφ = T(0.0)
     N = problem.horizon
     Q̂u = update_rule.hamiltonian.gradient_control
@@ -115,7 +115,7 @@ function expected_decrease_cost(update_rule::UpdateRuleData{T}, problem::Problem
     for t = N-1:-1:1
         Δφ += dot(Q̂u[t], parameters.α[t])
     end
-    return Δφ * step_size
+    return Δφ
 end
 
 function rollout!(update_rule::UpdateRuleData{T}, data::SolverData{T}, problem::ProblemData{T}; step_size::T=1.0) where T

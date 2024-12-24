@@ -80,7 +80,7 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
             χl[t] .*= μ
             χu[t] .= u_tmp2[t]
             χu[t] .*= μ
-            
+
             Q̂u[t] .= χl[t]      # barrier term gradient
             Q̂u[t] .*= -1.0      # barrier term gradient
             Q̂u[t] .+= χu[t]     # barrier term gradient
@@ -157,7 +157,6 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
             data.status != 0 && break
 
             ldiv!(bk, update_rule.parameters.eq[t])
-            # println(t, " α ", α[t])
 
             # update parameters of update rule for ineq. dual variables, i.e., 
 
@@ -165,6 +164,8 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
             # ζ_L =  - Σ^L * β 
             # χ_U =  μ inv.(u^U - u) - z^U + Σ^U .* α 
             # ζ_U =  Σ^U .* β
+
+            # see update above for Q̂u[t] for first part of χ^L[t] χ^U[t]
 
             ζl[t] .= β[t]
             ζl[t] .*= u_tmp1[t]
