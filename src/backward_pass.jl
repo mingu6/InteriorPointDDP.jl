@@ -43,13 +43,7 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
     # Value function
     V̂x = update_rule.value.gradient
     V̂xx = update_rule.value.hessian
-    # Bound constraints
-    # bounds = problem.bounds
 
-    # bl1 = update_rule.bl_tmp1
-    # bl2 = update_rule.bl_tmp2
-    # bu1 = update_rule.bu_tmp1
-    # bu2 = update_rule.bu_tmp2
     u_tmp1 = update_rule.u_tmp1
     u_tmp2 = update_rule.u_tmp2
     
@@ -69,22 +63,6 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
             num_control = length(u[t])
             num_constr = length(h[t])
 
-            # bt = bounds[t]
-            
-            # bl1[t] .= @views u[t][bt.indices_lower]
-            # bl1[t] .-= @views bt.lower[bt.indices_lower]
-            # bl1[t] .= inv.(bl1[t])
-            # bl2[t] .= bl1[t]  # σ_L
-            # bl2[t] .*= @views zl[t][bt.indices_lower]
-            # bl1[t] .*= μ  # μ / (u - ul)
-
-            # bu1[t] .= @views bt.upper[bt.indices_upper]
-            # bu1[t] .-= @views u[t][bt.indices_upper]
-            # bu1[t] .= inv.(bu1[t])
-            # bu2[t] .= bu1[t]  # σ_Uq
-            # bu2[t] .*= @views zu[t][bt.indices_upper]
-            # bu1[t] .*= μ  # μ / (uu - u)
-
             u_tmp1[t] .= inv.(il[t])
             u_tmp2[t] .= inv.(iu[t])
 
@@ -102,6 +80,7 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
             χl[t] .*= μ
             χu[t] .= u_tmp2[t]
             χu[t] .*= μ
+            
             Q̂u[t] .= χl[t]      # barrier term gradient
             Q̂u[t] .*= -1.0      # barrier term gradient
             Q̂u[t] .+= χu[t]     # barrier term gradient
@@ -122,18 +101,10 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
             for i = 1:num_control
                 Q̂uu[t][i, i] = u_tmp1[t][i] + u_tmp2[t][i]
             end
-            # Q̂uu[t] .= diagm(u_tmp1[t])
-            # Q̂uu[t] .+= diagm(u_tmp2[t])
 
             mul!(update_rule.ux_tmp[t], transpose(fu[t]), V̂xx[t+1])
             mul!(Q̂uu[t], update_rule.ux_tmp[t], fu[t], 1.0, 1.0)
             Q̂uu[t] .+= luu[t]
-            # for (i1, i) in enumerate(bt.indices_lower)
-            #     Q̂uu[t][i, i] += bl2[t][i1]
-            # end
-            # for (i1, i) in enumerate(bt.indices_upper)
-            #     Q̂uu[t][i, i] += bu2[t][i1]
-            # end
     
             # Q̂xu = Lxu + fu' * V̂xx * fx + V̂x ⋅ fxu
             mul!(update_rule.ux_tmp[t], transpose(fu[t]), V̂xx[t+1])
@@ -203,50 +174,12 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
             χl[t] .-= zl[t]
             χl[t] .-= u_tmp1[t]
 
-            # println(t, " χl[t] ", χl[t])
-
             ζu[t] .= β[t]
             ζu[t] .*= u_tmp2[t]
 
             u_tmp2[t] .*= α[t]
             χu[t] .-= zu[t]
             χu[t] .+= u_tmp2[t]
-
-            # println(t, " χu[t] ", χu[t])
-                        
-            # χlt, χut = χl[t], χu[t]
-            # ζlt, ζut = ζl[t], ζu[t]
-            # αt, βt = α[t], β[t]
-            # bl1t, bl2t = bl1[t], bl2[t]
-            # bu1t, bu2t = bu1[t], bu2[t]
-            # zlt, zut = zl[t], zu[t]
-            # for (i1, i) in enumerate(bt.indices_lower)
-            #     # feedforward
-            #     χlti = @views χlt[i, :]
-            #     χlti .= @views αt[i, :]
-            #     χlti .*= @views bl2t[i1]
-            #     χlti .*= -1.0
-            #     χlti .-= @views zlt[i]
-            #     χlti .+= @views bl1t[i1]
-            #     # feedback
-            #     ζlti = @views ζlt[i, :]
-            #     ζlti .= @views βt[i, :]
-            #     ζlti .*= @views bl2t[i1]
-            #     ζlti .*= -1.0
-            # end
-            
-            # for (i1, i) in enumerate(bt.indices_upper)
-            #     # feedforward
-            #     χuti = @views χut[i, :]
-            #     χuti .= @views αt[i, :]
-            #     χuti .*= @views bu2t[i1]
-            #     χuti .-= @views zut[i]
-            #     χuti .+= @views bu1t[i1]
-            #     # feedback
-            #     ζuti = @views ζut[i, :]
-            #     ζuti .= @views βt[i, :]
-            #     ζuti .*= @views bu2t[i1]
-            # end
 
             # Update return function approx. for next timestep 
             # Vxx = Q̂xx + Q̂ux' * β + β * Q̂ux' + β' Q̂uu' * β

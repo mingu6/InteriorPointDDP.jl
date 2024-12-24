@@ -34,19 +34,12 @@ end
 function barrier_objective!(problem::ProblemData{T}, data::SolverData{T}, update_rule::UpdateRuleData{T}; mode=:nominal) where T
     N = problem.horizon
     bounds = problem.bounds
-    # u = mode == :nominal ? problem.nominal_controls : problem.controls
     _, u, _, il, iu = primal_trajectories(problem, mode=mode)
-    # bl1 = update_rule.bl_tmp1
-    # bu1 = update_rule.bu_tmp1
     u_tmp1 = update_rule.u_tmp1
     
     barrier_obj = 0.
     for t = 1:N-1
-        # bt = bounds[t]
 
-        # bl1[t] .= @views u[t][bt.indices_lower]
-        # bl1[t] .-= @views bt.lower[bt.indices_lower]
-        # bl1[t] .= log.(bl1[t])
         u_tmp1[t] .= log.(il[t])
         for i in bounds[t].indices_lower
             barrier_obj -= u_tmp1[t][i]
@@ -56,13 +49,6 @@ function barrier_objective!(problem::ProblemData{T}, data::SolverData{T}, update
         for i in bounds[t].indices_upper
             barrier_obj -= u_tmp1[t][i]
         end
-
-        # bu1[t] .= @views bt.upper[bt.indices_upper]
-        # bu1[t] .-= @views u[t][bt.indices_upper]
-        # bu1[t] .= log.(bu1[t])
-
-        # barrier_obj -= sum(bl1[t])
-        # barrier_obj -= sum(bu1[t])
     end
     
     barrier_obj *= data.μ

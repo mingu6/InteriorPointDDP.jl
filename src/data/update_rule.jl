@@ -64,11 +64,6 @@ struct UpdateRuleData{T}
 	hu_tmp::Vector{Matrix{T}}
 	hx_tmp::Vector{Matrix{T}}
 
-    bl_tmp1::Vector{Vector{T}}
-    bl_tmp2::Vector{Vector{T}}
-    bu_tmp1::Vector{Vector{T}}
-    bu_tmp2::Vector{Vector{T}}
-
     lhs::Vector{Matrix{T}}
     lhs_tl::Vector{SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}}
     lhs_tr::Vector{SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}}
@@ -140,20 +135,7 @@ function update_rule_data(T, dynamics::Vector{Dynamics}, constraints::Constraint
     kkt_matrix_ws = [BunchKaufmanWs(L) for L in lhs]
     D_cache = [Pair(zeros(T, c.num_constraint + c.num_control), zeros(T, c.num_constraint + c.num_control)) for c in constraints]
 
-    if !isnothing(bounds)
-        bl_tmp1 = [zeros(T, length(b.indices_lower)) for b in bounds]
-        bl_tmp2 = [zeros(T, length(b.indices_lower)) for b in bounds]
-        bu_tmp1 = [zeros(T, length(b.indices_upper)) for b in bounds]
-        bu_tmp2 = [zeros(T, length(b.indices_upper)) for b in bounds]
-    else
-        bl_tmp1 = [zeros(T, 0) for b in bounds]
-        bl_tmp2 = [zeros(T, 0) for b in bounds]
-        bu_tmp1 = [zeros(T, 0) for b in bounds]
-        bu_tmp2 = [zeros(T, 0) for b in bounds]
-    end
-
     UpdateRuleData{T}(parameters, value, hamiltonian, Q̃u,
         x_tmp, u_tmp1, u_tmp2, h_tmp, uu_tmp, ux_tmp, xx_tmp, hu_tmp, hx_tmp,
-        bl_tmp1, bl_tmp2, bu_tmp1, bu_tmp2,
         lhs, lhs_tl, lhs_tr, lhs_bl, lhs_br, kkt_matrix_ws, D_cache)
 end

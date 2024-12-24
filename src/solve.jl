@@ -116,19 +116,11 @@ function optimality_error(update_rule::UpdateRuleData{T}, problem::ProblemData{T
     
     N = problem.horizon
     bounds = problem.bounds
-    # h = mode == :nominal ? problem.nominal_constraints : problem.constraints
-    # u = mode == :nominal ? problem.nominal_controls : problem.controls
     _, u, h, il, iu = primal_trajectories(problem, mode=mode)
     ϕ, zl, zu = dual_trajectories(problem, mode=mode)
     
-    # fu = problem.model.jacobian_control
-    # hu = problem.constraints_data.jacobian_control
-    # lu = problem.cost_data.gradient_control
     V̂x = update_rule.value.gradient
     Q̂x = update_rule.hamiltonian.gradient_state
-    
-    # bl1 = update_rule.bl_tmp1
-    # bu1 = update_rule.bu_tmp1
 
     u_tmp1 = update_rule.u_tmp1
     u_tmp2 = update_rule.u_tmp2
@@ -137,21 +129,7 @@ function optimality_error(update_rule::UpdateRuleData{T}, problem::ProblemData{T
     num_constr = problem.constraints_data.num_constraints[1]
     
     for t = N-1:-1:1
-        # bt = bounds[t]
         num_ineq += bounds[t].num_lower + bounds[t].num_upper
-        
-        # dual infeasibility (stationarity) - Q̃u in paper
-        
-        # update_rule.u_tmp[t] .= lu[t]
-        # mul!(update_rule.u_tmp[t], transpose(hu[t]), ϕ[t], 1.0, 1.0)
-        # mul!(update_rule.u_tmp[t], transpose(fu[t]), V̂x[t+1], 1.0, 1.0)
-        # for i in bt.indices_lower
-        #     update_rule.u_tmp[t][i] -= zl[t][i]
-        # end
-        # for i in bt.indices_upper
-        #     update_rule.u_tmp[t][i] += zu[t][i]
-        # end
-        # dual_inf = max(dual_inf, norm(update_rule.u_tmp[t], Inf))
         dual_inf = max(dual_inf, norm(update_rule.Q̃u[t], Inf))
         
         update_rule.x_tmp[t] .= Q̂x[t]
@@ -180,20 +158,7 @@ function optimality_error(update_rule::UpdateRuleData{T}, problem::ProblemData{T
         cs_inf = max(cs_inf, norm(u_tmp2[t], Inf))
         z_norm += sum(zl[t])
         z_norm += sum(zu[t])
-
-        # bl1[t] .= @views u[t][bt.indices_lower]
-        # bl1[t] .-= @views bt.lower[bt.indices_lower]
-        # bl1[t] .*= @views zl[t][bt.indices_lower]
-        # cs_inf = max(cs_inf, norm(bl1[t], Inf))
-        # z_norm += @views sum(zl[t][bt.indices_lower])
-        
-        # bu1[t] .= @views u[t][bt.indices_upper]
-        # bu1[t] .-= @views bt.upper[bt.indices_upper]
-        # bu1[t] .*= @views zu[t][bt.indices_upper]
-        # cs_inf = max(cs_inf, norm(bu1[t], Inf))
-        # z_norm += @views sum(zu[t][bt.indices_upper])
     end
-    # cs_inf -= μ
     
     scaling_cs = max(options.s_max, z_norm / max(num_ineq, 1.0))  / options.s_max
     scaling_dual = max(options.s_max, (ϕ_norm + z_norm) / max(num_ineq + num_constr, 1.0))  / options.s_max
@@ -203,22 +168,14 @@ end
 function rescale_duals!(problem::ProblemData{T}, update_rule::UpdateRuleData{T}, μ::T, options::Options{T}; mode=:nominal) where T
     N = problem.horizon
     κ_Σ = options.κ_Σ
-    # u = mode == :nominal ? problem.nominal_controls : problem.num_controls
-    # bounds = problem.bounds
+
     _, u, h, il, iu = primal_trajectories(problem, mode=mode)
     _, zl, zu = dual_trajectories(problem, mode=mode)
-
-    # bl1 = update_rule.bl_tmp1
-    # bu1 = update_rule.bu_tmp1
-    # bl2 = update_rule.bl_tmp2
-    # bu2 = update_rule.bu_tmp2
 
     u_tmp1 = update_rule.u_tmp1
     u_tmp2 = update_rule.u_tmp2
 
     for t = 1:N-1
-        # bt = bounds[t]
-    
         # z^L <- max.(min.(z^L, κ_Σ * μ ./ (u - ul)), μ ./ (κ_Σ .* (u - ul)))
 
         u_tmp1[t] .= μ
@@ -229,14 +186,6 @@ function rescale_duals!(problem::ProblemData{T}, update_rule::UpdateRuleData{T},
         u_tmp1[t] .= min.(zl[t], u_tmp1[t])
         zl[t] .= max.(u_tmp2[t], u_tmp1[t])
         
-        # bl1[t] .= @views u[t][bt.indices_lower]
-        # bl1[t] .-= @views bt.lower[bt.indices_lower]
-        # bl2[t] .= inv.(bl1[t])
-        # bl2[t] .*= κ_Σ * μ
-        # zl[t][bt.indices_lower] .= @views min.(zl[t][bt.indices_lower], bl2[t])
-        # bl1[t] .*= μ / κ_Σ
-        # zl[t][bt.indices_lower] .= @views max.(zl[t][bt.indices_lower], bl1[t])
-        
         # z^U <- max.(min.(z^U, κ_Σ * μ ./ (u^U - u)), μ ./ (κ_Σ .* (u^U- u)))
 
         u_tmp1[t] .= μ
@@ -246,19 +195,9 @@ function rescale_duals!(problem::ProblemData{T}, update_rule::UpdateRuleData{T},
         u_tmp2[t] ./= κ_Σ
         u_tmp1[t] .= min.(zu[t], u_tmp1[t])
         zu[t] .= max.(u_tmp2[t], u_tmp1[t])
-        
-        # bu1[t] .= @views bt.upper[bt.indices_upper]
-        # bu1[t] .-= @views u[t][bt.indices_upper]
-        # bu2[t] .= inv.(bu1[t])
-        # bu2[t] .*= κ_Σ * μ
-        # zu[t][bt.indices_upper] .= @views min.(zu[t][bt.indices_upper], bu2[t])
-        # bu1[t] .*= μ / κ_Σ
-        # zu[t][bt.indices_upper] .= @views max.(zu[t][bt.indices_upper], bu1[t])
     end
 end
 
-
-# TODO: remove indices_lower etc
 function reset_duals!(problem::ProblemData{T}) where T
     N = problem.horizon
     bounds = problem.bounds
