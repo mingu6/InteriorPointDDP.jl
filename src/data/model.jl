@@ -15,14 +15,17 @@ function model_data(T, dynamics::Model)
 	jacobian_state = [zeros(T, d.num_next_state, d.num_state) for d in dynamics]
     jacobian_control = [zeros(T, d.num_next_state, d.num_control) for d in dynamics]
 	
-	vfxx = [zeros(T, d.num_state, d.num_state) for d in dynamics]
+	# vfxx = [zeros(T, d.num_state, d.num_state) for d in dynamics]
+	# vfux = [zeros(T, d.num_control, d.num_state) for d in dynamics]
+	# vfuu = [zeros(T, d.num_control, d.num_control) for d in dynamics]
+    vfxx = [T(1e-5) * I(d.num_state) for d in dynamics]
 	vfux = [zeros(T, d.num_control, d.num_state) for d in dynamics]
-	vfuu = [zeros(T, d.num_control, d.num_control) for d in dynamics]
+	vfuu = [T(1e-5) * I(d.num_control) for d in dynamics]
     
     ModelData{T}(dynamics, jacobian_state, jacobian_control, vfxx, vfux, vfuu)
 end
 
-function reset!(data::ModelData) 
+function reset!(data::ModelData{T}) where T 
     N = length(data.dynamics) + 1
     for t = 1:N-1 
         fill!(data.jacobian_state[t], 0.0) 
@@ -30,5 +33,7 @@ function reset!(data::ModelData)
         fill!(data.vfxx[t], 0.0)
         fill!(data.vfux[t], 0.0)
         fill!(data.vfuu[t], 0.0) 
+        data.vfxx[t] .+= T(1e-5) * I(data.dynamics[t].num_state)
+        data.vfuu[t] .+= T(1e-5) * I(data.dynamics[t].num_control)
     end 
 end 

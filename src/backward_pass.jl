@@ -46,13 +46,15 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
 
     u_tmp1 = update_rule.u_tmp1
     u_tmp2 = update_rule.u_tmp2
+    uxnext_tmp = update_rule.uxnext_tmp
+    xx_tmp = update_rule.xx_tmp
     
     x, u, h, il, iu = primal_trajectories(problem, mode=mode)
     ϕ, zl, zu = dual_trajectories(problem, mode=mode)
 
     μ = data.μ
-    δ_c = 0.
-    reg = 0.0
+    δ_c = T(0.0)
+    reg = T(0.0)
     
     while reg <= options.reg_max
         data.status = 0
@@ -90,8 +92,8 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
             Q̃u[t] .+= zu[t]
             
             # Q̂xx = Lxx + fx' * V̂xx * fx + V̂xx ⋅ fxx
-            mul!(update_rule.xx_tmp[t], transpose(fx[t]), V̂xx[t+1])
-            mul!(Q̂xx[t], update_rule.xx_tmp[t], fx[t])
+            mul!(xx_tmp[t], transpose(fx[t]), V̂xx[t+1])
+            mul!(Q̂xx[t], xx_tmp[t], fx[t])
             Q̂xx[t] .+= lxx[t]
     
             # Q̂uu = luu + ϕ ⋅ huu + Σ + fu' * V̂xx * fu + V̂x ⋅ fuu
@@ -101,14 +103,14 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
             for i = 1:num_control
                 Q̂uu[t][i, i] = u_tmp1[t][i] + u_tmp2[t][i]
             end
-
-            mul!(update_rule.ux_tmp[t], transpose(fu[t]), V̂xx[t+1])
-            mul!(Q̂uu[t], update_rule.ux_tmp[t], fu[t], 1.0, 1.0)
+            
+            mul!(uxnext_tmp[t], transpose(fu[t]), V̂xx[t+1])
+            mul!(Q̂uu[t], uxnext_tmp[t], fu[t], 1.0, 1.0)
             Q̂uu[t] .+= luu[t]
     
             # Q̂xu = Lxu + fu' * V̂xx * fx + V̂x ⋅ fxu
-            mul!(update_rule.ux_tmp[t], transpose(fu[t]), V̂xx[t+1])
-            mul!(Q̂ux[t], update_rule.ux_tmp[t], fx[t])
+            mul!(update_rule.uxnext_tmp[t], transpose(fu[t]), V̂xx[t+1])
+            mul!(Q̂ux[t], update_rule.uxnext_tmp[t], fx[t])
             Q̂ux[t] .+= lux[t]
             
             # apply second order tensor contraction terms to Q̂uu, Q̂ux, Q̂xx
@@ -116,14 +118,17 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
                 fn_eval_time_ = time()
                 tensor_contraction!(vfxx[t], vfux[t], vfuu[t], problem.model.dynamics[t], x[t], u[t], V̂x[t+1])
                 data.fn_eval_time += time() - fn_eval_time_
-                Q̂xx[t] .+= vfxx[t]
-                Q̂ux[t] .+= vfux[t]
-                Q̂uu[t] .+= vfuu[t]
-
-                Q̂uu[t] .+= vhuu[t]
-                Q̂ux[t] .+= vhux[t]
-                Q̂xx[t] .+= vhxx[t]
+            else
+                data.k != 0 && sr1_update!(problem, update_rule, data, t; mode=mode)
             end
+
+            Q̂xx[t] .+= vfxx[t]
+            Q̂ux[t] .+= vfux[t]
+            Q̂uu[t] .+= vfuu[t]
+
+            Q̂uu[t] .+= vhuu[t]
+            Q̂ux[t] .+= vhux[t]
+            Q̂xx[t] .+= vhxx[t]
             
             # setup linear system in backward pass
             update_rule.lhs_tl[t] .= Q̂uu[t]
@@ -204,4 +209,135 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
     data.status != 0 && (verbose && (@warn "Backward pass failure, unable to find positive definite iteration matrix."))
 end
 
+function sr1_update!(problem::ProblemData{T}, update_rule::UpdateRuleData{T}, data::SolverData{T},
+            t::Int64; mode=:nominal) where T
+    # TODO: update constraint and dynamics together?
+    # TODO: init SR1, set parameters for checks
+    # TODO: 2-norm for check?
+    
+    x, u, _, _, _ = primal_trajectories(problem, mode=mode)
+    ϕ, _, _ = dual_trajectories(problem, mode=mode)
+    x_prev = problem.previous_states
+    u_prev = problem.previous_controls
 
+    fx = problem.model.jacobian_state
+    fu = problem.model.jacobian_control
+    fx_prev = problem.previous_fx
+    fu_prev = problem.previous_fu
+    
+    vfxx = problem.model.vfxx
+    vfux = problem.model.vfux
+    vfuu = problem.model.vfuu
+    
+    hx = problem.constraints_data.jacobian_state
+    hu = problem.constraints_data.jacobian_control
+    hx_prev = problem.previous_hx
+    hu_prev = problem.previous_hu
+    
+    vhxx = problem.constraints_data.vhxx
+    vhux = problem.constraints_data.vhux
+    vhuu = problem.constraints_data.vhuu
+
+    V̂x = update_rule.value.gradient
+
+    u_tmp = update_rule.u_tmp
+    u_tmp3 = update_rule.u_tmp3
+    x_tmp = update_rule.x_tmp
+    x_tmp1 = update_rule.x_tmp1
+    xx_tmp = update_rule.xx_tmp
+    uu_tmp = update_rule.uu_tmp
+    ux_tmp = update_rule.ux_tmp
+    hx_tmp = update_rule.hx_tmp
+    hu_tmp = update_rule.hu_tmp
+    uxnext_tmp = update_rule.uxnext_tmp
+
+    r = 1e-8
+
+    # δx-, δu-
+    u_tmp[t] .= u[t]
+    u_tmp[t] .-= u_prev[t]
+    x_tmp[t] .= x[t]
+    x_tmp[t] .-= x_prev[t]
+
+    # ## dynamics Hessian terms
+
+    # SR1 residual for rank 1 update, i.e., y - E^- (δx-, δu-)
+    mul!(x_tmp1[t], vfxx[t], x_tmp[t])
+    mul!(x_tmp1[t], transpose(vfux[t]), u_tmp[t], 1.0, 1.0)
+    x_tmp1[t] .*= -1.0
+
+    mul!(u_tmp3[t], vfuu[t], u_tmp[t])
+    mul!(u_tmp3[t], vfux[t], x_tmp[t], 1.0, 1.0)
+    u_tmp3[t] .*= -1.0
+
+    uxnext_tmp[t] .= transpose(fu[t])
+    uxnext_tmp[t] .-= transpose(fu_prev[t])
+    mul!(u_tmp3[t], uxnext_tmp[t], V̂x[t+1], 1.0, 1.0)
+
+    xx_tmp[t] .= transpose(fx[t])
+    xx_tmp[t] .-= transpose(fx_prev[t])
+    mul!(x_tmp1[t], xx_tmp[t], V̂x[t+1], 1.0, 1.0)
+
+    # apply rank 1 SR1 update
+    sr1_denom = dot(x_tmp1[t], x_tmp[t])
+    sr1_denom += dot(u_tmp3[t], u_tmp[t])
+
+    # check if update is large enough
+    if abs(sr1_denom) > r * (norm(x_tmp1[t], 1) + norm(u_tmp3[t], 1)) * (norm(x_tmp[t], 1) + norm(u_tmp[t], 1))
+        xx_tmp[t] .= x_tmp1[t]
+        xx_tmp[t] .*= transpose(x_tmp1[t])  # TODO: replace with mul! ?
+        xx_tmp[t] ./= sr1_denom
+        vfxx[t] .+= xx_tmp[t]
+
+        uu_tmp[t] .= u_tmp3[t]
+        uu_tmp[t] .*= transpose(u_tmp3[t])
+        uu_tmp[t] ./= sr1_denom
+        vfuu[t] .+= uu_tmp[t]
+
+        ux_tmp[t] .= u_tmp3[t]
+        ux_tmp[t] .*= transpose(x_tmp1[t])
+        ux_tmp[t] ./= sr1_denom
+        vfux[t] .+= ux_tmp[t]
+    end
+
+    # ## constraint Hessian terms
+
+    # SR1 residual for rank 1 update, i.e., y - E^- (δx-, δu-)
+    mul!(x_tmp1[t], vhxx[t], x_tmp[t])
+    mul!(x_tmp1[t], transpose(vhux[t]), u_tmp[t], 1.0, 1.0)
+    x_tmp1[t] .*= -1.0
+
+    mul!(u_tmp3[t], vhuu[t], u_tmp[t])
+    mul!(u_tmp3[t], vhux[t], x_tmp[t], 1.0, 1.0)
+    u_tmp3[t] .*= -1.0
+
+    hu_tmp[t] .= hu[t]
+    hu_tmp[t] .-= hu_prev[t]
+    mul!(u_tmp3[t], transpose(hu_tmp[t]), ϕ[t], 1.0, 1.0)
+
+    hx_tmp[t] .= hx[t]
+    hx_tmp[t] .-= hx_prev[t]
+    mul!(x_tmp1[t], transpose(hx_tmp[t]), ϕ[t], 1.0, 1.0)
+
+    # apply rank 1 SR1 update
+    sr1_denom = dot(x_tmp1[t], x_tmp[t])
+    sr1_denom += dot(u_tmp3[t], u_tmp[t])
+
+    if abs(sr1_denom) > r * (norm(x_tmp1[t], 1) + norm(u_tmp3[t], 1)) * (norm(x_tmp[t], 1) + norm(u_tmp[t], 1))
+        xx_tmp[t] .= x_tmp1[t]
+        xx_tmp[t] .*= transpose(x_tmp1[t])
+        xx_tmp[t] ./= sr1_denom
+        vhxx[t] .+= xx_tmp[t]
+
+        uu_tmp[t] .= u_tmp3[t]
+        uu_tmp[t] .*= transpose(u_tmp3[t])
+        uu_tmp[t] ./= sr1_denom
+        vhuu[t] .+= uu_tmp[t]
+
+        ux_tmp[t] .= u_tmp3[t]
+        ux_tmp[t] .*= transpose(x_tmp1[t])
+        ux_tmp[t] ./= sr1_denom
+        vhux[t] .+= ux_tmp[t]
+    end
+    return nothing
+end

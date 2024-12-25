@@ -55,14 +55,19 @@ struct UpdateRuleData{T}
 
     # pre-allocated memory
     x_tmp::Vector{Vector{T}}
+    x_tmp1::Vector{Vector{T}}
+    u_tmp::Vector{Vector{T}}
     u_tmp1::Vector{Vector{T}}
     u_tmp2::Vector{Vector{T}}
+    u_tmp3::Vector{Vector{T}}
     h_tmp::Vector{Vector{T}}
 	uu_tmp::Vector{Matrix{T}}
 	ux_tmp::Vector{Matrix{T}}
     xx_tmp::Vector{Matrix{T}}
 	hu_tmp::Vector{Matrix{T}}
 	hx_tmp::Vector{Matrix{T}}
+    uxnext_tmp::Vector{Matrix{T}}
+    xxnext_tmp::Vector{Matrix{T}}
 
     lhs::Vector{Matrix{T}}
     lhs_tl::Vector{SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}}
@@ -116,12 +121,17 @@ function update_rule_data(T, dynamics::Vector{Dynamics}, constraints::Constraint
     Q̃u = [zeros(T, d.num_control) for d in dynamics]
 
     x_tmp = [[zeros(T, d.num_state) for d in dynamics]..., zeros(T, dynamics[end].num_next_state)]
+    x_tmp1 = [[zeros(T, d.num_state) for d in dynamics]..., zeros(T, dynamics[end].num_next_state)]
+    u_tmp = [zeros(T, d.num_control) for d in dynamics]
     u_tmp1 = [zeros(T, d.num_control) for d in dynamics]
     u_tmp2 = [zeros(T, d.num_control) for d in dynamics]
+    u_tmp3 = [zeros(T, d.num_control) for d in dynamics]
 	h_tmp = [zeros(T, c.num_constraint) for c in constraints]
 	uu_tmp = [zeros(T, d.num_control, d.num_control) for d in dynamics]
 	ux_tmp = [zeros(T, d.num_control, d.num_state) for d in dynamics]
-    xx_tmp = [zeros(T, d.num_state, d.num_state) for d in dynamics]
+    xx_tmp = [zeros(T, d.num_state, d.num_next_state) for d in dynamics]
+    uxnext_tmp = [zeros(T, d.num_control, d.num_next_state) for d in dynamics]
+    xxnext_tmp = [zeros(T, d.num_state, d.num_next_state) for d in dynamics]
 
     hu_tmp = [zeros(T, c.num_constraint, c.num_control) for c in constraints]
     hx_tmp = [zeros(T, c.num_constraint, c.num_state) for c in constraints]
@@ -135,7 +145,8 @@ function update_rule_data(T, dynamics::Vector{Dynamics}, constraints::Constraint
     kkt_matrix_ws = [BunchKaufmanWs(L) for L in lhs]
     D_cache = [Pair(zeros(T, c.num_constraint + c.num_control), zeros(T, c.num_constraint + c.num_control)) for c in constraints]
 
-    UpdateRuleData{T}(parameters, value, hamiltonian, Q̃u,
-        x_tmp, u_tmp1, u_tmp2, h_tmp, uu_tmp, ux_tmp, xx_tmp, hu_tmp, hx_tmp,
+    UpdateRuleData{T}(parameters, value, hamiltonian, Q̃u, x_tmp, x_tmp1,
+        u_tmp, u_tmp1, u_tmp2, u_tmp3, h_tmp, uu_tmp, ux_tmp, xx_tmp, 
+        hu_tmp, hx_tmp, uxnext_tmp, xxnext_tmp, 
         lhs, lhs_tl, lhs_tr, lhs_bl, lhs_br, kkt_matrix_ws, D_cache)
 end

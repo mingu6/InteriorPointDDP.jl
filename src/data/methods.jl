@@ -70,9 +70,19 @@ end
 
 function update_nominal_trajectory!(data::ProblemData) 
     N = data.horizon
-    for t = 1:N
+    constr = data.constraints_data
+    model = data.model
+
+    for t = 1:N-1
+        # TODO: flag so only done if QN option on
+        data.previous_states[t] .= data.nominal_states[t]
+        data.previous_controls[t] .= data.nominal_controls[t]
+        data.previous_fx[t] .= model.jacobian_state[t]
+        data.previous_fu[t] .= model.jacobian_control[t]
+        data.previous_hx[t] .= constr.jacobian_state[t]
+        data.previous_hu[t] .= constr.jacobian_control[t]
+
         data.nominal_states[t] .= data.states[t]
-        t == N && continue
         data.nominal_controls[t] .= data.controls[t]
         data.nominal_constraints[t] .= data.constraints[t]
         data.nominal_ineq_lo[t] .= data.ineq_lo[t]
@@ -81,6 +91,7 @@ function update_nominal_trajectory!(data::ProblemData)
         data.nominal_ineq_duals_lo[t] .= data.ineq_duals_lo[t]
         data.nominal_ineq_duals_up[t] .= data.ineq_duals_up[t]
     end
+    data.nominal_states[N] .= data.states[N]
 end
 
 function primal_trajectories(problem::ProblemData; mode=:nominal)
