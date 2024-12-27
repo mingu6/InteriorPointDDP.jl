@@ -34,8 +34,8 @@ xN = [0.0; π; 0.0; 0.0]
 
 
 model = Model(
-            optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_method" => "none", "max_refinement_steps" => 0, 
-                        "min_refinement_steps" => 0, "print_level" => print_level, "print_timing_statistics" => "yes")
+            optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_method" => "none",
+                "print_level" => print_level, "print_timing_statistics" => "yes")
             );
 
 # ## Costs
