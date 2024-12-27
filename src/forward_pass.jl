@@ -16,6 +16,7 @@ function forward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T}, 
 
     while data.step_size >= min_step_size
         α = data.step_size
+        # rollout!(update_rule, data, problem, step_size=α)
         try
             rollout!(update_rule, data, problem, step_size=α)
         catch e
@@ -23,9 +24,9 @@ function forward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T}, 
             e isa DomainError && (data.step_size *= 0.5, continue)
             rethrow(e)
         end
-        constraint!(problem, data.μ; mode=:current)
         
         data.status = check_fraction_boundary(problem, update_rule, τ)
+        constraint!(problem, data.μ; mode=:current)
         data.status != 0 && (data.step_size *= 0.5, continue)
         
         # used for sufficient decrease from current iterate step acceptance criterion
