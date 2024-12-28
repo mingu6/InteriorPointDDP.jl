@@ -40,10 +40,10 @@ dynamics = [cartpole_dyn for k = 1:N-1]
 
 # ## Costs
 
-stage = Cost((x, u) -> h * dot(u[1], u[1]), nx, nu)
+stage = Cost((x, u) -> 0.1 * h * dot(u[1], u[1]), nx, nu)
 objective = [
     [stage for k = 1:N-1]...,
-    Cost((x, u) -> 400.0 * dot(x - xN, x - xN), nx, 0)
+    Cost((x, u) -> 100.0 * dot(x - xN, x - xN), nx, 0)
 ] 
 
 # ## Constraints
@@ -71,7 +71,7 @@ open(fname, "w") do io
         
         # ## Initialise solver and solve
         
-        x1 = (rand(T, 4) .- T(0.5)) .* T[0.1, 0.1, 0.1, 0.1]
+        x1 = (rand(T, 4) .- T(0.5)) .* T[0.05, 0.05, 0.05, 0.05]
         ū = [T(1.0e-1) * (rand(T, nu) .- T(0.5)) for k = 1:N-1]
         solve!(solver, x1, ū)
         

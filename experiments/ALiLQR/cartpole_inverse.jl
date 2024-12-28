@@ -41,10 +41,10 @@ dynamics = [cartpole_dyn for k = 1:N-1]
 
 # ## Costs
 
-stage = Cost((x, u) -> h * dot(u[1], u[1]), nx, nu)
+stage = Cost((x, u) -> 0.1 * h * dot(u[1], u[1]), nx, nu)
 objective = [
     [stage for k = 1:N-1]...,
-    Cost((x, u) -> 400. * dot(x - xN, x - xN), nx, 0)
+    Cost((x, u) -> 100. * dot(x - xN, x - xN), nx, 0)
 ] 
 
 # ## Constraints
@@ -67,7 +67,7 @@ open("results/cartpole_inverse.txt", "w") do io
 		solver.options.verbose = verbose
 		
 		Random.seed!(seed)
-		x1 = (rand(4) .- 0.5) .* [0.1, 0.1, 0.1, 0.1]
+		x1 = (rand(4) .- 0.5) .* [0.05, 0.05, 0.05, 0.05]
 		ū = [1.0e-1 * (rand(nu) .- 0.5) for k = 1:N-1]
 		x̄ = rollout(dynamics, x1, ū)
 		

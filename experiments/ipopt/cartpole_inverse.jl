@@ -40,8 +40,8 @@ model = Model(
 
 # ## Costs
 
-objt = (x, u) -> h * u[1] * u[1]
-objT = (x, u) -> 400. * (x - xN)' * (x - xN)
+objt = (x, u) -> 0.1 * h * u[1] * u[1]
+objT = (x, u) -> 100. * (x - xN)' * (x - xN)
 
 cost = (x, u) -> begin
 	J = 0.0
@@ -55,7 +55,7 @@ end
 # ## Dynamics - forward Euler
 
 f = (x, u) -> x + h * [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]]  # forward Euler
-dyn_con = (x, u) -> implicit_dynamics(cartpole, x, u) * h
+dyn_con = (x, u) -> implicit_dynamics(cartpole, x, u)
 
 # ## Constraints
 
@@ -78,7 +78,7 @@ open("results/cartpole_inverse.txt", "w") do io
 		
         # ## Initialise variables and solve
         
-        x1 = (rand(4) .- 0.5) .* [0.1, 0.1, 0.1, 0.1]
+        x1 = (rand(4) .- 0.5) .* [0.05, 0.05, 0.05, 0.05]
         fix.(x[1, :], x1, force = true)
         ū = [1.0e-1 * (rand(nu) .- 0.5) for k = 1:N-1]
         
