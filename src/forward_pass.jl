@@ -12,11 +12,9 @@ function forward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T}, 
     θ = θ_prev
     
     Δφ = expected_decrease_cost(update_rule, problem)
-    min_step_size = estimate_min_step_size(Δφ, data, options)
 
-    while data.step_size >= min_step_size
+    while data.step_size >= eps(T)
         α = data.step_size
-        # rollout!(update_rule, data, problem, step_size=α)
         try
             rollout!(update_rule, data, problem, step_size=α)
         catch e
@@ -53,16 +51,16 @@ function forward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T}, 
         data.primal_1_next = θ
         break
     end
-    data.step_size < min_step_size && (data.status = 7)
+    data.step_size < eps(T) && (data.status = 7)
     data.status != 0 && (verbose && (@warn "Line search failed to find a suitable iterate"))
 end
 
 function check_fraction_boundary(problem::ProblemData{T}, update_rule::UpdateRuleData{T}, τ::T) where T
     N = problem.horizon
 
-    _, u, _, il, iu = primal_trajectories(problem, mode=:current)
+    _, _, _, il, iu = primal_trajectories(problem, mode=:current)
     _, zl, zu = dual_trajectories(problem, mode=:current)
-    _, ū, _, il̄, iū = primal_trajectories(problem, mode=:nominal)
+    _, _, _, il̄, iū = primal_trajectories(problem, mode=:nominal)
     _, zl̄, zū = dual_trajectories(problem, mode=:nominal)
 
     for t = 1:N-1
@@ -83,28 +81,6 @@ function check_fraction_boundary(problem::ProblemData{T}, update_rule::UpdateRul
         end
     end
     return 0
-end
-
-function estimate_min_step_size(Δφ_L::T, data::SolverData{T}, options::Options{T}) where T
-    # compute minimum step size based on linear models of step acceptance conditions
-    θ_min = data.min_primal_1
-    θ = data.primal_1_curr
-    γ_θ = options.γ_θ
-    γ_α = options.γ_α
-    γ_φ = options.γ_φ
-    s_θ = options.s_θ
-    s_φ = options.s_φ
-    δ = options.δ
-    if Δφ_L < 0.0 && θ <= θ_min
-        min_step_size = min(γ_θ, -γ_φ * θ / Δφ_L, δ * θ ^ s_θ / (-Δφ_L) ^ s_φ)
-    elseif Δφ_L < 0.0 && θ > θ_min
-        min_step_size = min(γ_θ, -γ_φ * θ / Δφ_L)
-    else
-        min_step_size = γ_θ
-    end
-    min_step_size *= γ_α
-    min_step_size = max(min_step_size, eps(T))
-    return min_step_size
 end
 
 function expected_decrease_cost(update_rule::UpdateRuleData{T}, problem::ProblemData{T}) where T
