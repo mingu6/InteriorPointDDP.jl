@@ -33,8 +33,8 @@ model = Model(
 
 # ## control limits
 
-ul = [-2.0; -5.0]
-uu = [2.0; 5.0]
+ul = [-2.0; -4.0]
+uu = [2.0; 4.0]
 
 # ## obstacles
 

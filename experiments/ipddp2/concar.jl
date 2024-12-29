@@ -4,9 +4,9 @@ using Plots
 using Random
 using Printf
 
-benchmark = true
+benchmark = false
 verbose = true
-quasi_newton = false
+quasi_newton = true
 n_benchmark = 10
 
 T = Float64
@@ -21,8 +21,8 @@ num_action = 2
 
 # ## control limits
 
-ul = T[-2.0; -5.0]
-uu = T[2.0; 5.0]
+ul = T[-2.0; -4.0]
+uu = T[2.0; 4.0]
 
 # ## obstacles
 
