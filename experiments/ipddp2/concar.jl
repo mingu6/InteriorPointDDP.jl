@@ -6,7 +6,7 @@ using Printf
 
 benchmark = false
 verbose = true
-quasi_newton = true
+quasi_newton = false
 n_benchmark = 10
 
 T = Float64
