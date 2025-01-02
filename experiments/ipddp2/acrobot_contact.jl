@@ -41,7 +41,7 @@ options = Options{T}(quasi_newton=quasi_newton, verbose=true, κ_μ=0.6, θ_μ=1
 dyn_acrobot = Dynamics((x, u) -> [x[nq .+ (1:nq)]; u[nτ .+ (1:nq)]], nx, nu)
 dynamics = [dyn_acrobot for k = 1:N-1]
 
-# ## Costs
+# ## Objective
 
 function objt(x, u)
 	τ = u[1]
@@ -61,10 +61,10 @@ function objN(x, u)
 	return J
 end
 
-stage = Cost(objt, nx, nu)
+stage = Objective(objt, nx, nu)
 objective = [
 	[stage for k = 1:N-1]...,
-	Cost(objN, nx, 0),
+	Objective(objN, nx, 0),
 ]
 
 # ## Constraints

@@ -22,8 +22,8 @@ mutable struct ProblemData{T}
     # model data
     model::ModelData{T}
 
-    # objective/cost data
-    cost_data::CostsData{T}
+    # objective/objective data
+    objective_data::ObjectivesData{T}
     
     # constraints data
     constraints_data::ConstraintsData{T}
@@ -34,9 +34,9 @@ mutable struct ProblemData{T}
     horizon::Int
 end
 
-function problem_data(T, dynamics::Model, costs::Costs, constraints::Constraints, bounds::Union{Bounds, Nothing})
+function problem_data(T, dynamics::Model, objectives::Objectives, constraints::Constraints, bounds::Union{Bounds, Nothing})
 
-    @assert length(dynamics) + 1 == length(costs) == length(constraints) + 1
+    @assert length(dynamics) + 1 == length(objectives) == length(constraints) + 1
     @assert isnothing(bounds) ? length(bounds) == length(constraints) : true
 
 	states = [[zeros(T, d.num_state) for d in dynamics]..., 
@@ -60,17 +60,17 @@ function problem_data(T, dynamics::Model, costs::Costs, constraints::Constraints
     nominal_ineq_duals_up = [ones(T, d.num_control) for d in dynamics]
 
     model = model_data(T, dynamics)
-    costs_dat = costs_data(T, dynamics, costs)
+    objectives_dat = objectives_data(T, dynamics, objectives)
     constr_data = constraint_data(T, constraints)
     bounds = isnothing(bounds) ? [Bound(T, d.num_control) for d in dynamics] : bounds
     @assert all(length(b.lower) == length(b.upper) for b in bounds)
     @assert all(length(b.lower) == d.num_control for (b, d) in zip(bounds, dynamics))
     
-    horizon = length(costs)
+    horizon = length(objectives)
     
     ProblemData(states, controls, constr, ineq_lo, ineq_up,
         eq_duals, ineq_duals_lo, ineq_duals_up,
         nominal_states, nominal_controls, nominal_constr, nominal_ineq_lo, nominal_ineq_up,
         nominal_eq_duals, nominal_ineq_duals_lo, nominal_ineq_duals_up,
-        model, costs_dat, constr_data, bounds, horizon)
+        model, objectives_dat, constr_data, bounds, horizon)
 end

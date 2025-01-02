@@ -1,9 +1,9 @@
 """
-    Costs Data
+    Objectives Data
 """
 
-struct CostsData{T}
-    costs
+struct ObjectivesData{T}
+    objectives
     gradient_state::Vector{Vector{T}}
     gradient_control::Vector{Vector{T}}
     hessian_state_state::Vector{Matrix{T}}
@@ -11,7 +11,7 @@ struct CostsData{T}
     hessian_control_state::Vector{Matrix{T}}
 end
 
-function costs_data(T, dynamics::Model, costs::Costs)
+function objectives_data(T, dynamics::Model, objectives::Objectives)
 	gradient_state = [[zeros(T, d.num_state) for d in dynamics]..., 
         zeros(T, dynamics[end].num_next_state)]
     gradient_control = [zeros(T, d.num_control) for d in dynamics]
@@ -19,10 +19,10 @@ function costs_data(T, dynamics::Model, costs::Costs)
         zeros(T, dynamics[end].num_next_state, dynamics[end].num_next_state)]
     hessian_control_control = [zeros(T, d.num_control, d.num_control) for d in dynamics]
     hessian_control_state = [zeros(T, d.num_control, d.num_state) for d in dynamics]
-    CostsData{T}(costs, gradient_state, gradient_control, hessian_state_state, hessian_control_control, hessian_control_state)
+    ObjectivesData{T}(objectives, gradient_state, gradient_control, hessian_state_state, hessian_control_control, hessian_control_state)
 end
 
-function reset!(data::CostsData{T}) where T 
+function reset!(data::ObjectivesData{T}) where T 
     N = length(data.gradient_state) 
     for t = 1:N 
         fill!(data.gradient_state[t], 0.0) 

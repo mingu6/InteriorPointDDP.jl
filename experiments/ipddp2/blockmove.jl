@@ -27,12 +27,12 @@ f = (x, u) -> x + h * [x[2], u[1]]
 blockmove_dyn = Dynamics(f, num_state, num_control)
 dynamics = [blockmove_dyn for k = 1:N-1]
 
-# ## Costs
+# ## Objective
 
-stage_cost = Cost((x, u) -> h * (u[2] + u[3]), 2, 3)
+stage_cost = Objective((x, u) -> h * (u[2] + u[3]), 2, 3)
 objective = [
     [stage_cost for k = 1:N-1]...,
-    Cost((x, u) -> 500.0 * dot(x - xN, x - xN), 2, 0),
+    Objective((x, u) -> 500.0 * dot(x - xN, x - xN), 2, 0),
 ]
 
 # ## Constraints

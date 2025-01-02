@@ -11,7 +11,7 @@ function forward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T}, 
     φ_prev = data.barrier_obj_curr
     θ = θ_prev
     
-    Δφ = expected_decrease_cost(update_rule, problem)
+    Δφ = expected_decrease_objective(update_rule, problem)
 
     while data.step_size >= eps(T)
         α = data.step_size
@@ -83,7 +83,7 @@ function check_fraction_boundary(problem::ProblemData{T}, update_rule::UpdateRul
     return 0
 end
 
-function expected_decrease_cost(update_rule::UpdateRuleData{T}, problem::ProblemData{T}) where T
+function expected_decrease_objective(update_rule::UpdateRuleData{T}, problem::ProblemData{T}) where T
     Δφ = T(0.0)
     N = problem.horizon
     Q̂u = update_rule.hamiltonian.gradient_control

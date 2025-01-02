@@ -8,14 +8,14 @@ mutable struct Solver{T}
     options::Options{T}
 end
 
-function Solver(T, dynamics::Vector{Dynamics}, costs::Costs, constraints::Constraints,
+function Solver(T, dynamics::Vector{Dynamics}, objectives::Objectives, constraints::Constraints,
             bounds::Union{Bounds, Nothing}=nothing; options::Union{Options, Nothing}=nothing)
 
     # allocate update rule data  
     update_rule = update_rule_data(T, dynamics, constraints, bounds)
 
     # allocate model data
-    problem = problem_data(T, dynamics, costs, constraints, bounds)
+    problem = problem_data(T, dynamics, objectives, constraints, bounds)
 
     # allocate solver data
     data = solver_data(T)
@@ -25,9 +25,9 @@ function Solver(T, dynamics::Vector{Dynamics}, costs::Costs, constraints::Constr
 	Solver(problem, update_rule, data, options)
 end
 
-function Solver(T, dynamics::Vector{Dynamics}, costs::Costs,
+function Solver(T, dynamics::Vector{Dynamics}, objectives::Objectives,
             bounds::Union{Bounds, Nothing}=nothing; options::Union{Options, Nothing}=nothing)
-    N = length(costs)
+    N = length(objectives)
     constraint = Constraint()
     constraints = [constraint for t = 1:N-1]
     
@@ -35,7 +35,7 @@ function Solver(T, dynamics::Vector{Dynamics}, costs::Costs,
     update_rule = update_rule_data(T, dynamics, constraints)
 
     # allocate model data
-    problem = problem_data(T, dynamics, costs, constraints, bounds)
+    problem = problem_data(T, dynamics, objectives, constraints, bounds)
 
     # allocate solver data
     data = solver_data(T)

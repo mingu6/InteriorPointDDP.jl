@@ -7,7 +7,7 @@ Base.@kwdef mutable struct Options{T}
     print_frequency = 10
     
     μ_init::T= 1.0                # multiplier on barrier parameter initialisation
-    ineq_dual_init::T= 1.0        # dual variable initialisation value TODO: change name
+    ineq_dual_init::T= 1.0        # dual variable initialisation value
     κ_1::T= 0.01                  # fraction-to-boundary initialization for controls
     κ_2::T= 0.01                  # fraction-to-boundary initialization for controls
     

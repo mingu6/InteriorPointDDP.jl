@@ -6,12 +6,12 @@ using Printf
 using Crayons
 using FastLapackInterface
 
-include("costs.jl")
+include("objectives.jl")
 include("dynamics.jl")
 include("constraints.jl")
 include("bounds.jl")
 include(joinpath("data", "model.jl"))
-include(joinpath("data", "costs.jl"))
+include(joinpath("data", "objectives.jl"))
 include(joinpath("data", "constraints.jl"))
 include(joinpath("data", "update_rule.jl"))
 include(joinpath("data", "problem.jl"))
@@ -27,7 +27,7 @@ include("print.jl")
 include("solve.jl")
 
 # costs
-export Cost
+export Objective
 
 # constraints 
 export Constraint

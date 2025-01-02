@@ -16,7 +16,7 @@ function solve!(solver::Solver{T}) where T
 	data = solver.data
     
     reset!(problem.model)
-    reset!(problem.cost_data)
+    reset!(problem.objective_data)
     reset!(data)
     reset_duals!(problem)
     
@@ -24,7 +24,7 @@ function solve!(solver::Solver{T}) where T
     
     # automatically select initial perturbation. loosely based on bound of CS condition (duality) for LPs
     fn_eval_time_ = time()
-    cost!(data, problem, mode=:nominal)
+    objective!(data, problem, mode=:nominal)
     data.μ = options.μ_init
 
     constraint!(problem, data.μ; mode=:nominal)

@@ -38,12 +38,12 @@ f = (x, u) -> x + h * [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]]
 cartpole_dyn = Dynamics(f, nx, nu)
 dynamics = [cartpole_dyn for k = 1:N-1]
 
-# ## Costs
+# ## Objective
 
-stage = Cost((x, u) -> 0.1 * h * dot(u[1], u[1]), nx, nu)
+stage = Objective((x, u) -> 0.1 * h * dot(u[1], u[1]), nx, nu)
 objective = [
     [stage for k = 1:N-1]...,
-    Cost((x, u) -> 100.0 * dot(x - xN, x - xN), nx, 0)
+    Objective((x, u) -> 100.0 * dot(x - xN, x - xN), nx, 0)
 ] 
 
 # ## Constraints

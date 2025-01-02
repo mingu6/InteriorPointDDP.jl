@@ -66,8 +66,8 @@ stage_cost = (x, u) -> begin
     return J
 end
 objective = [
-    [Cost(stage_cost, num_state, num_primal) for k = 1:N-1]...,
-    Cost((x, u) -> 1e3 * dot(x - xN, x - xN), num_state, 0)
+    [Objective(stage_cost, num_state, num_primal) for k = 1:N-1]...,
+    Objective((x, u) -> 1e3 * dot(x - xN, x - xN), num_state, 0)
 ]
 
 # ## constraints

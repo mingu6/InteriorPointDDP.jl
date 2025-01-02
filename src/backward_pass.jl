@@ -17,13 +17,13 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
     vhxx = problem.constraints_data.vhxx
     vhux = problem.constraints_data.vhux
     vhuu = problem.constraints_data.vhuu
-    # Cost gradients
-    lx = problem.cost_data.gradient_state
-    lu = problem.cost_data.gradient_control
-    # Cost hessians
-    lxx = problem.cost_data.hessian_state_state
-    luu = problem.cost_data.hessian_control_control
-    lux = problem.cost_data.hessian_control_state
+    # Objective gradients
+    lx = problem.objective_data.gradient_state
+    lu = problem.objective_data.gradient_control
+    # Objective hessians
+    lxx = problem.objective_data.hessian_state_state
+    luu = problem.objective_data.hessian_control_control
+    lux = problem.objective_data.hessian_control_state
     # Hamiltonian approximation
     Q̂x = update_rule.hamiltonian.gradient_state
     Q̂u = update_rule.hamiltonian.gradient_control

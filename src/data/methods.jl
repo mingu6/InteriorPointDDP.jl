@@ -1,18 +1,18 @@
-function cost(problem::ProblemData{T}; mode=:nominal) where T
+function objective(problem::ProblemData{T}; mode=:nominal) where T
     if mode == :nominal
-        return cost(problem.costs.costs, problem.nominal_states, problem.nominal_controls)
+        return objective(problem.objectives.objectives, problem.nominal_states, problem.nominal_controls)
     elseif mode == :current
-        return cost(problem.costs.costs, problem.states, problem.controls)
+        return objective(problem.objectives.objectives, problem.states, problem.controls)
     else 
         return 0.0 
     end
 end
 
-function cost!(data::SolverData{T}, problem::ProblemData{T}; mode=:nominal) where T
+function objective!(data::SolverData{T}, problem::ProblemData{T}; mode=:nominal) where T
 	if mode == :nominal
-		data.objective = cost(problem.cost_data.costs, problem.nominal_states, problem.nominal_controls)
+		data.objective = objective(problem.objective_data.objectives, problem.nominal_states, problem.nominal_controls)
 	elseif mode == :current
-		data.objective = cost(problem.cost_data.costs, problem.states, problem.controls)
+		data.objective = objective(problem.objective_data.objectives, problem.states, problem.controls)
 	end
 	return data.objective
 end
@@ -53,7 +53,7 @@ function barrier_objective!(problem::ProblemData{T}, data::SolverData{T}, update
     
     barrier_obj *= data.μ
     fn_eval_time_ = time()
-    cost!(data, problem, mode=mode)
+    objective!(data, problem, mode=mode)
     data.fn_eval_time += time() - fn_eval_time_
     barrier_obj += data.objective
     return barrier_obj
