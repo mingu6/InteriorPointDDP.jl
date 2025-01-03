@@ -73,13 +73,8 @@ open(fname, "w") do io
         
         x1 = (rand(T, 4) .- T(0.5)) .* T[0.05, 0.05, 0.05, 0.05]
         ū = [T(1.0e-1) * (rand(T, nu) .- T(0.5)) for k = 1:N-1]
-        state_diffs = solve!(solver, x1, ū)
+        solve!(solver, x1, ū)
 
-		if solver.data.status == 0
-            plot!(1:solver.data.k+1, state_diffs, yaxis=:log10, yticks=[1e2, 1e0, 1e-2, 1e-4, 1e-6, 1e-8],
-                    ylims=(1e-9, 3e2), legend=false, linecolor=1, xtickfontsize=14, ytickfontsize=14)
-		end
-        
         if benchmark
             solver.options.verbose = false
             solver_time = 0.0
@@ -99,13 +94,11 @@ open(fname, "w") do io
     end
 end
 
-savefig("plots/cartpole_convergence.pdf")
+# ## Visualise solution
 
-# # ## Visualise solution
-
-# if visualise
-#     x_sol, u_sol = get_trajectory(solver)
+if visualise
+    x_sol, u_sol = get_trajectory(solver)
     
-# 	q_sol = [x[1:nq] for x in x_sol]
-# 	visualize!(vis, cartpole, q_sol, Δt=h);
-# end
+	q_sol = [x[1:nq] for x in x_sol]
+	visualize!(vis, cartpole, q_sol, Δt=h);
+end

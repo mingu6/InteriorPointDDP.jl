@@ -4,7 +4,7 @@ using Plots
 using Random
 using Printf
 
-benchmark = false
+benchmark = true
 verbose = true
 quasi_newton = false
 n_benchmark = 10
@@ -104,10 +104,10 @@ solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
 
 # ## Plots
 
-# plot(xlims=(0, 1), ylims=(0, 1), xtickfontsize=14, ytickfontsize=14)
-# for xyr in xyr_obs
-#     plotCircle!(xyr[1], xyr[2], xyr[3])
-# end
+plot(xlims=(0, 1), ylims=(0, 1), xtickfontsize=14, ytickfontsize=14)
+for xyr in xyr_obs
+    plotCircle!(xyr[1], xyr[2], xyr[3])
+end
 
 # ## Initialise solver and solve
 
@@ -120,34 +120,28 @@ open(fname, "w") do io
         
         x1 = rand(T, 4) .* T[0.05; 0.05; π / 2; 0.0]
         ū = [[T(1.0e-3) .* (rand(T, 2) .- 0.5); T(0.01) * ones(T, num_obstacles + 2)] for k = 1:N-1]
-    
-        state_diffs = solve!(solver, x1, ū)
-
-		if solver.data.status == 0
-            plot!(1:solver.data.k+1, state_diffs, yaxis=:log10, yticks=[1e2, 1e0, 1e-2, 1e-4, 1e-6, 1e-8],
-                    ylims=(1e-9, 3e2), legend=false, linecolor=1, xtickfontsize=14, ytickfontsize=14)
-		end
+        solve!(solver, x1, ū)
         
-        # x_sol, u_sol = get_trajectory(solver)
-        # plotTrajectory!(x_sol)
+        x_sol, u_sol = get_trajectory(solver)
+        plotTrajectory!(x_sol)
         
-        # if benchmark
-        #     solver.options.verbose = false
-        #     solver_time = 0.0
-        #     wall_time = 0.0
-        #     for i in 1:n_benchmark
-        #         solve!(solver, x1, ū)
-        #         solver_time += solver.data.solver_time
-        #         wall_time += solver.data.wall_time
-        #     end
-        #     solver_time /= n_benchmark
-        #     wall_time /= n_benchmark
-        #     @printf(io, " %2s     %5s      %5s    %.8e    %.8e     %5.1f         %5.1f  \n", seed, solver.data.k, solver.data.status == 0,
-        #             solver.data.objective, solver.data.primal_inf, wall_time * 1000, solver_time * 1000)
-        # else
-        #     @printf(io, " %2s     %5s      %5s    %.8e    %.8e \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf)
-        # end
+        if benchmark
+            solver.options.verbose = false
+            solver_time = 0.0
+            wall_time = 0.0
+            for i in 1:n_benchmark
+                solve!(solver, x1, ū)
+                solver_time += solver.data.solver_time
+                wall_time += solver.data.wall_time
+            end
+            solver_time /= n_benchmark
+            wall_time /= n_benchmark
+            @printf(io, " %2s     %5s      %5s    %.8e    %.8e     %5.1f         %5.1f  \n", seed, solver.data.k, solver.data.status == 0,
+                    solver.data.objective, solver.data.primal_inf, wall_time * 1000, solver_time * 1000)
+        else
+            @printf(io, " %2s     %5s      %5s    %.8e    %.8e \n", seed, solver.data.k, solver.data.status == 0, solver.data.objective, solver.data.primal_inf)
+        end
     end
 end
 
-savefig("plots/concar_convergence.pdf")
+savefig("plots/concar_IPDDP.pdf")

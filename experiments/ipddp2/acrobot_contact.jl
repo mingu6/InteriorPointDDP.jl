@@ -95,12 +95,7 @@ open(fname, "w") do io
 		
 		q_init = LinRange([0.0; 0.0], qN, N)[2:end]
 		ū = [[T(1.0e-2) * (rand(T, nτ) .- 0.5); q_init[k]; T(0.01) * ones(T, nc); T(0.01) * ones(T, nc)] for k = 1:N-1]
-		state_diffs = solve!(solver, x1, ū)
-
-		if solver.data.status == 0
-            plot!(1:solver.data.k+1, state_diffs, yaxis=:log10, yticks=[1e2, 1e0, 1e-2, 1e-4, 1e-6, 1e-8],
-                    ylims=(1e-9, 3e2), legend=false, linecolor=1, xtickfontsize=14, ytickfontsize=14)
-		end
+		solve!(solver, x1, ū)
 				
 		if benchmark
             solver.options.verbose = false
@@ -120,24 +115,22 @@ open(fname, "w") do io
 	end
 end
 
-savefig("plots/acrobot_convergence.pdf")
+# ## Plot solution
 
-# # ## Plot solution
+x_sol, u_sol = get_trajectory(solver)
+θe = map(x -> x[4], x_sol[1:end-1])
+s1 = map(θ -> π / 2 - θ, θe)
+s2 = map(θ -> θ + π / 2, θe)
+λ1 = map(u -> u[4], u_sol)
+λ2 = map(u -> u[5], u_sol)
+plot(range(0, h * (N-1), N-1), [s1 s2 λ1 λ2], xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylims=(0,6),
+	legendfontsize=12, linewidth=2, xlabelfontsize=14, linestyle=[:solid :solid :dot :dot], linecolor=[1 2 1 2], 
+	background_color_legend = nothing, label=[L"$s_t^{(1)}$" L"$s_t^{(2)}$" L"$\lambda^{(1)}_t$" L"$\lambda^{(2)}_t$"])
+savefig("plots/acrobot_contact_IPDDP.pdf")
 
-# x_sol, u_sol = get_trajectory(solver)
-# θe = map(x -> x[4], x_sol[1:end-1])
-# s1 = map(θ -> π / 2 - θ, θe)
-# s2 = map(θ -> θ + π / 2, θe)
-# λ1 = map(u -> u[4], u_sol)
-# λ2 = map(u -> u[5], u_sol)
-# plot(range(0, h * (N-1), N-1), [s1 s2 λ1 λ2], xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylims=(0,6),
-# 	legendfontsize=12, linewidth=2, xlabelfontsize=14, linestyle=[:solid :solid :dot :dot], linecolor=[1 2 1 2], 
-# 	background_color_legend = nothing, label=[L"$s_t^{(1)}$" L"$s_t^{(2)}$" L"$\lambda^{(1)}_t$" L"$\lambda^{(2)}_t$"])
-# savefig("plots/acrobot_contact_IPDDP.pdf")
+# ## Visualise trajectory using MeshCat
 
-# # ## Visualise trajectory using MeshCat
-
-# if visualise
-# 	q_sol = state_to_configuration(x_sol)
-# 	visualize!(vis, acrobot_impact, q_sol, Δt=h);
-# end
+if visualise
+	q_sol = state_to_configuration(x_sol)
+	visualize!(vis, acrobot_impact, q_sol, Δt=h);
+end
