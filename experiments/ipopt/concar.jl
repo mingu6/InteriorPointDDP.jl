@@ -7,7 +7,7 @@ using Suppressor
 using Printf
 
 output = false
-benchmark = false
+benchmark = true
 n_benchmark = 10
 
 print_level = output ? 5 : 4
@@ -47,7 +47,6 @@ xyr_obs = [
 num_obstacles = length(xyr_obs)
 
 @variable(model, s_obs[1:N-1, 1:num_obstacles]);  # slacks for obstacle constraints
-@variable(model, s_yz[1:N-1, 1:2]);  # slacks for state boundaries
 
 # ## Dynamics - RK4
 
@@ -64,8 +63,6 @@ function RK4(x, u, g)
     return x + h / 6 * (k1 + k2 + k3 + k4)
 end
 
-f = (x, u) -> RK4(x, u, g)
-
 # ## constraints
 
 obs_dist(obs_xy) = (x) -> begin
@@ -74,10 +71,10 @@ obs_dist(obs_xy) = (x) -> begin
 end
 
 for k = 1:N-1
-    @constraint(model, x[k+1, :] == f(x[k, :], u[k, :]))
+    @constraint(model, x[k+1, :] == RK4(x[k, :], u[k, :], g))
     @constraint(model, ul .<= u[k, :] .<= uu)
-    @constraint(model, f(x[k, :], u[k, :])[1:2] == s_yz[k, :])
-    @constraint(model, [0.0, 0.0] .<= s_yz[k, :] .<= [1.0, 1.0])
+    @constraint(model, [0.0, 0.0] .<= x[k+1, 1:2] .<= [1.0, 1.0])
+
     @constraint(model, 0.0 .<= s_obs[k, :])
     for (i, obs) in enumerate(xyr_obs)
         @constraint(model, (obs[3] + r_car)^2 - obs_dist(obs[1:2])(x[k+1, :]) + s_obs[k, i] == 0.0)
@@ -119,11 +116,12 @@ open("results/concar.txt", "w") do io
         x1 = rand(4) .* [0.05; 0.05; π / 2; 0.0]
         fix.(x[1, :], x1, force = true)
         
-        ū = [1.0e-3 * (rand(2) .- 0.5) for k = 1:N-1]
+        ū = [1.0e-1 * (rand(2) .- 0.5) for k = 1:N-1]
         
+        xs_init = LinRange(x1, xN, N)[2:end]
         x̄ = [x1]
         for k in 2:N
-            push!(x̄, f(x̄[k-1],  ū[k-1]))
+            push!(x̄, [xs_init[k-1][1:2]; (rand(2) .- 0.5) .* 0.1])
         end
         
         for k = 1:N
@@ -141,9 +139,6 @@ open("results/concar.txt", "w") do io
         for k = 1:N-1
             for j = 1:num_obstacles
                 set_start_value(s_obs[k, j], 0.01)
-            end
-            for j = 1:2
-                set_start_value(s_yz[k, j], 0.01)
             end
         end
         
