@@ -107,7 +107,6 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
             Q̂uu[t] .+= luu[t]
     
             # Q̂xu = Lxu + fu' * V̂xx * fx + V̂x ⋅ fxu
-            mul!(update_rule.ux_tmp[t], transpose(fu[t]), V̂xx[t+1])
             mul!(Q̂ux[t], update_rule.ux_tmp[t], fx[t])
             Q̂ux[t] .+= lux[t]
             

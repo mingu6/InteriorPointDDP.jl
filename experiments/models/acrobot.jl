@@ -86,22 +86,22 @@ function P_func(model, q)
     [0.0 -1.0; 0.0 1.0]
 end
 
-function manipulator_fd(model::DoublePendulum{T}, h, q⁻, q, q⁺, τ, λ) where T
+function manipulator_fd(model::DoublePendulum{T}, Δ , q⁻, q, q⁺, τ, λ) where T
 	# evalutate at midpoint
 	qᵐ⁻ = 0.5 * (q⁻ + q)
     qᵐ⁺ = 0.5 * (q + q⁺)
-    q̇ᵐ⁻ = (q - q⁻) / h
-    q̇ᵐ⁺ = (q⁺ - q) / h
+    q̇ᵐ⁻ = (q - q⁻) / Δ 
+    q̇ᵐ⁺ = (q⁺ - q) / Δ 
 
 	M̂h = M_func(model, qᵐ⁺) * q̇ᵐ⁺ - M_func(model, qᵐ⁻) * q̇ᵐ⁻
 	Ĉ = 0.5 * (C_func(model, qᵐ⁺, q̇ᵐ⁺) + C_func(model, qᵐ⁻, q̇ᵐ⁻))
 	B = B_func(model, q⁺)
 	N = P_func(model, q⁺)
 	
-	return M̂h + h * (Ĉ - B .* τ - transpose(N) * λ + 0.5 * q̇ᵐ⁺)
+	return M̂h + Δ  * (Ĉ - B .* τ - transpose(N) * λ + 0.5 * q̇ᵐ⁺)
 end
 
-function implicit_contact_dynamics(model::DoublePendulum{T}, x, u, h, μ=0.0) where T
+function implicit_contact_dynamics(model::DoublePendulum{T}, x, u, Δ , μ=0.0) where T
     nq = model.nq
     nτ = model.nu
     nc = model.nc
@@ -115,7 +115,7 @@ function implicit_contact_dynamics(model::DoublePendulum{T}, x, u, h, μ=0.0) wh
     s = u[(nτ + nq + nc) .+ (1:nc)]
     
     [
-        manipulator_fd(model, h, q⁻, q, q⁺, τ, λ);
+        manipulator_fd(model, Δ , q⁻, q, q⁺, τ, λ);
         (s .- ϕ_func(model, q⁺));
         λ .* s .- μ;
     ]
