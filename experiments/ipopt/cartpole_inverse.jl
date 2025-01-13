@@ -22,7 +22,7 @@ if visualise
     render(vis)
 end
 
-h = 0.05
+Δ = 0.05
 N = 101
 
 nq = cartpole.nq
@@ -40,7 +40,7 @@ model = Model(
 
 # ## Costs
 
-objt = (x, u) -> 0.1 * h * u[1] * u[1]
+objt = (x, u) -> 0.1 * Δ * u[1] * u[1]
 objT = (x, u) -> 100. * (x - xN)' * (x - xN)
 
 cost = (x, u) -> begin
@@ -54,7 +54,7 @@ end
 
 # ## Dynamics - forward Euler
 
-f = (x, u) -> x + h * [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]]  # forward Euler
+f = (x, u) -> x + Δ * [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]]  # forward Euler
 dyn_con = (x, u) -> implicit_dynamics(cartpole, x, u)
 
 # ## Constraints
@@ -126,6 +126,6 @@ if visualise
     xv = value.(x)
     x_sol = [xv[k, :] for k in 1:N]
 	q_sol = [x[1:nq] for x in x_sol]
-	visualize!(vis, cartpole, q_sol, Δt=h);
+	visualize!(vis, cartpole, q_sol, Δt=Δ);
 end
     

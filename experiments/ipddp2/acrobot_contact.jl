@@ -13,7 +13,7 @@ quasi_newton = false
 n_benchmark = 10
 
 T = Float64
-h = 0.05
+Δ = 0.05
 N = 101
 
 include("../models/acrobot.jl")
@@ -45,7 +45,7 @@ dynamics = [dyn_acrobot for k = 1:N-1]
 
 function objt(x, u)
 	τ = u[1]
-	J = 0.01 * h * τ * τ
+	J = 0.01 * Δ * τ * τ
 	return J
 end
 
@@ -54,7 +54,7 @@ function objN(x, u)
 	
 	q⁻ = x[1:acrobot_impact.nq] 
 	q = x[acrobot_impact.nq .+ (1:acrobot_impact.nq)] 
-	q̇ᵐ⁻ = (q - q⁻) ./ h
+	q̇ᵐ⁻ = (q - q⁻) ./ Δ
 
 	J += 200.0 * dot(q̇ᵐ⁻, q̇ᵐ⁻)
 	J += 500.0 * dot(q - qN, q - qN)
@@ -69,7 +69,7 @@ objective = [
 
 # ## Constraints
 
-stage_constr = Constraint((x, u) -> implicit_contact_dynamics(acrobot_impact, x, u, h),
+stage_constr = Constraint((x, u) -> implicit_contact_dynamics(acrobot_impact, x, u, Δ),
 			nx, nu, indices_compl=[5, 6])
 
 constraints = [stage_constr for k = 1:N-1]
@@ -123,7 +123,7 @@ s1 = map(θ -> π / 2 - θ, θe)
 s2 = map(θ -> θ + π / 2, θe)
 λ1 = map(u -> u[4], u_sol)
 λ2 = map(u -> u[5], u_sol)
-plot(range(0, h * (N-1), N-1), [s1 s2 λ1 λ2], xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylims=(0,6),
+plot(range(0, Δ * (N-1), N-1), [s1 s2 λ1 λ2], xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylims=(0,6),
 	legendfontsize=12, linewidth=2, xlabelfontsize=14, linestyle=[:solid :solid :dot :dot], linecolor=[1 2 1 2], 
 	background_color_legend = nothing, label=[L"$s_t^{(1)}$" L"$s_t^{(2)}$" L"$\lambda^{(1)}_t$" L"$\lambda^{(2)}_t$"])
 savefig("plots/acrobot_contact_IPDDP.pdf")
@@ -132,5 +132,5 @@ savefig("plots/acrobot_contact_IPDDP.pdf")
 
 if visualise
 	q_sol = state_to_configuration(x_sol)
-	visualize!(vis, acrobot_impact, q_sol, Δt=h);
+	visualize!(vis, acrobot_impact, q_sol, Δt=Δ);
 end

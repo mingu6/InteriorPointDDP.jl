@@ -10,7 +10,7 @@ quasi_newton = false
 n_benchmark = 10
 
 T = Float64
-h = 0.01
+Δ = 0.01
 N = 101
 xN = T[1.0; 0.0]
 x1 = T[0.0; 0.0]
@@ -22,14 +22,14 @@ num_control = 3  # pushing force, 2x slacks for + and - components of abs work
 
 # ## Dynamics - forward Euler
 
-f = (x, u) -> x + h * [x[2], u[1]]
+f = (x, u) -> x + Δ * [x[2], u[1]]
 
 blockmove_dyn = Dynamics(f, num_state, num_control)
 dynamics = [blockmove_dyn for k = 1:N-1]
 
 # ## Objective
 
-stage_cost = Objective((x, u) -> h * (u[2] + u[3]), 2, 3)
+stage_cost = Objective((x, u) -> Δ * (u[2] + u[3]), 2, 3)
 objective = [
     [stage_cost for k = 1:N-1]...,
     Objective((x, u) -> 500.0 * dot(x - xN, x - xN), 2, 0),

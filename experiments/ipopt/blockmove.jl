@@ -13,7 +13,7 @@ print_level = output ? 5 : 4
 
 include("ipopt_parse.jl")
 
-h = 0.01
+Δ = 0.01
 N = 101
 xN = [1.0; 0.0]
 x1 = [0.0; 0.0]
@@ -26,12 +26,12 @@ model = Model(
                 "print_level" => print_level, "print_timing_statistics" => "yes")
             );
 
-f = (x, u) -> x + h * [x[2], u[1]]  # forward Euler
+f = (x, u) -> x + Δ * [x[2], u[1]]  # forward Euler
 
 function cost(x, u)
     J = 0.0
     for k = 1:N-1
-        J += h * (u[k, 2] + u[k, 3])
+        J += Δ * (u[k, 2] + u[k, 3])
     end
     J += 400.0 * (x[N, :] - xN)' * (x[N, :] - xN)
     return J

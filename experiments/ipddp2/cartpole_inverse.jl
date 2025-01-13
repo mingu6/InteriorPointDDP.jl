@@ -12,7 +12,7 @@ quasi_newton = false
 n_benchmark = 10
 
 T = Float64
-h = 0.05
+Δ = 0.05
 N = 101
 
 include("../models/cartpole.jl")
@@ -34,13 +34,13 @@ options = Options{T}(quasi_newton=quasi_newton, verbose=false)
 
 # ## Dynamics - forward Euler
 
-f = (x, u) -> x + h * [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]]
+f = (x, u) -> x + Δ * [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]]
 cartpole_dyn = Dynamics(f, nx, nu)
 dynamics = [cartpole_dyn for k = 1:N-1]
 
 # ## Objective
 
-stage = Objective((x, u) -> 0.1 * h * dot(u[1], u[1]), nx, nu)
+stage = Objective((x, u) -> 0.1 * Δ * dot(u[1], u[1]), nx, nu)
 objective = [
     [stage for k = 1:N-1]...,
     Objective((x, u) -> 100.0 * dot(x - xN, x - xN), nx, 0)
@@ -48,7 +48,7 @@ objective = [
 
 # ## Constraints
 
-stage_constr = Constraint((x, u) -> implicit_dynamics(cartpole, x, u) * h, nx, nu)
+stage_constr = Constraint((x, u) -> implicit_dynamics(cartpole, x, u) * Δ, nx, nu)
 
 constraints = [stage_constr for k = 1:N-1]
 
@@ -100,5 +100,5 @@ if visualise
     x_sol, u_sol = get_trajectory(solver)
     
 	q_sol = [x[1:nq] for x in x_sol]
-	visualize!(vis, cartpole, q_sol, Δt=h);
+	visualize!(vis, cartpole, q_sol, Δt=Δ);
 end

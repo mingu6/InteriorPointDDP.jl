@@ -10,13 +10,14 @@ visualise = false
 benchmark = false
 verbose = true
 
-h = 0.05
+Δ = 0.05
 N = 101
 
 options = Options()
 options.scaling_penalty = 1.3
 options.initial_constraint_penalty = 1e-3
-options.max_dual_updates = 50
+options.max_dual_updates = 200
+options.constraint_tolerance = 1e-8
 
 include("../models/cartpole.jl")
 
@@ -35,13 +36,13 @@ xN = [0.0; π; 0.0; 0.0]
 
 # ## Dynamics - forward Euler
 
-f = (x, u) -> x + h * [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]]  # forward Euler
+f = (x, u) -> x + Δ * [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]]  # forward Euler
 cartpole_dyn = Dynamics(f, nx, nu)
 dynamics = [cartpole_dyn for k = 1:N-1]
 
 # ## Costs
 
-stage = Cost((x, u) -> 0.1 * h * dot(u[1], u[1]), nx, nu)
+stage = Cost((x, u) -> 0.1 * Δ * dot(u[1], u[1]), nx, nu)
 objective = [
     [stage for k = 1:N-1]...,
     Cost((x, u) -> 100. * dot(x - xN, x - xN), nx, 0)
@@ -49,7 +50,7 @@ objective = [
 
 # ## Constraints
 
-stage_constr = Constraint((x, u) -> [u[1] - 4.0; -u[1] - 4.0; implicit_dynamics(cartpole, x, u)],
+stage_constr = Constraint((x, u) -> [u[1] - 4.0; -u[1] - 4.0; Δ * implicit_dynamics(cartpole, x, u)],
                     nx, nu, indices_inequality=collect(1:2))
 
 constraints = [stage_constr for k = 1:N-1]
@@ -90,5 +91,5 @@ if visualise
 	x_sol, u_sol = get_trajectory(solver)
 
 	q_sol = [x[1:nq] for x in x_sol]
-	visualize!(vis, cartpole, q_sol, Δt=h);
+	visualize!(vis, cartpole, q_sol, Δt=Δ);
 end

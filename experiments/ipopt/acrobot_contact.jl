@@ -14,7 +14,7 @@ n_benchmark = 10
 
 print_level = output ? 5 : 4
 
-h = 0.05
+Δ = 0.05
 N = 101
 
 include("../models/acrobot.jl")
@@ -47,7 +47,7 @@ f = (x, u) -> [x[nq .+ (1:nq)]; u[nτ .+ (1:nq)]]
 
 function objt(x, u)
 	τ = u[1]
-	J = 0.01 * h * τ * τ
+	J = 0.01 * Δ * τ * τ
 	return J
 end
 
@@ -56,7 +56,7 @@ function objN(x, u)
 	
 	q⁻ = x[1:acrobot_impact.nq] 
 	q = x[acrobot_impact.nq .+ (1:acrobot_impact.nq)] 
-	q̇ᵐ⁻ = (q - q⁻) ./ h
+	q̇ᵐ⁻ = (q - q⁻) ./ Δ
 
 	J += 200.0 * q̇ᵐ⁻' * q̇ᵐ⁻
 	J += 500.0 * (q - qN)' * (q - qN)
@@ -73,7 +73,7 @@ end
 
 # ## Constraints
 
-constr = (x, u) -> implicit_contact_dynamics(acrobot_impact, x, u, h, 1e-4)
+constr = (x, u) -> implicit_contact_dynamics(acrobot_impact, x, u, Δ, 1e-4)
 
 @variable(model, x[1:N, 1:nx]);
 @variable(model, u[1:N-1, 1:nu]);
@@ -150,7 +150,7 @@ s1 = map(θ -> π / 2 - θ, θe)
 s2 = map(θ -> θ + π / 2, θe)
 λ1 = map(u -> u[4], u_sol)
 λ2 = map(u -> u[5], u_sol)
-plot(range(0, h * (N-1), N-1), [s1 s2 λ1 λ2], xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylims=(0,6),
+plot(range(0, Δ * (N-1), N-1), [s1 s2 λ1 λ2], xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylims=(0,6),
 legendfontsize=12, linewidth=2, xlabelfontsize=14, linestyle=[:solid :solid :dot :dot], linecolor=[1 2 1 2], 
 background_color_legend = nothing, label=[L"$s_t^{(1)}$" L"$s_t^{(2)}$" L"$\lambda^{(1)}_t$" L"$\lambda^{(2)}_t$"])
 savefig("plots/acrobot_contact_IPOPT.pdf")
@@ -159,5 +159,5 @@ savefig("plots/acrobot_contact_IPOPT.pdf")
 
 if visualise	
 	q_sol = state_to_configuration(x_sol)
-	visualize!(vis, acrobot_impact, q_sol, Δt=h);
+	visualize!(vis, acrobot_impact, q_sol, Δt=Δ);
 end

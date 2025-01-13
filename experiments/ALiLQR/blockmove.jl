@@ -8,7 +8,7 @@ benchmark = false
 verbose = true
 
 N = 101
-h = 0.01
+Δ = 0.01
 xN = [1.0; 0.0]
 x0 = [0.0; 0.0]
 
@@ -21,14 +21,14 @@ num_control = 3  # force and two slack variables to represent abs work
 
 # ## Dynamics - Forward Euler
 
-f = (x, u) -> x + h * [x[2], u[1]]  # forward Euler
+f = (x, u) -> x + Δ * [x[2], u[1]]  # forward Euler
 
 blockmove_dyn = Dynamics(f, num_state, num_control)
 dynamics = [blockmove_dyn for k = 1:N-1]
 
 # ## Costs
 
-stage = Cost((x, u) -> h * (u[2] + u[3]), num_state, num_control)
+stage = Cost((x, u) -> Δ * (u[2] + u[3]), num_state, num_control)
 objective = [
     [stage for k = 1:N-1]...,
     Cost((x, u) -> 400.0 * dot(x - xN, x - xN), num_state, 0),

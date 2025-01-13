@@ -5,19 +5,17 @@ using Random
 using BenchmarkTools
 using Printf
 
-benchmark = false
+benchmark = true
 verbose = true
 
 N = 101
-h = 0.05
+Δ = 0.05
 r_car = 0.02
 xN = [1.0; 1.0; π / 4; 0.0]
 
 options = Options()
-options.scaling_penalty = 2.0
-options.initial_constraint_penalty = 1e-1
-options.max_iterations = 1000
-options.max_dual_updates = 30
+options.max_dual_updates = 50
+options.constraint_tolerance = 1e-8
 
 # ## car 
 num_state = 4
@@ -49,10 +47,10 @@ end
 
 function RK4(x, u, g)
     k1 = g(x, u)
-    k2 = g(x + h * 0.5 * k1, u)
-    k3 = g(x + h * 0.5 * k2, u)
-    k4 = g(x + h * k3, u)
-    return x + h / 6 * (k1 + k2 + k3 + k4)
+    k2 = g(x + Δ * 0.5 * k1, u)
+    k3 = g(x + Δ * 0.5 * k2, u)
+    k4 = g(x + Δ * k3, u)
+    return x + Δ / 6 * (k1 + k2 + k3 + k4)
 end
 
 f = (x, u) -> RK4(x, u, g)
@@ -64,8 +62,8 @@ dynamics = [car for k = 1:N-1]
 
 stage_cost = (x, u) -> begin
     J = 0.0
-    J += h * dot(x - xN, x - xN)
-    J += h * dot(u[1:2] .* [10.0, 1.0], u[1:2])
+    J += Δ * dot(x - xN, x - xN)
+    J += Δ * dot(u[1:2] .* [10.0, 1.0], u[1:2])
     return J
 end
 objective = [
