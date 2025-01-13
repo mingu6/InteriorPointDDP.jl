@@ -1,3 +1,5 @@
+using IterativeRefinement
+
 function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T}, data::SolverData{T},
             options::Options{T}; mode=:nominal, verbose::Bool=false) where T
     N = problem.horizon
@@ -53,6 +55,8 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
     μ = data.μ
     δ_c = 0.
     reg = 0.0
+
+    bounds = problem.bounds
     
     while reg <= options.reg_max
         data.status = 0
@@ -110,6 +114,11 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
             mul!(update_rule.ux_tmp[t], transpose(fu[t]), V̂xx[t+1])
             mul!(Q̂ux[t], update_rule.ux_tmp[t], fx[t])
             Q̂ux[t] .+= lux[t]
+
+            # Q̃uu
+            Q̃uu = zeros(num_control, num_control)
+            mul!(Q̃uu, update_rule.ux_tmp[t], fu[t], 1.0, 1.0)
+            Q̃uu .+= luu[t]
             
             # apply second order tensor contraction terms to Q̂uu, Q̂ux, Q̂xx
             if !options.quasi_newton
@@ -123,6 +132,9 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
                 Q̂uu[t] .+= vhuu[t]
                 Q̂ux[t] .+= vhux[t]
                 Q̂xx[t] .+= vhxx[t]
+
+                Q̃uu .+= vfuu[t]
+                Q̃uu .+= vhuu[t]
             end
             
             # setup linear system in backward pass
@@ -151,12 +163,76 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
                 end
             end
 
+            reg1 = copy(reg)
+            δ_c1 = copy(δ_c)
+
             bk, data.status, reg, δ_c = inertia_correction!(update_rule.kkt_matrix_ws[t], update_rule.lhs[t], update_rule.D_cache[t],
                         num_control, μ, reg, data.reg_last, options)
 
             data.status != 0 && break
 
             ldiv!(bk, update_rule.parameters.eq[t])
+
+
+            # iterative refinement - setup uncondensed asymmetric system
+
+            # num_ineq = bounds[t].num_lower + bounds[t].num_upper
+            # ind_l = bounds[t].indices_lower
+            # ind_u = bounds[t].indices_upper
+            # nl = bounds[t].num_lower
+            # nu = bounds[t].num_upper
+            # il_m = zeros(nl, nl)
+            # iu_m = zeros(nu, nu)
+            # zl_m = zeros(nl, num_control)
+            # zu_m = zeros(nu, num_control)
+            # eye_l = zeros(num_control, nl)
+            # eye_u = zeros(num_control, nu)
+
+            # for l in 1:nl
+            #     zl_m[l, ind_l[l]] = zl[t][ind_l[l]]
+            #     il_m[l, l] = il[t][ind_l[l]]
+            #     eye_l[ind_l[l], l] = -1.0
+            # end
+
+            # for l in 1:nu
+            #     zu_m[l, ind_u[l]] = zu[t][ind_u[l]]
+            #     iu_m[l, l] = iu[t][ind_u[l]]
+            #     eye_u[ind_u[l], l] = 1.0
+            # end
+
+            # lhs_full = [(Q̃uu + reg1 .* I(num_control)) transpose(hu[t]) eye_l eye_u;
+            #     hu[t] (zeros(num_constr, num_constr) - δ_c1 * I(num_constr)) zeros(num_constr, nl + nu);
+            #     zl_m zeros(nl, num_constr) il_m zeros(nl, nu);
+            #     -zu_m zeros(nu, num_constr) zeros(nu, nl) iu_m]
+
+            # num_state = length(x[t])
+            # rhs_full = -1.0 .* [Q̃u[t] Q̂ux[t];
+            #          h[t] hx[t];
+            #          (zl[t][ind_l] .* il[t][ind_l] .- μ) zeros(nl, num_state);
+            #          (zu[t][ind_u] .* iu[t][ind_u] .- μ) zeros(nu, num_state)]
+            
+            # display(rhs_full)
+            # display(lhs_full)
+            # update_rule_ir, bnorm, bcomp = rfldiv(lhs_full, rhs_full; equilibrate=false)
+            # update_rule_ir = lhs_full \ rhs_full
+    
+            # α[t] .= update_rule_ir[1:num_control, 1]
+            # β[t] .= update_rule_ir[1:num_control, 2:end]
+            # ψ[t] .= update_rule_ir[num_control .+ (1:num_constr), 1]
+            # ω[t] .= update_rule_ir[num_control .+ (1:num_constr), 2:end]
+            # χl[t][ind_l] .= update_rule_ir[num_control + num_constr .+ (1:nl), 1]
+            # ζl[t][ind_l, :] .= update_rule_ir[num_control + num_constr .+ (1:nl), 2:end]
+            # χu[t][ind_u] .= update_rule_ir[num_control + num_constr + nl .+ (1:nu), 1]
+            # ζu[t][ind_u, :] .= update_rule_ir[num_control + num_constr + nl .+ (1:nu), 2:end]
+
+            # α1 = update_rule_ir[1:num_control, 1]
+            # β1 = update_rule_ir[1:num_control, 2:end]
+            # ψ1 = update_rule_ir[num_control .+ (1:num_constr), 1]
+            # ω1 = update_rule_ir[num_control .+ (1:num_constr), 2:end]
+            # χl1 = update_rule_ir[num_control + num_constr .+ (1:nl), 1]
+            # ζl1 = update_rule_ir[num_control + num_constr .+ (1:nl), 2:end]
+            # χu1 = update_rule_ir[num_control + num_constr + nl .+ (1:nu), 1]
+            # ζu1 = update_rule_ir[num_control + num_constr + nl .+ (1:nu), 2:end]
 
             # update parameters of update rule for ineq. dual variables, i.e., 
 
@@ -166,6 +242,9 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
             # ζ_U =  Σ^U .* β
 
             # see update above for Q̂u[t] for first part of χ^L[t] χ^U[t]
+
+            # println(χl1 - (μ .* inv.(il[t]) - zl[t] - u_tmp1[t] .* α1))
+            # println(χu1 - (μ .* inv.(iu[t][ind_u]) - zu[t][ind_u] + u_tmp2[t][ind_u] .* α1[ind_u]))
 
             ζl[t] .= β[t]
             ζl[t] .*= u_tmp1[t]
@@ -181,6 +260,17 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
             u_tmp2[t] .*= α[t]
             χu[t] .-= zu[t]
             χu[t] .+= u_tmp2[t]
+
+            # println(t, " ", α[t] - α1)
+            # println(t, " ", β[t] - β1)
+            # println(t, " ", ψ[t] - ψ1)
+            # println(t, " ", ω[t] - ω1)
+            # println(t, " ", χl[t][ind_l] - χl1)
+            # println(t, " ", ζl[t][ind_l, :] - ζl1)
+            # println(t, " ", χu[t][ind_u] - χu1)
+            # println(t, " ", ζu[t][ind_u, :] - ζu1)
+
+            # throw("arrrrgh")
 
             # Update return function approx. for next timestep 
             # Vxx = Q̂xx + Q̂ux' * β + β * Q̂ux' + β' Q̂uu' * β
