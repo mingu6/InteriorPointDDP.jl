@@ -9,21 +9,21 @@ function visualize!(vis, model::DoublePendulum, x;
 default_background!(vis)
 
 i = 1
-l1 = Cylinder(Point3f0(0.0, 0.0, 0.0), Point3f0(0.0, 0.0, model.l1),
+l1 = Cylinder(Point3d(0.0, 0.0, 0.0), Point3d(0.0, 0.0, model.l1),
     convert(Float32, 0.025))
 setobject!(vis["l1$i"], l1, MeshPhongMaterial(color = color))
-l2 = Cylinder(Point3f0(0.0,0.0,0.0), Point3f0(0.0, 0.0, model.l2),
+l2 = Cylinder(Point3d(0.0,0.0,0.0), Point3d(0.0, 0.0, model.l2),
     convert(Float32, 0.025))
 setobject!(vis["l2$i"], l2, MeshPhongMaterial(color = color))
 
-setobject!(vis["elbow$i"], Sphere(Point3f0(0.0),
+setobject!(vis["elbow$i"], Sphere(Point3d(0.0),
     convert(Float32, 0.05)),
     MeshPhongMaterial(color = color))
-setobject!(vis["ee$i"], Sphere(Point3f0(0.0),
+setobject!(vis["ee$i"], Sphere(Point3d(0.0),
     convert(Float32, 0.05)),
     MeshPhongMaterial(color = color))
 
-anim = MeshCat.Animation(convert(Int, floor(1.0 / Δt)))
+anim = MeshCat.Animation(vis; fps=convert(Int, floor(1.0 / Δt)))
 
 T = length(x)
 for t = 1:T
@@ -55,20 +55,20 @@ function _create_acrobot!(vis, model::DoublePendulum;
     i = 0,
     r = 0.1)
 
-l1 = Cylinder(Point3f0(0.0, 0.0, 0.0), Point3f0(0.0, 0.0, model.l1),
+l1 = Cylinder(Point3d(0.0, 0.0, 0.0), Point3d(0.0, 0.0, model.l1),
     convert(Float32, 0.025))
 setobject!(vis["l1_$i"], l1, MeshPhongMaterial(color = color))
-l2 = Cylinder(Point3f0(0.0,0.0,0.0), Point3f0(0.0, 0.0, model.l2),
+l2 = Cylinder(Point3d(0.0,0.0,0.0), Point3d(0.0, 0.0, model.l2),
     convert(Float32, 0.025))
 setobject!(vis["l2_$i"], l2, MeshPhongMaterial(color = color))
 
-setobject!(vis["elbow_nominal_$i"], Sphere(Point3f0(0.0),
+setobject!(vis["elbow_nominal_$i"], Sphere(Point3d(0.0),
     convert(Float32, 0.05)),
     MeshPhongMaterial(color = Colors.RGBA(0.0, 0.0, 0.0, tl)))
-setobject!(vis["elbow_limit_$i"], Sphere(Point3f0(0.0),
+setobject!(vis["elbow_limit_$i"], Sphere(Point3d(0.0),
     convert(Float32, 0.05)),
     MeshPhongMaterial(color = limit_color))
-setobject!(vis["ee_$i"], Sphere(Point3f0(0.0),
+setobject!(vis["ee_$i"], Sphere(Point3d(0.0),
     convert(Float32, 0.05)),
     MeshPhongMaterial(color = Colors.RGBA(0.0, 0.0, 0.0, tl)))
 end
