@@ -101,7 +101,7 @@ function manipulator_fd(model::DoublePendulum{T}, Δ , q⁻, q, q⁺, τ, λ) wh
 	return M̂h + Δ  * (Ĉ - B .* τ - transpose(N) * λ + 0.5 * q̇ᵐ⁺)
 end
 
-function implicit_contact_dynamics(model::DoublePendulum{T}, x, u, Δ , μ=0.0) where T
+function implicit_contact_dynamics(model::DoublePendulum{T}, x, u, Δ, μ=0.0) where T
     nq = model.nq
     nτ = model.nu
     nc = model.nc
