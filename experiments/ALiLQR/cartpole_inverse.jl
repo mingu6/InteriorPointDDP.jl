@@ -69,7 +69,7 @@ open("results/cartpole_inverse.txt", "w") do io
 		
 		Random.seed!(seed)
 		x1 = (rand(4) .- 0.5) .* [0.05, 0.05, 0.05, 0.05]
-		ū = [1.0e-1 * (rand(nu) .- 0.5) for k = 1:N-1]
+		ū = [1.0e-2 * (rand(nu) .- 0.5) for k = 1:N-1]
 		x̄ = rollout(dynamics, x1, ū)
 		
 		solve!(solver, x̄, ū)

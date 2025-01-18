@@ -80,7 +80,7 @@ open("results/cartpole_inverse.txt", "w") do io
         
         x1 = (rand(4) .- 0.5) .* [0.05, 0.05, 0.05, 0.05]
         fix.(x[1, :], x1, force = true)
-        ū = [1.0e-1 * (rand(nu) .- 0.5) for k = 1:N-1]
+        ū = [1.0e-2 * (rand(nu) .- 0.5) for k = 1:N-1]
         
         x̄ = [x1]
         for k in 2:N
