@@ -16,8 +16,9 @@ N = 101
 options = Options()
 options.scaling_penalty = 1.3
 options.initial_constraint_penalty = 1e-3
-options.max_dual_updates = 200
+options.max_dual_updates = 300
 options.constraint_tolerance = 1e-8
+options.constraint_norm = 1
 
 include("../models/cartpole.jl")
 
