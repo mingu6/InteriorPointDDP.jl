@@ -5,7 +5,7 @@ using Random
 using BenchmarkTools
 using Printf
 
-benchmark = true
+benchmark = false
 verbose = true
 
 N = 101
@@ -14,8 +14,7 @@ r_car = 0.02
 xN = [1.0; 1.0; π / 4; 0.0]
 
 options = Options()
-options.scaling_penalty = 10.0
-options.initial_constraint_penalty = 1.0
+options.scaling_penalty = 3.0
 options.max_dual_updates = 300
 options.constraint_tolerance = 1e-8
 options.constraint_norm = 1
