@@ -18,10 +18,10 @@ Num. Failed:  2, Num. Success:  48
 
 AL-iLQR 
 
-Iterations:  20  20.0  20.0  20.0  20  
-Objective:  2.00386091e+05  2.00386097e+05  2.00386100e+05  2.00386105e+05  2.00386116e+05  
-Constraint Violation:  1.00066180e+01  1.00098709e+01  1.00113885e+01  1.00137078e+01  1.00153527e+01  
-Wall (ms):   22.6   22.7   22.7   22.8   23.1 
+Iterations:  2  3.0  5.0  6.0  24  
+Objective:  1.01710034e+04  1.02341997e+04  1.02737839e+04  1.03459494e+04  1.03493773e+04  
+Constraint Violation:  1.00157193e+01  1.00224382e+01  1.00450677e+01  1.00622101e+01  1.20092224e+09  
+Wall (ms):    1.6    2.3    3.0    3.8   11.7 
 Solver (ms):    0.0    0.0    0.0    0.0    0.0  
-Num. Failed:  50, Num. Success:  0
+Num. Failed:  48, Num. Success:  2
 

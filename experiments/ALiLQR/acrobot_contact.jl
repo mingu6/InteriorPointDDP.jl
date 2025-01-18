@@ -15,10 +15,7 @@ verbose = true
 N = 101
 
 options = Options()
-options.scaling_penalty = 1.0
-options.initial_constraint_penalty = 0.5
-options.max_iterations = 100
-options.max_dual_updates = 20
+options.max_dual_updates = 1
 
 include("../models/acrobot.jl")
 
@@ -72,10 +69,10 @@ objective = [
 # ## Constraints - perturb complementarity to make easier
 
 stage_constr = Constraint((x, u) -> [
-            implicit_contact_dynamics(acrobot_impact, x, u, Δ, 1e-4);
+			implicit_contact_dynamics(acrobot_impact, x, u, Δ, 1e-2);
             u[1] - 10.0;
             -u[1] - 10.0;
-            -u[nq+2:nq+2+2*nc:end]
+            -u[nτ + nq + 1:end]
             ],
             nx, nu)
 
@@ -112,6 +109,12 @@ open("results/acrobot_contact.txt", "w") do io
 end
 
 # ## Plot solution
+
+Random.seed!(1)
+q_init = LinRange([0.0; 0.0], qN, N)[2:end]
+ū = [[1.0e-2 * (rand(nτ) .- 0.5); q_init[k]; 0.01 * ones(nc); 0.01 * ones(nc)] for k = 1:N-1]
+x̄ = rollout(dynamics, x1, ū)
+solve!(solver, x̄, ū)
 
 x_sol, u_sol = get_trajectory(solver)
 θe = map(x -> x[4], x_sol[1:end-1])
