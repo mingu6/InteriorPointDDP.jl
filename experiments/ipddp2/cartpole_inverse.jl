@@ -72,7 +72,7 @@ open(fname, "w") do io
         # ## Initialise solver and solve
         
         x1 = (rand(T, 4) .- T(0.5)) .* T[0.05, 0.05, 0.05, 0.05]
-        ū = [T(1.0e-1) * (rand(T, nu) .- T(0.5)) for k = 1:N-1]
+        ū = [T(1.0e-2) * (rand(T, nu) .- T(0.5)) for k = 1:N-1]
         solve!(solver, x1, ū)
 
         if benchmark

@@ -6,7 +6,7 @@ Base.@kwdef mutable struct Options{T}
     verbose = false
     print_frequency = 10
     
-    μ_init::T= 1.0                # multiplier on barrier parameter initialisation
+    μ_init::T= 2.0                # multiplier on barrier parameter initialisation
     ineq_dual_init::T= 1.0        # dual variable initialisation value
     κ_1::T= 0.01                  # fraction-to-boundary initialization for controls
     κ_2::T= 0.01                  # fraction-to-boundary initialization for controls
@@ -21,8 +21,8 @@ Base.@kwdef mutable struct Options{T}
     δ_c::T= 1e-8
 
     κ_ϵ::T= 10.0                  # tolerance factor for lowering barrier parameter
-    κ_μ::T= 0.2                   # linear decrease factor for barrier parameter
-    θ_μ::T= 1.5                   # superlinear decrease factor for barrier parameter
+    κ_μ::T= 0.4                   # linear decrease factor for barrier parameter
+    θ_μ::T= 1.3                   # superlinear decrease factor for barrier parameter
     τ_min::T= 0.99                # lower bound on fraction-to-boundary parameter
     
     s_max::T= 100.0               # scaling threshold for NLP error

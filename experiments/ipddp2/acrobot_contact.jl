@@ -34,7 +34,7 @@ x1 = T[0.0; 0.0; 0.0; 0.0]
 qN = T[π; 0.0]
 xN = T[qN; qN]
 
-options = Options{T}(quasi_newton=quasi_newton, verbose=true, κ_μ=0.6, θ_μ=1.2)
+options = Options{T}(quasi_newton=quasi_newton, verbose=true)
 		
 # ## Dynamics - implicit variational integrator (midpoint)
 

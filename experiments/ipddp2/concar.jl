@@ -14,7 +14,7 @@ N = 101
 Δ = 0.05
 r_car = 0.02
 xN = T[1.0; 1.0; π / 4; 0.0]
-options = Options{T}(quasi_newton=quasi_newton, verbose=true, μ_init=2.5)
+options = Options{T}(quasi_newton=quasi_newton, verbose=true)
 
 num_state = 4
 num_action = 2
