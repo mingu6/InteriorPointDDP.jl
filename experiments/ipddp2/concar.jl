@@ -77,7 +77,7 @@ obs_dist(obs_xy) = (x, u) -> begin
     xy_diff = xp[1:2]- obs_xy
     return dot(xy_diff, xy_diff)
 end
-stage_constr_fn = (x, u) -> begin
+path_constr_fn = (x, u) -> begin
 [
     # obstacle avoidance constraints w/slack variable,
     # i.e., d_obs^2 - d_thresh^2 >= 0 and d_obs^2 - d_thresh^2 + s = 0, s >= 0
@@ -88,7 +88,7 @@ stage_constr_fn = (x, u) -> begin
 ]
 end
 
-obs_constr = Constraint(stage_constr_fn, num_state, num_primal)
+obs_constr = Constraint(path_constr_fn, num_state, num_primal)
 constraints = [obs_constr for k = 1:N-1]
 
 # ## bounds

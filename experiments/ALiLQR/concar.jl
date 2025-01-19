@@ -17,11 +17,10 @@ options = Options()
 options.scaling_penalty = 3.0
 options.max_dual_updates = 300
 options.constraint_tolerance = 1e-8
-options.constraint_norm = 1
 
 # ## car 
 num_state = 4
-num_action = 2
+num_control = 2
 
 # ## control limits
 
@@ -57,7 +56,7 @@ end
 
 f = (x, u) -> RK4(x, u, g)
 
-car = Dynamics(f, num_state, num_action)
+car = Dynamics(f, num_state, num_control)
 dynamics = [car for k = 1:N-1] 
 
 # ## objective 
@@ -68,10 +67,19 @@ stage_cost = (x, u) -> begin
     J += Δ * dot(u[1:2] .* [10.0, 1.0], u[1:2])
     return J
 end
+term_cost = (x, u) -> 1e3 * dot(x - xN, x - xN)
 objective = [
-    [Cost(stage_cost, num_state, num_action) for k = 1:N-1]...,
-    Cost((x, u) -> 1e3 * dot(x - xN, x - xN), num_state, 0)
+    [Cost(stage_cost, num_state, num_control) for k = 1:N-1]...,
+    Cost(term_cost, num_state, 0)
 ]
+
+function eval_objective(x, u)
+    J = 0.0
+    for t = 1:N-1
+        J += stage_cost(x[t], u[t])
+    end
+    J += term_cost(x[N], 0.0)
+end
 
 # ## constraints - waypoints are constraints for iLQR
 
@@ -79,7 +87,7 @@ obs_dist(obs_xy) = (x) -> begin
     xy_diff = x[1:2] - obs_xy
     return dot(xy_diff, xy_diff)
 end
-stage_constr_fn = (x, u) -> begin
+path_constr_fn = (x, u) -> begin
 [
     ul - u; ## control limit (lower)
     u - uu; ## control limit (upper)
@@ -92,13 +100,21 @@ stage_constr_fn = (x, u) -> begin
     f(x, u)[1] - 1.0;
     f(x, u)[2] - 1.0;
 ]
-
 end
 
-obs_constr = Constraint(stage_constr_fn, num_state, num_action,
-    indices_inequality=collect(1:2*num_action+num_obstacles+4))
+obs_constr = Constraint(path_constr_fn, num_state, num_control,
+    indices_inequality=collect(1:2*num_control+num_obstacles+4))
 
 constraints = [[obs_constr for k = 1:N-1]..., Constraint()]
+
+function eval_constraints_1norm(x, u)
+    θ = 0.0
+    for t in 1:N-1
+        h = path_constr_fn(x[t], u[t])
+        θ += norm(max.(h, zeros(length(h))), 1)
+    end
+    return θ
+end
 
 # ## Initialise solver
 
@@ -128,14 +144,16 @@ open("results/concar.txt", "w") do io
         
         x_sol, u_sol = get_trajectory(solver)
         plotTrajectory!(x_sol)
+
+        J = eval_objective(x_sol, u_sol)
+        θ = eval_constraints_1norm(x_sol, u_sol)
 		
 		if benchmark
             solver.options.verbose = false
             solve_time = @belapsed solve!($solver, $x̄, $ū) samples=10 setup=(solver=Solver(dynamics, objective, constraints; options=options))
-            @printf(io, " %2s     %5s      %5s    %.8e    %.8e    %5.1f       %5.1f\n", seed, solver.data.iterations[1], solver.data.status[1], solver.data.objective[1],
-                            solver.data.max_violation[1], solve_time * 1000, 0.0)
+            @printf(io, " %2s     %5s      %5s    %.8e    %.8e    %5.1f       %5.1f\n", seed, solver.data.iterations[1], solver.data.status[1], J, θ, solve_time * 1000, 0.0)
         else
-            @printf(io, " %2s     %5s      %5s    %.8e    %.8e \n", seed, solver.data.iterations[1], solver.data.status[1], solver.data.objective[1], solver.data.max_violation[1])
+            @printf(io, " %2s     %5s      %5s    %.8e    %.8e \n", seed, solver.data.iterations[1], solver.data.status[1], J, θ)
         end
     end
 end

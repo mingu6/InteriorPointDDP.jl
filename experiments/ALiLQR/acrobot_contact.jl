@@ -16,6 +16,8 @@ N = 101
 
 options = Options()
 options.max_dual_updates = 1
+options.initial_constraint_penalty = 1e-5
+options.max_iterations = 1000
 
 include("../models/acrobot.jl")
 
@@ -42,13 +44,13 @@ dynamics = [dyn_acrobot for k = 1:N-1]
 
 # ## Costs
 
-function objt(x, u)
+function stage_cost(x, u)
 	τ = u[1]
 	J = 0.01 * Δ * τ * τ
 	return J
 end
 
-function objN(x, u)
+function term_cost(x, u)
 	J = 0.0 
 	
 	q⁻ = x[1:acrobot_impact.nq] 
@@ -60,25 +62,38 @@ function objN(x, u)
 	return J
 end
 
-stage = Cost(objt, nx, nu)
-objective = [
-    [stage for k = 1:N-1]...,
-    Cost(objN, nx, 0),
-]
+stage = Cost(stage_cost, nx, nu)
+objective = [[stage for k = 1:N-1]..., Cost(term_cost, nx, 0)]
+
+function eval_objective(x, u)
+    J = 0.0
+    for t = 1:N-1
+        J += stage_cost(x[t], u[t])
+    end
+    J += term_cost(x[N], 0.0)
+end
 
 # ## Constraints - perturb complementarity to make easier
 
-stage_constr = Constraint((x, u) -> [
-			implicit_contact_dynamics(acrobot_impact, x, u, Δ, 1e-2);
-            u[1] - 10.0;
-            -u[1] - 10.0;
-            -u[nτ + nq + 1:end]
-            ],
-            nx, nu)
+path_constr_fn = (x, u) -> [
+	implicit_contact_dynamics(acrobot_impact, x, u, Δ, 0.0);
+	u[1] - 10.0;
+	-u[1] - 10.0;
+	-u[nτ + nq + 1:end]
+	]
+path_constr = Constraint(path_constr_fn, nx, nu)
 
-constraints = [[stage_constr for k = 1:N-1]...,
-                Constraint()
-                ]
+constraints = [[path_constr for k = 1:N-1]..., Constraint()]
+
+function eval_constraints_1norm(x, u)
+    θ = 0.0
+    for t in 1:N-1
+        h = path_constr_fn(x[t], u[t])
+        θ += norm(max.(h[7:end], zeros(6)), 1)
+		θ += norm(h[1:6], 1)
+    end
+    return θ
+end
                 
 # ## Initialise solver
 
@@ -96,14 +111,18 @@ open("results/acrobot_contact.txt", "w") do io
 		x̄ = rollout(dynamics, x1, ū)
 		
 		solve!(solver, x̄, ū)
+
+		x_sol, u_sol = get_trajectory(solver)
+
+		J = eval_objective(x_sol, u_sol)
+        θ = eval_constraints_1norm(x_sol, u_sol)
 		
 		if benchmark
             solver.options.verbose = false
             solve_time = @belapsed solve!(solver, $x̄, $ū) samples=10 setup=(solver=Solver(dynamics, objective, constraints; options=options))
-            @printf(io, " %2s     %5s      %5s    %.8e    %.8e    %5.1f       %5.1f\n", seed, solver.data.iterations[1], solver.data.status[1], solver.data.objective[1],
-                            solver.data.max_violation[1], solve_time * 1000, 0.0)
+            @printf(io, " %2s     %5s      %5s    %.8e    %.8e    %5.1f       %5.1f\n", seed, solver.data.iterations[1], solver.data.status[1], J, θ, solve_time * 1000, 0.0)
         else
-            @printf(io, " %2s     %5s      %5s    %.8e    %.8e \n", seed, solver.data.iterations[1], solver.data.status[1], solver.data.objective[1], solver.data.max_violation[1])
+            @printf(io, " %2s     %5s      %5s    %.8e    %.8e \n", seed, solver.data.iterations[1], solver.data.status[1], J, θ)
         end
 	end
 end

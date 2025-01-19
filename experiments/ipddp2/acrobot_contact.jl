@@ -43,13 +43,13 @@ dynamics = [dyn_acrobot for k = 1:N-1]
 
 # ## Objective
 
-function objt(x, u)
+function stage_obj(x, u)
 	τ = u[1]
 	J = 0.01 * Δ * τ * τ
 	return J
 end
 
-function objN(x, u)
+function term_obj(x, u)
 	J = 0.0 
 	
 	q⁻ = x[1:acrobot_impact.nq] 
@@ -61,18 +61,15 @@ function objN(x, u)
 	return J
 end
 
-stage = Objective(objt, nx, nu)
-objective = [
-	[stage for k = 1:N-1]...,
-	Objective(objN, nx, 0),
-]
+stage = Objective(stage_obj, nx, nu)
+objective = [[stage for k = 1:N-1]..., Objective(term_obj, nx, 0)]
 
 # ## Constraints
 
-stage_constr = Constraint((x, u) -> implicit_contact_dynamics(acrobot_impact, x, u, Δ),
+path_constr = Constraint((x, u) -> implicit_contact_dynamics(acrobot_impact, x, u, Δ),
 			nx, nu, indices_compl=[5, 6])
 
-constraints = [stage_constr for k = 1:N-1]
+constraints = [path_constr for k = 1:N-1]
 
 # ## Bounds
 

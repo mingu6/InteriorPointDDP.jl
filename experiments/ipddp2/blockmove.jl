@@ -37,10 +37,10 @@ objective = [
 
 # ## Constraints
 
-stage_constr = Constraint((x, u) -> [
+path_constr = Constraint((x, u) -> [
     u[2] - u[3] - u[1] * x[2]
 ], 2, 3)
-constraints = [stage_constr for k = 1:N-1]
+constraints = [path_constr for k = 1:N-1]
 
 # ## Bounds
 

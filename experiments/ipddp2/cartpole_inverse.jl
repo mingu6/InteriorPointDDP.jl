@@ -48,9 +48,9 @@ objective = [
 
 # ## Constraints
 
-stage_constr = Constraint((x, u) -> implicit_dynamics(cartpole, x, u) * Δ, nx, nu)
+path_constr = Constraint((x, u) -> implicit_dynamics(cartpole, x, u) * Δ, nx, nu)
 
-constraints = [stage_constr for k = 1:N-1]
+constraints = [path_constr for k = 1:N-1]
 
 # ## Bounds
 
