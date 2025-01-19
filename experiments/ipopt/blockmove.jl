@@ -40,14 +40,20 @@ end
 @variable(model, x[1:N, 1:nx]);
 @variable(model, u[1:N-1, 1:nu]);
 
+for t = 1:N-1
+    set_lower_bound(u[t, 1], -10.0)
+    set_upper_bound(u[t, 1], 10.0)
+    for i = 2:3
+        set_lower_bound(u[t, i], 0.0)
+    end
+end
+
 @objective(model, Min, cost(x, u))
 
 fix.(x[1, :], x1, force = true)
 for k = 1:N-1
     @constraint(model, x[k+1, :] == f(x[k, :], u[k, :]))
     @constraint(model, u[k, 2] - u[k, 3] == u[k, 1] * x[k, 2])
-    @constraint(model, -10.0 <= u[k, 1] <= 10.0)
-    @constraint(model, u[k, 2:3] .>= 0.0)
 end
 
 open("results/blockmove.txt", "w") do io

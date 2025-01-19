@@ -43,15 +43,15 @@ model = Model(
 
 f = (x, u) -> [x[nq .+ (1:nq)]; u[nτ .+ (1:nq)]]
 
-# ## Costs
+# ## Objective
 
-function objt(x, u)
+function stage_obj(x, u)
 	τ = u[1]
 	J = 0.01 * Δ * τ * τ
 	return J
 end
 
-function objN(x, u)
+function term_obj(x, u)
 	J = 0.0 
 	
 	q⁻ = x[1:acrobot_impact.nq] 
@@ -66,17 +66,25 @@ end
 cost = (x, u) -> begin
 	J = 0.0
 	for k in 1:N-1
-		J += objt(x[k, :], u[k, :])
+		J += stage_obj(x[k, :], u[k, :])
 	end
-	J += objN(x[N, :], 0.0)
+	J += term_obj(x[N, :], 0.0)
 end
 
 # ## Constraints
 
-constr = (x, u) -> implicit_contact_dynamics(acrobot_impact, x, u, Δ, 1e-4)
+constr = (x, u) -> implicit_contact_dynamics(acrobot_impact, x, u, Δ, 0.0)
 
 @variable(model, x[1:N, 1:nx]);
 @variable(model, u[1:N-1, 1:nu]);
+
+for t = 1:N-1
+    set_lower_bound(u[t, 1], -10.0)
+    set_upper_bound(u[t, 1], 10.0)
+    for i = (nτ + nq) .+ (1:2*nc)
+        set_lower_bound(u[t, i], 0.0)
+    end
+end
 
 @objective(model, Min, cost(x, u))
 
@@ -84,8 +92,6 @@ fix.(x[1, :], x1, force = true)
 for k = 1:N-1
     @constraint(model, x[k+1, :] == f(x[k, :], u[k, :]))
     @constraint(model, constr(x[k, :], u[k, :]) .== 0.0)
-    @constraint(model, u[k, (nτ + nq) .+ (1:2*nc)] .>= 0.0)
-    @constraint(model, 10.0 .>= u[k, 1] .>= -10.0)
 end
 
 open("results/acrobot_contact.txt", "w") do io

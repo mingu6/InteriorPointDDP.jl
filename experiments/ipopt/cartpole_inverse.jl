@@ -38,17 +38,17 @@ model = Model(
                 "print_level" => print_level, "print_timing_statistics" => "yes")
             );
 
-# ## Costs
+# ## Objective
 
-objt = (x, u) -> 0.1 * Δ * u[1] * u[1]
-objT = (x, u) -> 100. * (x - xN)' * (x - xN)
+stage_obj = (x, u) -> 0.1 * Δ * u[1] * u[1]
+term_obj = (x, u) -> 100. * (x - xN)' * (x - xN)
 
 cost = (x, u) -> begin
 	J = 0.0
 	for k in 1:N-1
-		J += objt(x[k, :], u[k, :])
+		J += stage_obj(x[k, :], u[k, :])
 	end
-	J += objT(x[N, :], 0.0)
+	J += term_obj(x[N, :], 0.0)
 	return J
 end
 
@@ -62,12 +62,18 @@ dyn_con = (x, u) -> implicit_dynamics(cartpole, x, u)
 @variable(model, x[1:N, 1:nx]);
 @variable(model, u[1:N-1, 1:nu]);
 
+for t = 1:N-1
+    for i = 1:nF
+        set_lower_bound(u[t, i], -4.0)
+        set_upper_bound(u[t, i], 4.0)
+    end
+end
+
 @objective(model, Min, cost(x, u))
 
 for k = 1:N-1
     @constraint(model, x[k+1, :] == f(x[k, :], u[k, :]))
     @constraint(model, dyn_con(x[k, :], u[k, :]) .== 0.0)
-    @constraint(model, 4.0 .>= u[k, 1:nF] .>= -4.0)
 end
 
 open("results/cartpole_inverse.txt", "w") do io

@@ -36,6 +36,13 @@ model = Model(
 ul = [-2.0; -4.0]
 uu = [2.0; 4.0]
 
+for t = 1:N-1
+    for i = 1:nu
+        set_lower_bound(u[t, i], ul[i])
+        set_upper_bound(u[t, i], uu[i])
+    end
+end
+
 # ## obstacles
 
 xyr_obs = [
@@ -46,8 +53,8 @@ xyr_obs = [
     ]
 num_obstacles = length(xyr_obs)
 
-@variable(model, s_obs[1:N-1, 1:num_obstacles]);  # slacks for obstacle constraints
-@variable(model, s_yz[1:N-1, 1:2]);  # slacks for state boundaries
+@variable(model, s_obs[1:N-1, 1:num_obstacles] .>= 0.0);  # slacks for obstacle constraints
+@variable(model, 0.0 .<= s_yz[1:N-1, 1:2] .<= 1.0);  # slacks for state boundaries
 
 # ## Dynamics - RK4
 
@@ -75,10 +82,7 @@ end
 
 for k = 1:N-1
     @constraint(model, x[k+1, :] == f(x[k, :], u[k, :]))
-    @constraint(model, ul .<= u[k, :] .<= uu)
     @constraint(model, f(x[k, :], u[k, :])[1:2] == s_yz[k, :])
-    @constraint(model, [0.0, 0.0] .<= s_yz[k, :] .<= [1.0, 1.0])
-    @constraint(model, 0.0 .<= s_obs[k, :])
     for (i, obs) in enumerate(xyr_obs)
         @constraint(model, (obs[3] + r_car)^2 - obs_dist(obs[1:2])(x[k+1, :]) + s_obs[k, i] == 0.0)
     end
