@@ -20,7 +20,7 @@ plot(range(0, (N-1) * h, length=N), [x_ip x_al], linecolor=[1 1], xtickfontsize=
     label=["\$y_t\$ (IPDDP2)" "\$y_t\$ (AL-iLQR)"])
 savefig("blockmove_y.pdf")
 
-plot(range(0, (N-1) * h, length=N), [v_ip v_al], linecolor=[2 2], xtickfontsize=14, ytickfontsize=14, ylims=(0, 1.9),
+plot(range(0, (N-1) * h, length=N), [v_ip v_al], linecolor=[2 2], xtickfontsize=14, ytickfontsize=14, #ylims=(0, 1.9),
     linestyle=[:solid :dot], linewidth=3, legendfontsize=16, legend=:best, background_color_legend = nothing,
     xlabel="\$t\$", xlabelfontsize=16,
     label=["\$v_t\$ (IPDDP2)" "\$v_t\$ (AL-iLQR)"])
@@ -43,8 +43,8 @@ plot(range(0, (N-1) * h, length=N-1), [F_ip F_al], linecolor=[3 3], xtickfontsiz
     label=["\$F_t\$ (IPDDP2)" "\$F_t\$ (AL-iLQR)"])
 savefig("blockmove_F.pdf")
 
-plot(range(0, (N-1) * h, length=N-1), [w_ip w_al s_al], linecolor=[4 4 5], xtickfontsize=14, ytickfontsize=14, ylims=(-3, 18),
-    linestyle=[:solid :dot :dash], linewidth=3, legendfontsize=16, legend=:topright, background_color_legend = nothing,
+plot(range(0, (N-1) * h, length=N-1), [w_ip w_al], linecolor=[4 4], xtickfontsize=14, ytickfontsize=14, #ylims=(-3, 18),
+    linestyle=[:solid :dot], linewidth=3, legendfontsize=16, legend=:best, background_color_legend = nothing,
     xlabel="\$t\$", xlabelfontsize=16,
-    label=[ "\$|F_tv_t|\$        (IPDDP2)" "\$|F_tv_t|\$       (AL-iLQR)" L"$s^{+}_t - s^{\_}_t$  (AL-iLQR)" ])
+    label=[ "\$|F_tv_t|\$        (IPDDP2)" "\$|F_tv_t|\$       (AL-iLQR)"])
 savefig("blockmove_Fv.pdf")

@@ -15,8 +15,9 @@ xN = [1.0; 0.0]
 x0 = [0.0; 0.0]
 
 options = Options()
-options.scaling_penalty = 1.0
-options.initial_constraint_penalty = 1e-4
+# options.scaling_penalty = 1.0
+# options.initial_constraint_penalty = 1e-4
+options.constraint_tolerance = 1e-8
 
 num_state = 2
 num_control = 3  # force and two slack variables to represent abs work
