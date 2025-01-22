@@ -15,9 +15,11 @@ verbose = true
 N = 101
 
 options = Options()
-options.max_dual_updates = 1
-options.initial_constraint_penalty = 1e-5
-options.max_iterations = 1000
+options.max_dual_updates = 2
+options.initial_constraint_penalty = 1e-6
+options.scaling_penalty = 1.02
+options.max_iterations = 300
+options.min_step_size = 1e-8
 
 include("../models/acrobot.jl")
 
@@ -106,8 +108,10 @@ open("results/acrobot_contact.txt", "w") do io
 		solver.options.verbose = verbose
 		
 		Random.seed!(seed)
-		q_init = LinRange([0.0; 0.0], qN, N)[2:end]
-		ū = [[1.0e-2 * (rand(nτ) .- 0.5); q_init[k]; 0.01 * ones(nc); 0.01 * ones(nc)] for k = 1:N-1]
+
+		q1 = 0.1 .* (rand(2) .- 0.5)
+		q_init = LinRange(q1, qN, N)[2:end]
+		ū = [[1.0e-1 * (rand(nτ) .- 0.5); q_init[k]; 0.01 * ones(nc); 0.01 * ones(nc)] for k = 1:N-1]
 		x̄ = rollout(dynamics, x1, ū)
 		
 		solve!(solver, x̄, ū)

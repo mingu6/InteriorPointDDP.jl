@@ -102,8 +102,9 @@ open("results/acrobot_contact.txt", "w") do io
 		
 		# ## Initialise variables and solve
 		
-		q_init = LinRange([0.0; 0.0], qN, N)[2:end]
-		ū = [[1.0e-2 * (rand(nτ) .- 0.5); q_init[k]; 0.01 * ones(nc); 0.01 * ones(nc)] for k = 1:N-1]
+		q1 = 0.1 .* (rand(2) .- 0.5)
+		q_init = LinRange(q1, qN, N)[2:end]
+		ū = [[1.0e-1 * (rand(nτ) .- 0.5); q_init[k]; 0.01 * ones(nc); 0.01 * ones(nc)] for k = 1:N-1]
 		
 		x̄ = [x1]
 		for k in 2:N
