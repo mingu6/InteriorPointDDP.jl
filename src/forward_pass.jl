@@ -14,9 +14,9 @@ function forward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T}, 
     Δφ = expected_decrease_objective(update_rule, problem)
 
     while data.step_size >= eps(T)
-        α = data.step_size
+        γ = data.step_size
         try
-            rollout!(update_rule, data, problem, step_size=α)
+            rollout!(update_rule, data, problem, step_size=γ)
         catch e
             # reduces step size if NaN or Inf encountered
             e isa DomainError && (data.step_size *= 0.5, continue)
@@ -24,8 +24,9 @@ function forward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T}, 
         end
         
         data.status = check_fraction_boundary(problem, update_rule, τ)
-        constraint!(problem, data.μ; mode=:current)
         data.status != 0 && (data.step_size *= 0.5, continue)
+
+        constraint!(problem, data.μ; mode=:current)
         
         # used for sufficient decrease from current iterate step acceptance criterion
         θ = constraint_violation_1norm(problem, mode=:current)
@@ -37,8 +38,8 @@ function forward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T}, 
         
         # check for sufficient decrease conditions for the barrier objective/constraint violation
         data.switching = (Δφ < 0.0) && 
-            ((-α * Δφ) ^ options.s_φ * α^(1-options.s_φ)  > options.δ * θ_prev ^ options.s_θ)
-        data.armijo_passed = φ - φ_prev - 10. * eps(Float64) * abs(φ_prev) <= options.η_φ * α * Δφ
+            ((-γ * Δφ) ^ options.s_φ * γ^(1-options.s_φ)  > options.δ * θ_prev ^ options.s_θ)
+        data.armijo_passed = φ - φ_prev - 10. * eps(Float64) * abs(φ_prev) <= options.η_φ * γ * Δφ
         if (θ <= data.min_primal_1) && data.switching
             data.status = data.armijo_passed ? 0 : 4  #  sufficient decrease of barrier objective
         else
