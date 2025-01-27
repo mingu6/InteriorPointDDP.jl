@@ -14,7 +14,8 @@ r_car = 0.02
 xN = [1.0; 1.0; π / 4; 0.0]
 
 options = Options()
-options.scaling_penalty = 3.0
+options.scaling_penalty = 1.7
+options.initial_constraint_penalty = 5e-4
 options.max_dual_updates = 300
 options.constraint_tolerance = 1e-8
 
@@ -36,6 +37,7 @@ xyr_obs = [
     [0.30, 0.4, 0.1]
     ]
 num_obstacles = length(xyr_obs)
+num_primal = num_control + num_obstacles + num_state
 
 include("../visualise/concar.jl")
 
@@ -54,9 +56,9 @@ function RK4(x, u, g)
     return x + Δ / 6 * (k1 + k2 + k3 + k4)
 end
 
-f = (x, u) -> RK4(x, u, g)
+f = (x, u) -> u[num_control + num_obstacles .+ (1:num_state)]
 
-car = Dynamics(f, num_state, num_control)
+car = Dynamics(f, num_state, num_primal)
 dynamics = [car for k = 1:N-1] 
 
 # ## objective 
@@ -69,7 +71,7 @@ stage_cost = (x, u) -> begin
 end
 term_cost = (x, u) -> 1e3 * dot(x - xN, x - xN)
 objective = [
-    [Cost(stage_cost, num_state, num_control) for k = 1:N-1]...,
+    [Cost(stage_cost, num_state, num_primal) for k = 1:N-1]...,
     Cost(term_cost, num_state, 0)
 ]
 
@@ -83,35 +85,41 @@ end
 
 # ## constraints - waypoints are constraints for iLQR
 
-obs_dist(obs_xy) = (x) -> begin
-    xy_diff = x[1:2] - obs_xy
+obs_dist(obs_xy) = (x, u) -> begin
+    xp = u[num_control + num_obstacles .+ (1:2)]
+    xy_diff = xp[1:2] - obs_xy
     return dot(xy_diff, xy_diff)
 end
 path_constr_fn = (x, u) -> begin
 [
-    ul - u; ## control limit (lower)
-    u - uu; ## control limit (upper)
-    # obstacle avoidance constraints i.e., d_thresh^2 - d_obs^2 <= 0 
-    [(obs[3] + r_car)^2 - obs_dist(obs[1:2])(f(x, u))
+    ul - u[1:num_control]; ## control limit (lower)
+    u[1:num_control] - uu; ## control limit (upper)
+    # # slack variables for obstacle
+    -u[num_control .+ (1:num_obstacles)];
+    # # bound constraints, car must stay within [0, 1] x [0, 1] box
+    -u[num_control + num_obstacles + 1];
+    -u[num_control + num_obstacles + 2];
+    u[num_control + num_obstacles + 1] - 1.0;
+    u[num_control + num_obstacles + 2] - 1.0;
+    # # obstacle avoidance constraints i.e., d_thresh^2 - d_obs^2 <= 0 
+    [(obs[3] + r_car)^2 - obs_dist(obs[1:2])(x, u) + u[num_control + i]
         for (i, obs) in enumerate(xyr_obs)];
-    # bound constraints, car must stay within [0, 1] x [0, 1] box
-    -f(x, u)[1];
-    -f(x, u)[2];
-    f(x, u)[1] - 1.0;
-    f(x, u)[2] - 1.0;
+    RK4(x, u, g) - u[num_control + num_obstacles .+ (1:num_state)];
 ]
 end
 
-obs_constr = Constraint(path_constr_fn, num_state, num_control,
+obs_constr = Constraint(path_constr_fn, num_state, num_primal,
     indices_inequality=collect(1:2*num_control+num_obstacles+4))
 
 constraints = [[obs_constr for k = 1:N-1]..., Constraint()]
 
 function eval_constraints_1norm(x, u)
+    num_ineq = 2 * num_control + num_obstacles + 4
     θ = 0.0
     for t in 1:N-1
         h = path_constr_fn(x[t], u[t])
-        θ += norm(max.(h, zeros(length(h))), 1)
+        θ += norm(h[num_ineq.+(1:num_obstacles+num_state)], 1)
+        θ += norm(max.(h[1:num_ineq], zeros(num_ineq)), 1)
     end
     return θ
 end
@@ -136,9 +144,10 @@ open("results/concar.txt", "w") do io
 		
         # ## Initialise solver and solve
         
-        x0 = rand(4) .* [0.05; 0.05; π / 2; 0.0]
-        ū = [1.0e-3 .* (rand(2) .- 0.5) for k = 1:N-1]
-        x̄ = rollout(dynamics, x0, ū)
+        x1 = rand(4) .* [0.05; 0.05; π / 2; 0.0]
+        xs_init = LinRange(x1, xN, N)[2:end]
+        ū = [[1.0e-1 .* (rand(2) .- 0.5); 0.01 * ones(num_obstacles); xs_init[k][1:2]; 1e-1 .* (rand(2) .- 0.5)] for k = 1:N-1]
+        x̄ = rollout(dynamics, x1, ū)
         
         solve!(solver, x̄, ū)
         

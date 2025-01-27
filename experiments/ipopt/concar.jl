@@ -7,7 +7,7 @@ using Suppressor
 using Printf
 
 output = false
-benchmark = false
+benchmark = true
 n_benchmark = 10
 
 print_level = output ? 5 : 4
@@ -54,7 +54,13 @@ xyr_obs = [
 num_obstacles = length(xyr_obs)
 
 @variable(model, s_obs[1:N-1, 1:num_obstacles] .>= 0.0);  # slacks for obstacle constraints
-@variable(model, 0.0 .<= s_yz[1:N-1, 1:2] .<= 1.0);  # slacks for state boundaries
+@variable(model, s_x[1:N-1, 1:nx]);  # slacks for dynamics (MS)
+for t = 1:N-1
+    for i = 1:2
+        set_lower_bound(s_x[t, i], 0.0)
+        set_upper_bound(s_x[t, i], 1.0)
+    end
+end
 
 # ## Dynamics - RK4
 
@@ -71,20 +77,19 @@ function RK4(x, u, g)
     return x + Δ / 6 * (k1 + k2 + k3 + k4)
 end
 
-f = (x, u) -> RK4(x, u, g)
-
 # ## constraints
 
-obs_dist(obs_xy) = (x) -> begin
-    xy_diff = x[1:2] - obs_xy
+obs_dist(obs_xy) = (s_x) -> begin
+    xp = s_x[1:2]
+    xy_diff = xp - obs_xy
     return xy_diff' * xy_diff
 end
 
 for k = 1:N-1
-    @constraint(model, x[k+1, :] == f(x[k, :], u[k, :]))
-    @constraint(model, f(x[k, :], u[k, :])[1:2] == s_yz[k, :])
+    @constraint(model, x[k+1, :] == s_x[k, :])
+    @constraint(model, RK4(x[k, :], u[k, :], g) == s_x[k, :])
     for (i, obs) in enumerate(xyr_obs)
-        @constraint(model, (obs[3] + r_car)^2 - obs_dist(obs[1:2])(x[k+1, :]) + s_obs[k, i] == 0.0)
+        @constraint(model, (obs[3] + r_car)^2 - obs_dist(obs[1:2])(s_x[k, :]) + s_obs[k, i] == 0.0)
     end
 end
 
@@ -123,11 +128,12 @@ open("results/concar.txt", "w") do io
         x1 = rand(4) .* [0.05; 0.05; π / 2; 0.0]
         fix.(x[1, :], x1, force = true)
         
-        ū = [1.0e-3 * (rand(2) .- 0.5) for k = 1:N-1]
+        xs_init = LinRange(x1, xN, N)[2:end]
+        ū = [[1.0e-1 .* (rand(2) .- 0.5); 1e-1 .* (rand(2) .- 0.5)] for k = 1:N-1]
         
         x̄ = [x1]
         for k in 2:N
-            push!(x̄, f(x̄[k-1],  ū[k-1]))
+            push!(x̄, [xs_init[k-1]; ū[k-1][3:4]])
         end
         
         for k = 1:N
@@ -147,7 +153,10 @@ open("results/concar.txt", "w") do io
                 set_start_value(s_obs[k, j], 0.01)
             end
             for j = 1:2
-                set_start_value(s_yz[k, j], 0.01)
+                set_start_value(s_x[k, j], xs_init[k][j])
+            end
+            for j = 1:2
+                set_start_value(s_x[k, 2+j], ū[k][nu + j])
             end
         end
         

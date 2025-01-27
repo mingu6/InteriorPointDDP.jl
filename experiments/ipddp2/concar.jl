@@ -17,7 +17,7 @@ xN = T[1.0; 1.0; π / 4; 0.0]
 options = Options{T}(quasi_newton=quasi_newton, verbose=true)
 
 num_state = 4
-num_action = 2
+num_control = 2
 
 # ## control limits
 
@@ -33,7 +33,7 @@ xyr_obs = [
     T[0.30, 0.4, 0.1]
     ]
 num_obstacles = length(xyr_obs)
-num_primal = num_action + num_obstacles + 2  # 2 slacks for box constraints
+num_primal = num_control + num_obstacles + num_state
 
 include("../visualise/concar.jl")
 
@@ -52,7 +52,7 @@ function RK4(x, u, g)
     return x + Δ / 6 * (k1 + k2 + k3 + k4)
 end
 
-f = (x, u) -> RK4(x, u, g)
+f = (x, u) -> u[num_control + num_obstacles .+ (1:num_state)]
 
 car = Dynamics(f, num_state, num_primal)
 dynamics = [car for k = 1:N-1]
@@ -73,7 +73,7 @@ objective = [
 # ## constraints
 
 obs_dist(obs_xy) = (x, u) -> begin
-    xp = f(x, u)[1:2]
+    xp = u[num_control + num_obstacles .+ (1:2)]
     xy_diff = xp[1:2]- obs_xy
     return dot(xy_diff, xy_diff)
 end
@@ -81,10 +81,10 @@ path_constr_fn = (x, u) -> begin
 [
     # obstacle avoidance constraints w/slack variable,
     # i.e., d_obs^2 - d_thresh^2 >= 0 and d_obs^2 - d_thresh^2 + s = 0, s >= 0
-    [(obs[3] + r_car)^2 - obs_dist(obs[1:2])(x, u) + u[num_action + i]
+    [(obs[3] + r_car)^2 - obs_dist(obs[1:2])(x, u) + u[num_control + i]
         for (i, obs) in enumerate(xyr_obs)];
     # bound constraints, car must stay within [0, 1] x [0, 1] box
-    f(x, u)[1:2] - u[end-1:end]
+    RK4(x, u, g) - u[num_control + num_obstacles .+ (1:num_state)]
 ]
 end
 
@@ -95,8 +95,8 @@ constraints = [obs_constr for k = 1:N-1]
 
 # [control limits; obs slack; bound slack]
 bound = Bound(
-    [ul; zeros(T, num_obstacles); zeros(T, 2)],
-    [uu; T(Inf) * ones(T, num_obstacles); ones(T, 2)]
+    [ul; zeros(T, num_obstacles); zeros(T, 2); -T(Inf) * ones(T, 2)],
+    [uu; T(Inf) * ones(T, num_obstacles); ones(T, 2); T(Inf) * ones(T, 2)]
 )
 bounds = [bound for k in 1:N-1]
 
@@ -119,7 +119,9 @@ open(fname, "w") do io
         Random.seed!(seed)
         
         x1 = rand(T, 4) .* T[0.05; 0.05; π / 2; 0.0]
-        ū = [[T(1.0e-3) .* (rand(T, 2) .- 0.5); T(0.01) * ones(T, num_obstacles + 2)] for k = 1:N-1]
+        xs_init = LinRange(x1, xN, N)[2:end]
+        ū = [[T(1.0e-1) .* (rand(T, 2) .- 0.5); T(0.01) * ones(T, num_obstacles); xs_init[k][1:2]; T(1e-1) .* (rand(T, 2) .- 0.5)] for k = 1:N-1]
+
         solve!(solver, x1, ū)
         
         x_sol, u_sol = get_trajectory(solver)
