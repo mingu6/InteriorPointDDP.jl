@@ -124,6 +124,13 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
                 Q̂xx[t] .+= vhxx[t]
             end
             
+            # inertia calculation and correction (regularisation)
+            if reg > 0.0
+                for i in 1:num_control
+                    Q̂uu[t][i, i] += reg
+                end
+            end
+
             # setup linear system in backward pass
             update_rule.lhs_tl[t] .= Q̂uu[t]
             update_rule.lhs_tr[t] .= transpose(hu[t])
@@ -138,12 +145,6 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
             ω[t] .= hx[t]
             ω[t] .*= -1.0
 
-            # inertia calculation and correction (regularisation)
-            if reg > 0.0
-                for i in 1:num_control
-                    update_rule.lhs_tl[t][i, i] += reg
-                end
-            end
             if δ_c > 0.0
                 for i in 1:num_constr
                     update_rule.lhs_br[t][i, i] -= δ_c
@@ -192,9 +193,8 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
             V̂xx[t] .= Symmetric(V̂xx[t])
 
             # Vx = Q̂x + β' * Q̂u + [Q̂uu β + Q̂ux]^T α
-            update_rule.ux_tmp[t] .+= Q̂ux[t]
-            mul!(V̂x[t], transpose(update_rule.ux_tmp[t]), α[t])
-            mul!(V̂x[t], transpose(β[t]), Q̂u[t], 1.0, 1.0)
+            mul!(V̂x[t], transpose(β[t]), Q̂u[t])
+            mul!(V̂x[t], transpose(ω[t]), h[t], 1.0, 1.0)
             V̂x[t] .+= Q̂x[t]
         end
         data.status == 0 && break
@@ -202,5 +202,3 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
     data.reg_last = reg
     data.status != 0 && (verbose && (@warn "Backward pass failure, unable to find positive definite iteration matrix."))
 end
-
-

@@ -53,6 +53,3 @@ function forward_dynamics(model::Cartpole{T}, x, u) where T
     dyn_bias = C_func(model, q, q̇)
     return M \ (B .* u - dyn_bias)
 end
-
-# models
-cartpole = Cartpole{Float64}(2, 1, 1.0, 0.3, 0.5, 9.81)

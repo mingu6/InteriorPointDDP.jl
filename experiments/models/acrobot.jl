@@ -23,11 +23,6 @@ struct DoublePendulum{T}
     b2::T
 end
 
-acrobot_impact = DoublePendulum{Float64}(2, 1, 2,
-    1.0, 0.333, 1.0, 0.5, 1.0, 0.333, 1.0, 0.5, 9.81, 0.0, 0.0)
-acrobot_normal = DoublePendulum{Float64}(2, 1, 2,
-    1.0, 0.333, 1.0, 0.5, 1.0, 0.333, 1.0, 0.5, 9.81, 0.0, 0.0)
-
 function kinematics(model::DoublePendulum, x)
     [model.l1 * sin(x[1]) + model.l2 * sin(x[1] + x[2]),
      -1.0 * model.l1 * cos(x[1]) - model.l2 * cos(x[1] + x[2])]
