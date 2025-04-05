@@ -63,49 +63,67 @@ function parse_results(res)
     return seed, iters, status, obj, constr, wall, solver
 end
 
-function print_summary_results(io, fname, alg_name)
-    @printf(io, "%s \n", alg_name)
-    @printf(io, "\n")
-    _, iters, statuss, objs, constrs, wall, solver = read_results(fname)
-    @printf(io, "Iterations:  %s  %s  %s  %s  %s  \n", minimum(iters), quantile(iters, 0.25), median(iters), quantile(iters, 0.75), maximum(iters))
-    @printf(io, "Objective:  %.8e  %.8e  %.8e  %.8e  %.8e  \n", minimum(objs), quantile(objs, 0.25), median(objs), quantile(objs, 0.75), maximum(objs))
-    @printf(io, "Constraint Violation:  %.8e  %.8e  %.8e  %.8e  %.8e  \n", minimum(constrs), quantile(constrs, 0.25), median(constrs), quantile(constrs, 0.75), maximum(constrs))
-    @printf(io, "Wall (ms):  %5.1f  %5.1f  %5.1f  %5.1f  %5.1f \n", minimum(wall), quantile(wall, 0.25), median(wall), quantile(wall, 0.75), maximum(wall))
-    @printf(io, "Solver (ms):  %5.1f  %5.1f  %5.1f  %5.1f  %5.1f  \n", minimum(solver) ,quantile(solver, 0.25), median(solver), quantile(solver, 0.75), maximum(solver))
-    @printf(io, "Num. Failed:  %s, Num. Success:  %s", length(statuss) - sum(statuss), sum(statuss))
-    @printf(io, "\n")
-    @printf(io, "\n")
+using StatsPlots
+
+# function plot_results(problemclass)
+#     fnames_in = ["ipddp2/results/$problemclass.txt", "ipopt/results/$problemclass.txt", "ALiLQR/results/$problemclass.txt"]
+#     names = ["IPDDP2", "IPOPT", "AL-iLQR"]
+#     metric = []
+#     method = []
+#     vals = []
+#     for (fname, name) in zip(fnames_in, names)
+#         _, iters, statuss, objs, constrs, wall, solver = read_results(fname)
+#         vals = [vals; objs; constrs; iters; wall]
+#         metric = [metric; ["Obj." for _ in 1:length(objs)]; ["Constr." for _ in 1:length(constrs)]; ["Iters." for _ in 1:length(iters)]; ["Time" for _ in 1:length(wall)]]
+#         method = [method; [name for _ in 1:length([objs; constrs; iters; wall])]]
+#     end
+#     groupedboxplot(metric, vals, group=method, legend=:bottom, bar_width=0.7)
+#     savefig("$problemclass.pdf")
+# end
+
+# function plot_results(problemclass)
+#     fnames_in = ["ipddp2/results/$problemclass.txt", "ipopt/results/$problemclass.txt", "ALiLQR/results/$problemclass.txt"]
+#     names = ["IPDDP2", "IPOPT", "AL-iLQR"]
+
+#     _, iters_ipd, _, objs_ipd, constrs_ipd, wall_ipd, _ = read_results("ipddp2/results/$problemclass.txt")
+#     _, iters_ipo, _, objs_ipo, constrs_ipo, wall_ipo, _ = read_results("ipopt/results/$problemclass.txt")
+#     _, iters_al, _, objs_al, constrs_al, wall_al, _ = read_results("ALiLQR/results/$problemclass.txt")
+
+#     boxplot(["IPDDP2" "IPOPT" "AL-iLQR"], [objs_ipd objs_ipo objs_al], title="Objective Function",
+#         yaxis=:log10, legend=false, size=(240, 400))
+#     savefig("objective_$problemclass.pdf")
+
+#     boxplot(["IPDDP2" "IPOPT" "AL-iLQR"], [constrs_ipd constrs_ipo constrs_al], title="Max Violation", yaxis=:log10, legend=false, size=(240, 400))
+#     savefig("constr_$problemclass.pdf")
+
+#     boxplot(["IPDDP2" "IPOPT" "AL-iLQR"], [iters_ipd iters_ipo iters_al], title="Iterations", yaxis=:log10, legend=false, size=(240, 400))
+#     savefig("iterations_$problemclass.pdf")
+
+#     boxplot(["IPDDP2" "IPOPT" "AL-iLQR"], [wall_ipd wall_ipo wall_al], title="Total time (ms)", yaxis=:log10, legend=false, size=(240, 400))
+#     savefig("time_$problemclass.pdf")
+# end
+
+function plot_results(problemclass)
+    fnames_in = ["ipddp2/results/$problemclass.txt", "ipopt/results/$problemclass.txt"]
+    names = ["IPDDP2", "IPOPT", "AL-iLQR"]
+
+    _, iters_ipd, _, objs_ipd, constrs_ipd, wall_ipd, _ = read_results("ipddp2/results/$problemclass.txt")
+    _, iters_ipo, _, objs_ipo, constrs_ipo, wall_ipo, _ = read_results("ipopt/results/$problemclass.txt")
+
+    boxplot(["IPDDP2" "IPOPT"], [objs_ipd objs_ipo], title="Objective Function",
+        yaxis=:log10, legend=false, size=(200, 300))
+    savefig("objective_$problemclass.pdf")
+
+    boxplot(["IPDDP2" "IPOPT"], [constrs_ipd constrs_ipo], title="Max Violation", yaxis=:log10, legend=false, size=(200, 300))
+    savefig("constr_$problemclass.pdf")
+
+    boxplot(["IPDDP2" "IPOPT"], [iters_ipd iters_ipo], title="Iterations", legend=false, size=(200, 300))
+    savefig("iterations_$problemclass.pdf")
+
+    boxplot(["IPDDP2" "IPOPT"], [wall_ipd wall_ipo], title="Total time (ms)", legend=false, size=(200, 300))
+    savefig("time_$problemclass.pdf")
 end
 
-fnames_in = ["ipddp2/results/concar.txt", "ipopt/results/concar.txt", "ALiLQR/results/concar.txt"]
-names = ["IPDDP2", "IPOPT", "AL-iLQR"]
-
-open("summary_results_concar.txt", "w") do io
-    for (fname, name) in zip(fnames_in, names)
-        print_summary_results(io, fname, name)
-    end
-end
-
-fnames_in = ["ipddp2/results/cartpole_inverse.txt", "ipopt/results/cartpole_inverse.txt", "ALiLQR/results/cartpole_inverse.txt"]
-
-open("summary_results_cartpole_inverse.txt", "w") do io
-    for (fname, name) in zip(fnames_in, names)
-        print_summary_results(io, fname, name)
-    end
-end
-
-fnames_in = ["ipddp2/results/blockmove.txt", "ipopt/results/blockmove.txt", "ALiLQR/results/blockmove.txt"]
-
-open("summary_results_blockmove.txt", "w") do io
-    for (fname, name) in zip(fnames_in, names)
-        print_summary_results(io, fname, name)
-    end
-end
-
-fnames_in = ["ipddp2/results/acrobot_contact.txt", "ipopt/results/acrobot_contact.txt", "ALiLQR/results/acrobot_contact.txt"]
-
-open("summary_results_acrobot_contact.txt", "w") do io
-    for (fname, name) in zip(fnames_in, names)
-        print_summary_results(io, fname, name)
-    end
-end
+# plot_results("cartpole_inverse")
+# plot_results("concar")
+plot_results("pushing")

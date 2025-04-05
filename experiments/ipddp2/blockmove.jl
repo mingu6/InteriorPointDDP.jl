@@ -16,7 +16,7 @@ x1 = T[0.0; 0.0]
     
 num_state = 2  # position and velocity
 num_control = 3  # pushing force, 2x slacks for + and - components of abs work
-n_ocp = 500
+n_ocp = 1
 
 options = Options{T}(quasi_newton=quasi_newton, verbose=verbose)
 
@@ -34,9 +34,10 @@ for seed = 1:n_ocp
 
     # ## Objective
 
-    xN_y = T(1.0) + rand(T) * T(0.2)
-    xN_v = (rand(T) - T(0.5)) * T(0.2)
-    xN = T[xN_y; xN_v]
+    # xN_y = T(1.0) + rand(T) * T(0.2)
+    # xN_v = (rand(T) - T(0.5)) * T(0.2)
+    # xN = T[xN_y; xN_v]
+    xN = T[1.5, -0.2]
     stage_cost = Objective((x, u) -> Δ * (u[2] + u[3]), 2, 3)
     objective = [
         [stage_cost for k = 1:N-1]...,
@@ -52,7 +53,7 @@ for seed = 1:n_ocp
 
     # ## Bounds
 
-    limit = T(5.0) * rand(T) + T(5.0)  # bound is in [5, 10]
+    limit = T(10.0)
     bound = Bound(T[-limit, 0.0, 0.0], T[limit, Inf, Inf])
     bounds = [bound for k = 1:N-1]
 
@@ -61,7 +62,7 @@ for seed = 1:n_ocp
     
     # ## Initialise solver and solve
     
-    ū = [[T(1.0e-0) * (randn(T, 1) .- 0.5); T(0.01) * ones(T, 2)] for k = 1:N-1]
+    ū = [T(1.0e-2) * ones(T, 3) for k = 1:N-1]
     solve!(solver, x1, ū)
 
     if benchmark

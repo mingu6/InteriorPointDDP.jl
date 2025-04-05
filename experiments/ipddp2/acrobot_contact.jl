@@ -122,7 +122,7 @@ for seed = 1:n_ocp
 		wall_time /= n_benchmark
 		push!(results, [seed, solver.data.k, solver.data.status, solver.data.objective, solver.data.primal_inf, wall_time, solver_time])
 	else
-		push!(results, [seed, solver.data.k, solver.data.status, solver.data.objective, solver.data.primal_inf])
+		push!(results, [solver.data.μ, solver.data.k, solver.data.status, solver.data.objective, solver.data.primal_inf])
 	end
 
 	# ## Plot solution
@@ -147,15 +147,19 @@ for seed = 1:n_ocp
 	end
 end
 
-fname = quasi_newton ? "results/acrobot_contact_QN.txt" : "results/acrobot_contact.txt"
+# fname = quasi_newton ? "results/acrobot_contact_QN.txt" : "results/acrobot_contact.txt"
+fname = "results/contact_barrier.txt"
 open(fname, "w") do io
-	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")
+	# @printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")
+    # for i = 1:n_ocp
+    #     if benchmark
+    #         @printf(io, " %2s     %5s      %5s    %.8e    %.8e     %5.1f        %5.1f  \n", Int64(results[i][1]), Int64(results[i][2]), Int64(results[i][3]) == 0,
+    #                         results[i][4], results[i][5], results[i][6] * 1000, results[i][7] * 1000)
+    #     else
+    #         @printf(io, " %2s     %5s      %5s    %.8e    %.8e \n",  Int64(results[i][1]), Int64(results[i][2]), Int64(results[i][3]) == 0, results[i][4], results[i][5])
+    #     end
+    # end
     for i = 1:n_ocp
-        if benchmark
-            @printf(io, " %2s     %5s      %5s    %.8e    %.8e     %5.1f        %5.1f  \n", Int64(results[i][1]), Int64(results[i][2]), Int64(results[i][3]) == 0,
-                            results[i][4], results[i][5], results[i][6] * 1000, results[i][7] * 1000)
-        else
-            @printf(io, " %2s     %5s      %5s    %.8e    %.8e \n",  Int64(results[i][1]), Int64(results[i][2]), Int64(results[i][3]) == 0, results[i][4], results[i][5])
-        end
+        @printf(io, "%.8e\n",  results[i][1])
     end
 end

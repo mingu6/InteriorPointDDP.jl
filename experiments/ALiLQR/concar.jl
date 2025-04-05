@@ -22,8 +22,11 @@ options.constraint_tolerance = 1e-8
 # ## car 
 num_state = 4
 num_control = 2
+n_ocp = 500
 
 include("../visualise/concar.jl")
+
+results = Vector{Vector{Any}}()
 
 for seed = 1:n_ocp
     Random.seed!(seed)
@@ -39,7 +42,7 @@ for seed = 1:n_ocp
     obs_1 = [0.05, 0.25, 0.05] + [rand() * 0.1, (rand() - 0.5) * 0.2, rand() * 0.05]
     obs_2 = [0.45, 0.1, 0.05] + [(rand() - 0.5) * 0.2, (rand() - 0.5) * 0.2, rand() * 0.05]
     obs_3 = [0.7, 0.7, 0.15] + [- rand() * 0.1, -rand() * 0.1, rand() * 0.05]
-    obs_4 = [0.3, 0.4, 0.1] + [(rand() - 0.5) * 0.2, (rand() - T(0.5)) * 0.2, rand() * 0.05]
+    obs_4 = [0.3, 0.4, 0.1] + [(rand() - 0.5) * 0.2, (rand() - 0.5) * 0.2, rand() * 0.05]
 
     xyr_obs = [obs_1, obs_2, obs_3, obs_4]
     num_obstacles = length(xyr_obs)
@@ -157,9 +160,9 @@ for seed = 1:n_ocp
     if benchmark
         solver.options.verbose = false
         solve_time = @belapsed solve!($solver, $x̄, $ū) samples=10 setup=(solver=Solver($dynamics, $objective, $constraints; options=$options))
-        push!(results, [seed, solver.data.k, solver.data.status, solver.data.objective, solver.data.primal_inf, wall_time, solver_time])
+        push!(results, [seed, solver.data.iterations[1], solver.data.status[1], J, θ, solve_time * 1000, 0.0])
     else
-        push!(results, [seed, solver.data.k, solver.data.status, solver.data.objective, solver.data.primal_inf])
+        push!(results, [seed, solver.data.iterations[1], solver.data.status[1], J, θ])
     end
     savefig("plots/concar_ALiLQR_$seed.pdf")
 end
