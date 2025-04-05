@@ -4,9 +4,9 @@ using Plots
 using Random
 using Printf
 
-benchmark = false
+benchmark = true
 verbose = true
-quasi_newton = false
+visualise = false
 n_benchmark = 10
 
 T = Float64
@@ -14,13 +14,13 @@ N = 101
 Δ = 0.05
 r_car = 0.02
 xN = T[1.0; 1.0; π / 4; 0.0]
-options = Options{T}(quasi_newton=quasi_newton, verbose=true)
+options = Options{T}(verbose=true)
 
-include("../visualise/concar.jl")
+visualise && include("../visualise/concar.jl")
 
 num_state = 4
 num_control = 2
-n_ocp = 500
+n_ocp = 1
 
 results = Vector{Vector{Any}}()
 
@@ -35,10 +35,11 @@ for seed = 1:n_ocp
     uu = T[F_lim; τ_lim]
 
     # ## obstacles
-    obs_1 = T[0.05, 0.25, 0.05] + T[rand(T) * 0.1, (rand(T) - T(0.5)) * 0.2, rand(T) * 0.05]
-    obs_2 = T[0.45, 0.1, 0.05] + T[(rand(T) - T(0.5)) * 0.2, (rand(T) - T(0.5)) * 0.2, rand(T) * 0.05]
-    obs_3 = T[0.7, 0.7, 0.15] + T[- rand(T) * 0.1, -rand(T) * 0.1, rand(T) * 0.05]
-    obs_4 = T[0.3, 0.4, 0.1] + T[(rand(T) - T(0.5)) * 0.2, (rand(T) - T(0.5)) * 0.2, rand(T) * 0.05]
+
+    obs_1 = T[0.25, 0.25, 0.05] + T[(rand(T) - T(0.5)) * 0.2, (rand(T) - T(0.5)) * 0.2, rand(T) * 0.15]
+    obs_2 = T[0.75, 0.75, 0.05] + T[(rand(T) - T(0.5)) * 0.2, (rand(T) - T(0.5)) * 0.2, rand(T) * 0.15]
+    obs_3 = T[0.25, 0.75, 0.05] + T[(rand(T) - T(0.5)) * 0.2, (rand(T) - T(0.5)) * 0.2, rand(T) * 0.15]
+    obs_4 = T[0.75, 0.25, 0.05] + T[(rand(T) - T(0.5)) * 0.2, (rand(T) - T(0.5)) * 0.2, rand(T) * 0.15]
 
     xyr_obs = [obs_1, obs_2, obs_3, obs_4]
     num_obstacles = length(xyr_obs)
@@ -80,9 +81,8 @@ for seed = 1:n_ocp
     # ## constraints
 
     obs_dist(obs_xy) = (x, u) -> begin
-        # xp = f(x, u)[1:2]
-        xp = u[num_control + num_obstacles .+ (1:2)]
-        xy_diff = xp[1:2]- obs_xy
+        x2d = u[num_control + num_obstacles .+ (1:2)]
+        xy_diff = x2d - obs_xy
         return dot(xy_diff, xy_diff)
     end
     path_constr_fn = (x, u) -> begin
@@ -91,7 +91,7 @@ for seed = 1:n_ocp
         # i.e., d_obs^2 - d_thresh^2 >= 0 and d_obs^2 - d_thresh^2 + s = 0, s >= 0
         [(obs[3] + r_car)^2 - obs_dist(obs[1:2])(x, u) + u[num_control + i]
             for (i, obs) in enumerate(xyr_obs)];
-        # bound constraints, car must stay within [0, 1] x [0, 1] box
+        # multiple shooting dynamics constraints
         RK4(x, u, g) - u[num_control + num_obstacles .+ (1:num_state)]
     ]
     end
@@ -103,8 +103,8 @@ for seed = 1:n_ocp
 
     # [control limits; obs slack; bound slack]
     bound = Bound(
-        [ul; zeros(T, num_obstacles); zeros(T, 2); -T(Inf) * ones(T, 2)],
-        [uu; T(Inf) * ones(T, num_obstacles); ones(T, 2); T(Inf) * ones(T, 2)]
+        [ul; zeros(T, num_obstacles); -T(Inf) * ones(T, num_state)],
+        [uu; T(Inf) * ones(T, num_obstacles); T(Inf) * ones(T, num_state)]
     )
     bounds = [bound for k in 1:N-1]
 
@@ -115,19 +115,21 @@ for seed = 1:n_ocp
 
     # ## Plots
 
-    plot(xlims=(0, 1), ylims=(0, 1), xtickfontsize=14, ytickfontsize=14)
-    for xyr in xyr_obs
-        plotCircle!(xyr[1], xyr[2], xyr[3])
+    if visualise
+        plot(xlims=(-0.1, 1.1), ylims=(-0.1, 1.1), xtickfontsize=14, ytickfontsize=14)
+        for xyr in xyr_obs
+            plotCircle!(xyr[1], xyr[2], xyr[3])
+        end
     end
     
-    x1 = rand(T, 4) .* T[0.0; 0.0; π / 4; 0.0]
+    x1 = rand(T, 4) .* T[0.0; 0.0; π / 2; 0.0]
     xs_init = LinRange(x1, xN, N)[2:end]
-    ū = [[T(1e-1) .* (rand(T, 2) .- 0.5); T(1e-2) * ones(T, num_obstacles); xs_init[k][1:2]; T(1e-1) .* (rand(T, 2) .- 0.5)] for k = 1:N-1]
+    ū = [[T(1e-1) .* (rand(T, 2) .- 0.5); T(1e-2) * ones(T, num_obstacles); xs_init[k][1:2]; T(π / 2) .* (rand(T, 2) .- 0.5)] for k = 1:N-1]
 
     solve!(solver, x1, ū)
     
     x_sol, u_sol = get_trajectory(solver)
-    plotTrajectory!(x_sol)
+    visualise && plotTrajectory!(x_sol)
     
     if benchmark
         solver.options.verbose = false
@@ -144,12 +146,10 @@ for seed = 1:n_ocp
     else
         push!(results, [seed, solver.data.k, solver.data.status, solver.data.objective, solver.data.primal_inf])
     end
-    savefig("plots/concar_IPDDP_$seed.pdf")
+    visualise && savefig("plots/concar_IPDDP_$seed.pdf")
 end
 
-
-fname = quasi_newton ? "results/concar_QN.txt" : "results/concar.txt"
-open(fname, "w") do io
+open("results/concar.txt", "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")
     for i = 1:n_ocp
         if benchmark

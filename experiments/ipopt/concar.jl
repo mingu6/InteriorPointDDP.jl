@@ -7,7 +7,8 @@ using Suppressor
 using Printf
 
 output = false
-benchmark = false
+benchmark = true
+visualise = false
 n_benchmark = 10
 
 print_level = output ? 5 : 4
@@ -17,7 +18,7 @@ N = 101
 r_car = 0.02
 xN = [1.0; 1.0; π / 4; 0.0]
 
-include("../visualise/concar.jl")
+visualise && include("../visualise/concar.jl")
 
 nx = 4  # num. state
 nu = 2  # num. control
@@ -26,7 +27,6 @@ n_ocp = 500
 results = Vector{Vector{Any}}()
 
 include("ipopt_parse.jl")
-
 
 
 for seed = 1:n_ocp
@@ -59,22 +59,16 @@ for seed = 1:n_ocp
 
     # ## obstacles
 
-    obs_1 = [0.05, 0.25, 0.05] + [rand() * 0.1, (rand() - 0.5) * 0.2, rand() * 0.05]
-    obs_2 = [0.45, 0.1, 0.05] + [(rand() - 0.5) * 0.2, (rand() - 0.5) * 0.2, rand() * 0.05]
-    obs_3 = [0.7, 0.7, 0.15] + [- rand() * 0.1, -rand() * 0.1, rand() * 0.05]
-    obs_4 = [0.3, 0.4, 0.1] + [(rand() - 0.5) * 0.2, (rand() - 0.5) * 0.2, rand() * 0.05]
+    obs_1 = [0.25, 0.25, 0.05] + [(rand() - 0.5) * 0.2, (rand() - 0.5) * 0.2, rand() * 0.15]
+    obs_2 = [0.75, 0.75, 0.05] + [(rand() - 0.5) * 0.2, (rand() - 0.5) * 0.2, rand() * 0.15]
+    obs_3 = [0.25, 0.75, 0.05] + [(rand() - 0.5) * 0.2, (rand() - 0.5) * 0.2, rand() * 0.15]
+    obs_4 = [0.75, 0.25, 0.05] + [(rand() - 0.5) * 0.2, (rand() - 0.5) * 0.2, rand() * 0.15]
 
     xyr_obs = [obs_1, obs_2, obs_3, obs_4]
     num_obstacles = length(xyr_obs)
 
     @variable(model, s_obs[1:N-1, 1:num_obstacles] .>= 0.0);  # slacks for obstacle constraints
     @variable(model, s_x[1:N-1, 1:nx]);  # slacks for bound
-    for t = 1:N-1
-        for i = 1:2
-            set_lower_bound(s_x[t, i], 0.0)
-            set_upper_bound(s_x[t, i], 1.0)
-        end
-    end
 
     # ## Dynamics - RK4
 
@@ -129,17 +123,19 @@ for seed = 1:n_ocp
 
     # ## Plots
 
-    plot(xlims=(0, 1), ylims=(0, 1), xtickfontsize=14, ytickfontsize=14)
-    for xyr in xyr_obs
-        plotCircle!(xyr[1], xyr[2], xyr[3])
+    if visualise
+        plot(xlims=(-0.1, 1.1), ylims=(-0.1, 1.1), xtickfontsize=14, ytickfontsize=14)
+        for xyr in xyr_obs
+            plotCircle!(xyr[1], xyr[2], xyr[3])
+        end
     end
 
     set_attribute(model, "print_level", print_level)
-    x1 = rand(4) .* [0.0; 0.0; π / 4; 0.0]
+    x1 = rand(4) .* [0.0; 0.0; π / 2; 0.0]
     fix.(x[1, :], x1, force = true)
     
     xs_init = LinRange(x1, xN, N)[2:end]
-    ū = [1.0e-1 .* (rand(4) .- 0.5) for k = 1:N-1]
+    ū = [[1.0e-1 .* (rand(2) .- 0.5); π / 2 .* (rand(2) .- 0.5)] for k = 1:N-1]
     
     x̄ = [x1]
     for k in 2:N
@@ -163,7 +159,7 @@ for seed = 1:n_ocp
             set_start_value(s_obs[k, j], 0.01)
         end
         for j = 1:2
-            set_start_value(s_x[k, j], 0.01)
+            set_start_value(s_x[k, j], xs_init[k][j])
         end
         for j = 1:2
             set_start_value(s_x[k, 2+j], ū[k][nu + j])
@@ -177,7 +173,7 @@ for seed = 1:n_ocp
     
     xv = value.(x)
     x_sol = [xv[k, :] for k in 1:N]
-    plotTrajectory!(x_sol)
+    visualise && plotTrajectory!(x_sol)
     
     if benchmark
         set_attribute(model, "print_level", 4)
@@ -195,7 +191,7 @@ for seed = 1:n_ocp
     else
         push!(results, [seed, n_iter, succ, objective, constr_viol])
     end
-    savefig("plots/concar_IPOPT_$seed.pdf")
+    visualise && savefig("plots/concar_IPOPT_$seed.pdf")
 end
 
 open("results/concar.txt", "w") do io
