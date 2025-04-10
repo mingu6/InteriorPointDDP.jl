@@ -184,13 +184,11 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
 
             # Update return function approx. for next timestep 
             # Vxx = Q̂xx + Q̂ux' * β + β * Q̂ux' + β' Q̂uu' * β
-            mul!(update_rule.ux_tmp[t], Q̂uu[t], β[t])
-            mul!(V̂xx[t], transpose(β[t]), Q̂ux[t])
-
-            mul!(V̂xx[t], transpose(Q̂ux[t]), β[t], 1.0, 1.0)
+            mul!(V̂xx[t], transpose(Q̂ux[t]), β[t])
+            mul!(V̂xx[t], transpose(hx[t]), ω[t], 1.0, 1.0)
             V̂xx[t] .+= Q̂xx[t]
-            mul!(V̂xx[t], transpose(β[t]), update_rule.ux_tmp[t], 1.0, 1.0)
             V̂xx[t] .= Symmetric(V̂xx[t])
+
 
             # Vx = Q̂x + β' * Q̂u + [Q̂uu β + Q̂ux]^T α
             mul!(V̂x[t], transpose(β[t]), Q̂u[t])

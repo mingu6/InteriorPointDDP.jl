@@ -142,6 +142,7 @@ function rollout!(update_rule::UpdateRuleData{T}, data::SolverData{T}, problem::
         
         fn_eval_time_ = time()
         dynamics!(d, x[t+1], x[t], u[t])
+        
         # evaluate inequality constraints
         il[t] .= u[t]
         il[t] .-= bounds[t].lower

@@ -58,7 +58,7 @@ function solve!(solver::Solver{T}) where T
         # check (inner) barrier problem convergence and update barrier parameter if so
         dual_inf_μ, primal_inf_μ, cs_inf_μ = optimality_error(update_rule, problem, options, data.μ, mode=:nominal)
         opt_err_μ = max(dual_inf_μ, cs_inf_μ, primal_inf_μ)          
-        if opt_err_μ <= options.κ_ϵ * data.μ && num_bounds > 0
+        if opt_err_μ <= options.κ_ϵ * data.μ && num_bounds > 0 && data.μ > options.optimality_tolerance / 10.0
             data.μ = max(options.optimality_tolerance / 10.0, min(options.κ_μ * data.μ, data.μ ^ options.θ_μ))
             reset_filter!(data)
             # performance of current iterate updated to account for barrier parameter change
@@ -137,7 +137,7 @@ function optimality_error(update_rule::UpdateRuleData{T}, problem::ProblemData{T
         
         ϕ_norm += norm(ϕ[t], 1)
         
-        # primal feasibility (eq. constraint satisfcontrol)
+        # primal feasibility (eq. constraint satisfaction)
         
         primal_inf = max(primal_inf, norm(h[t], Inf))
         
