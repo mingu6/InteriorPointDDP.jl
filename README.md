@@ -1,4 +1,4 @@
-# InteriorPointDDP.jl (RSS 2025 Submission)
+# InteriorPointDDP.jl
 
 This repository contains a Julia package for solving constrained optimal control problems (OCPs) with our proposed IPDDP2 algorithm.
 
