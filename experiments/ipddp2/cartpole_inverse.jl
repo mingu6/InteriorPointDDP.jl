@@ -6,9 +6,8 @@ using MeshCat
 using Printf
 
 visualise = false
-benchmark = true
+benchmark = false
 verbose = true
-quasi_newton = false
 n_benchmark = 10
 
 T = Float64
@@ -26,7 +25,7 @@ end
 
 xN = T[0.0; π; 0.0; 0.0]
 
-options = Options{T}(quasi_newton=quasi_newton, verbose=false)
+options = Options{T}(verbose=verbose)
 
 results = Vector{Vector{Any}}()
 
@@ -108,8 +107,8 @@ for seed = 1:n_ocp
     end
 end
 
-fname = quasi_newton ? "results/cartpole_inverse_QN.txt" : "results/cartpole_inverse.txt"
-open(fname, "w") do io
+
+open("results/cartpole_inverse.txt", "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")
     for i = 1:n_ocp
         if benchmark

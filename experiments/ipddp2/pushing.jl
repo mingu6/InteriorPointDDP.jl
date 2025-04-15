@@ -12,15 +12,16 @@ n_benchmark = 10
 
 Δ = 0.04
 N = 76
-n_ocp = 100
+n_ocp = 500
 
-x1 = [0.0, 0.0, 0.0, 0.0]
-options = Options{Float64}(verbose=false)
+options = Options{Float64}(verbose=verbose, κ_ϵ=100.0, μ_init=10.0)
 
 results = Vector{Vector{Any}}()
 
 for seed = 1:n_ocp
 	Random.seed!(seed)
+    
+    x1 = [0.0, 0.0, 0.0, 0.0]
 
     xl = 0.07 + (rand() - 0.5) * 0.02
     xr = 0.12 + (rand() - 0.5) * 0.03
@@ -32,19 +33,7 @@ for seed = 1:n_ocp
     vel_lim = 3.0 + rand()
     r_push = 0.01 + 0.005 * (rand() - 0.5)
 
-    # obs1 = [0.2, 0.2, 0.05] + [0.05 * (rand() - 0.5), 0.05 * (rand() - 0.5), 0.005 * (rand() - 0.5)]
-    # obs2 = [0.0, 0.4, 0.05] + [0.025 * rand(), 0.05 * (rand() - 0.5), 0.005 *  (rand() - 0.5)]
-    # obs3 = [0.3, 0.0, 0.05] + [0.05 * (rand() - 0.5), 0.025 * rand(), 0.005 *  (rand() - 0.5)]
-
-    # obs1 = [0.2, 0.2, 0.05] + [0.05 * (rand() - 0.5), 0.05 * (rand() - 0.5), 0.005 * (rand() - 0.5)]
-    # obs2 = [0.1, 0.5, 0.05] + [0.025 * rand(), 0.05 * (rand() - 0.5), 0.005 *  (rand() - 0.5)]
-
-    # xyr_obs = [obs1, obs2, obs3]
-    # xyr_obs = [obs1, obs2]
-    xyr_obs = []
-    n_obs = length(xyr_obs)
-
-    nu = 9 + n_obs
+    nu = 9
     nx = 4
 
     # dynamics
@@ -94,8 +83,6 @@ for seed = 1:n_ocp
         u[5] * u[3] + u[7];
         u[6] * u[4] + u[8];
         f(x, u)[4] - u[9];  # bound constraint on ϕ_t
-        [(obs[3] + r_push)^2 - obs_dist(obs[1:2])(x, u) + u[9 + i]
-            for (i, obs) in enumerate(xyr_obs)]
         ]
     end
 
@@ -104,8 +91,8 @@ for seed = 1:n_ocp
 
     # Bounds
 
-    bound = Bound([[0.0, -force_lim, 0.0, 0.0, 0.0, 0.0, -Inf, -Inf, -0.9]; zeros(n_obs)],
-                [[force_lim, force_lim, vel_lim, vel_lim, Inf, Inf, Inf, Inf, 0.9]; Inf .* ones(n_obs)])
+    bound = Bound([0.0, -force_lim, 0.0, 0.0, 0.0, 0.0, -Inf, -Inf, -0.9],
+                [force_lim, force_lim, vel_lim, vel_lim, Inf, Inf, Inf, Inf, 0.9])
     bounds = [bound for k = 1:N-1]
 
     solver = Solver(Float64, dynamics, objective, constraints, bounds, options=options)
@@ -113,7 +100,7 @@ for seed = 1:n_ocp
         
     # ## Initialise solver and solve
     
-    ū = [[0.1 * rand(); 0.1 * (rand() - 0.5); 1e-2 .* ones(7 + n_obs)] for k = 1:N-1]
+    ū = [[0.1 * rand(); 0.1 * (rand() - 0.5); 1e-2 .* ones(7)] for k = 1:N-1]
     solve!(solver, x1, ū)
 
     if benchmark
@@ -132,6 +119,7 @@ for seed = 1:n_ocp
 		push!(results, [seed, solver.data.k, solver.data.status, solver.data.objective, solver.data.primal_inf])
 	end
 end
+
 
 open("results/pushing.txt", "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")

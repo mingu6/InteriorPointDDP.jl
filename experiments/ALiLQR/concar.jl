@@ -5,31 +5,33 @@ using Random
 using BenchmarkTools
 using Printf
 
-benchmark = false
+benchmark = true
 verbose = true
+visualise = false
 
 N = 101
 Δ = 0.05
 r_car = 0.02
-xN = [1.0; 1.0; π / 4; 0.0]
 
 options = Options()
 options.scaling_penalty = 1.7
 options.initial_constraint_penalty = 5e-4
 options.max_dual_updates = 300
-options.constraint_tolerance = 1e-8
+options.constraint_tolerance = 1e-6
 
 # ## car 
 num_state = 4
 num_control = 2
 n_ocp = 500
 
-include("../visualise/concar.jl")
+visualise && include("../visualise/concar.jl")
 
 results = Vector{Vector{Any}}()
 
 for seed = 1:n_ocp
     Random.seed!(seed)
+
+    xN = [1.0; 1.0; π / 4; 0.0]
 
     # ## control limits
     F_lim = 1.5 + rand()
@@ -39,15 +41,14 @@ for seed = 1:n_ocp
     uu = [F_lim; τ_lim]
 
     # ## obstacles
-    obs_1 = [0.05, 0.25, 0.05] + [rand() * 0.1, (rand() - 0.5) * 0.2, rand() * 0.05]
-    obs_2 = [0.45, 0.1, 0.05] + [(rand() - 0.5) * 0.2, (rand() - 0.5) * 0.2, rand() * 0.05]
-    obs_3 = [0.7, 0.7, 0.15] + [- rand() * 0.1, -rand() * 0.1, rand() * 0.05]
-    obs_4 = [0.3, 0.4, 0.1] + [(rand() - 0.5) * 0.2, (rand() - 0.5) * 0.2, rand() * 0.05]
+    obs_1 = [0.25, 0.25, 0.05] + [(rand() - 0.5) * 0.2, (rand() - 0.5) * 0.2, rand() * 0.15]
+    obs_2 = [0.75, 0.75, 0.05] + [(rand() - 0.5) * 0.2, (rand() - 0.5) * 0.2, rand() * 0.15]
+    obs_3 = [0.25, 0.75, 0.05] + [(rand() - 0.5) * 0.2, (rand() - 0.5) * 0.2, rand() * 0.15]
+    obs_4 = [0.75, 0.25, 0.05] + [(rand() - 0.5) * 0.2, (rand() - 0.5) * 0.2, rand() * 0.15]
 
     xyr_obs = [obs_1, obs_2, obs_3, obs_4]
     num_obstacles = length(xyr_obs)
-    num_primal = num_control + num_obstacles + num_state
-
+    num_primal = num_control #+ num_obstacles
 
     # ## Dynamics - RK4
 
@@ -64,7 +65,7 @@ for seed = 1:n_ocp
         return x + Δ / 6 * (k1 + k2 + k3 + k4)
     end
 
-    f = (x, u) -> u[num_control + num_obstacles .+ (1:num_state)]
+    f = (x, u) -> RK4(x, u, g)
 
     car = Dynamics(f, num_state, num_primal)
     dynamics = [car for k = 1:N-1] 
@@ -74,10 +75,10 @@ for seed = 1:n_ocp
     stage_cost = (x, u) -> begin
         J = 0.0
         J += Δ * dot(x - xN, x - xN)
-        J += Δ * dot(u[1:2] .* [10.0, 1.0], u[1:2])
+        J += Δ * dot(u[1:2] .* [5.0, 1.0], u[1:2])
         return J
     end
-    term_cost = (x, u) -> 1e3 * dot(x - xN, x - xN)
+    term_cost = (x, u) -> 5e2 * dot(x - xN, x - xN)
     objective = [
         [Cost(stage_cost, num_state, num_primal) for k = 1:N-1]...,
         Cost(term_cost, num_state, 0)
@@ -94,8 +95,8 @@ for seed = 1:n_ocp
     # ## constraints - waypoints are constraints for iLQR
 
     obs_dist(obs_xy) = (x, u) -> begin
-        xp = u[num_control + num_obstacles .+ (1:2)]
-        xy_diff = xp[1:2] - obs_xy
+        x2d = x[1:2]
+        xy_diff = x2d[1:2] - obs_xy
         return dot(xy_diff, xy_diff)
     end
     path_constr_fn = (x, u) -> begin
@@ -103,40 +104,35 @@ for seed = 1:n_ocp
         ul - u[1:num_control]; ## control limit (lower)
         u[1:num_control] - uu; ## control limit (upper)
         # # slack variables for obstacle
-        -u[num_control .+ (1:num_obstacles)];
-        # # bound constraints, car must stay within [0, 1] x [0, 1] box
-        -u[num_control + num_obstacles + 1];
-        -u[num_control + num_obstacles + 2];
-        u[num_control + num_obstacles + 1] - 1.0;
-        u[num_control + num_obstacles + 2] - 1.0;
+        # -u[num_control .+ (1:num_obstacles)];
         # # obstacle avoidance constraints i.e., d_thresh^2 - d_obs^2 <= 0 
-        [(obs[3] + r_car)^2 - obs_dist(obs[1:2])(x, u) + u[num_control + i]
-            for (i, obs) in enumerate(xyr_obs)];
-        RK4(x, u, g) - u[num_control + num_obstacles .+ (1:num_state)];
+        [(obs[3] + r_car)^2 - obs_dist(obs[1:2])(x, u) #+ u[num_control + i]
+            for (i, obs) in enumerate(xyr_obs)]
     ]
     end
 
+    num_ineq = 2*num_control+num_obstacles
     obs_constr = Constraint(path_constr_fn, num_state, num_primal,
-        indices_inequality=collect(1:2*num_control+num_obstacles+4))
+        indices_inequality=collect(1:num_ineq))
 
     constraints = [[obs_constr for k = 1:N-1]..., Constraint()]
 
-    function eval_constraints_1norm(x, u)
-        num_ineq = 2 * num_control + num_obstacles + 4
+    function eval_constraints_infnorm(x, u)
         θ = 0.0
         for t in 1:N-1
             h = path_constr_fn(x[t], u[t])
-            θ += norm(h[num_ineq.+(1:num_obstacles+num_state)], 1)
-            θ += norm(max.(h[1:num_ineq], zeros(num_ineq)), 1)
+            θ += norm(max.(h[1:num_ineq], zeros(num_ineq)), Inf)
         end
         return θ
     end
 
     # ## Plots
 
-    plot(xlims=(0, 1), ylims=(0, 1), xtickfontsize=14, ytickfontsize=14)
-    for xyr in xyr_obs
-        plotCircle!(xyr[1], xyr[2], xyr[3])
+    if visualise
+        plot(xlims=(-0.1, 1.1), ylims=(-0.1, 1.1), xtickfontsize=14, ytickfontsize=14)
+        for xyr in xyr_obs
+            plotCircle!(xyr[1], xyr[2], xyr[3])
+        end
     end
     
     # ## Initialise solver and solve
@@ -144,27 +140,26 @@ for seed = 1:n_ocp
     solver = Solver(dynamics, objective, constraints; options=options)
     solver.options.verbose = verbose
     
-    x1 = rand(4) .* [0.05; 0.05; π / 2; 0.0]
-    xs_init = LinRange(x1, xN, N)[2:end]
-    ū = [[1.0e-1 .* (rand(2) .- 0.5); 0.01 * ones(num_obstacles); xs_init[k][1:2]; 1e-1 .* (rand(2) .- 0.5)] for k = 1:N-1]
+    x1 = rand(num_state) .* [0.0; 0.0; π / 2; 0.0]
+    ū = [1.0e-1 .* (rand(num_control) .- 0.5) for k = 1:N-1]
     x̄ = rollout(dynamics, x1, ū)
     
     solve!(solver, x̄, ū)
     
     x_sol, u_sol = get_trajectory(solver)
-    plotTrajectory!(x_sol)
+    visualise && plotTrajectory!(x_sol)
 
     J = eval_objective(x_sol, u_sol)
-    θ = eval_constraints_1norm(x_sol, u_sol)
+    θ = eval_constraints_infnorm(x_sol, u_sol)
     
     if benchmark
         solver.options.verbose = false
         solve_time = @belapsed solve!($solver, $x̄, $ū) samples=10 setup=(solver=Solver($dynamics, $objective, $constraints; options=$options))
-        push!(results, [seed, solver.data.iterations[1], solver.data.status[1], J, θ, solve_time * 1000, 0.0])
+        push!(results, [seed, solver.data.iterations[1], solver.data.status[1], J, θ, solve_time, 0.0])
     else
         push!(results, [seed, solver.data.iterations[1], solver.data.status[1], J, θ])
     end
-    savefig("plots/concar_ALiLQR_$seed.pdf")
+    visualise && savefig("plots/concar_ALiLQR_$seed.pdf")
 end
 
 open("results/concar.txt", "w") do io

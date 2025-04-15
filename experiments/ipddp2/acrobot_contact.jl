@@ -9,7 +9,6 @@ using LaTeXStrings
 visualise = false
 benchmark = false
 verbose = true
-quasi_newton = false
 n_benchmark = 10
 
 T = Float64
@@ -26,14 +25,15 @@ if visualise
 end
 
 qN = T[π; 0.0]
-xN = T[qN; qN]
 
-options = Options{T}(quasi_newton=quasi_newton, verbose=true)
+options = Options{T}(verbose=verbose, optimality_tolerance=1e-6, κ_ϵ=100.0, μ_init=10.0)
 
 results = Vector{Vector{Any}}()
 
 for seed = 1:n_ocp
 	Random.seed!(seed)
+	
+	xN = T[qN; qN]
 
 	acrobot_impact = DoublePendulum{T}(2, 1, 2,
 		T(0.9) + 0.2 * rand(T),
@@ -89,7 +89,7 @@ for seed = 1:n_ocp
 
 	# ## Bounds
 
-	limit = T(5.0) * rand(T) + T(10.0)  # bound is in [10, 15]
+	limit = T(5.0) * rand(T) + T(10.0)
 	bound = Bound(
 		[-limit; -T(Inf) * ones(T, nq); zeros(T, nc); zeros(T, nc)],
 		[limit; T(Inf) * ones(T, nq); T(Inf) * ones(T, nc); T(Inf) * ones(T, nc)]
@@ -122,7 +122,7 @@ for seed = 1:n_ocp
 		wall_time /= n_benchmark
 		push!(results, [seed, solver.data.k, solver.data.status, solver.data.objective, solver.data.primal_inf, wall_time, solver_time])
 	else
-		push!(results, [solver.data.μ, solver.data.k, solver.data.status, solver.data.objective, solver.data.primal_inf])
+		push!(results, [seed, solver.data.k, solver.data.status, solver.data.objective, solver.data.primal_inf])
 	end
 
 	# ## Plot solution
@@ -147,19 +147,15 @@ for seed = 1:n_ocp
 	end
 end
 
-# fname = quasi_newton ? "results/acrobot_contact_QN.txt" : "results/acrobot_contact.txt"
-fname = "results/contact_barrier.txt"
-open(fname, "w") do io
-	# @printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")
-    # for i = 1:n_ocp
-    #     if benchmark
-    #         @printf(io, " %2s     %5s      %5s    %.8e    %.8e     %5.1f        %5.1f  \n", Int64(results[i][1]), Int64(results[i][2]), Int64(results[i][3]) == 0,
-    #                         results[i][4], results[i][5], results[i][6] * 1000, results[i][7] * 1000)
-    #     else
-    #         @printf(io, " %2s     %5s      %5s    %.8e    %.8e \n",  Int64(results[i][1]), Int64(results[i][2]), Int64(results[i][3]) == 0, results[i][4], results[i][5])
-    #     end
-    # end
+
+open("results/acrobot_contact.txt", "w") do io
+	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")
     for i = 1:n_ocp
-        @printf(io, "%.8e\n",  results[i][1])
+        if benchmark
+            @printf(io, " %2s     %5s      %5s    %.8e    %.8e     %5.1f        %5.1f  \n", Int64(results[i][1]), Int64(results[i][2]), Int64(results[i][3]) == 0,
+                            results[i][4], results[i][5], results[i][6] * 1000, results[i][7] * 1000)
+        else
+            @printf(io, " %2s     %5s      %5s    %.8e    %.8e \n",  Int64(results[i][1]), Int64(results[i][2]), Int64(results[i][3]) == 0, results[i][4], results[i][5])
+        end
     end
 end

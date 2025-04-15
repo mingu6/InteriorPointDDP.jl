@@ -7,7 +7,7 @@ using Suppressor
 using Printf
 
 output = false
-benchmark = true
+benchmark = false
 visualise = false
 n_benchmark = 10
 
@@ -33,10 +33,8 @@ for seed = 1:n_ocp
     Random.seed!(seed)
 
     model = Model(
-        optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_method" => "none",
-            "print_level" => print_level, "print_timing_statistics" => "yes"
-            , "max_resto_iter" => 0, "max_filter_resets" => 0
-            )
+        optimizer_with_attributes(Ipopt.Optimizer, "tol" => 1e-6,
+            "print_level" => print_level, "print_timing_statistics" => "yes")
         );
 
     @variable(model, x[1:N, 1:nx]);
@@ -68,7 +66,6 @@ for seed = 1:n_ocp
     num_obstacles = length(xyr_obs)
 
     @variable(model, s_obs[1:N-1, 1:num_obstacles] .>= 0.0);  # slacks for obstacle constraints
-    @variable(model, s_x[1:N-1, 1:nx]);  # slacks for bound
 
     # ## Dynamics - RK4
 
@@ -87,28 +84,27 @@ for seed = 1:n_ocp
 
     # ## constraints
 
-    obs_dist(obs_xy) = (s_x) -> begin
-        xp = s_x[1:2]
-        xy_diff = xp - obs_xy
+    obs_dist(obs_xy) = (x) -> begin
+        x2d = x[1:2]
+        xy_diff = x2d - obs_xy
         return xy_diff' * xy_diff
     end
 
     for k = 1:N-1
-        @constraint(model, x[k+1, :] == s_x[k, :])
-        @constraint(model, RK4(x[k, :], u[k, :], g) == s_x[k, :])
+        @constraint(model, RK4(x[k, :], u[k, :], g) == x[k+1, :])
         for (i, obs) in enumerate(xyr_obs)
-            @constraint(model, (obs[3] + r_car)^2 - obs_dist(obs[1:2])(s_x[k, :]) + s_obs[k, i] == 0.0)
+            @constraint(model, (obs[3] + r_car)^2 - obs_dist(obs[1:2])(x[k, :]) + s_obs[k, i] == 0.0)
         end
     end
 
     stage_cost = (x, u) -> begin
         J = 0.0
-        J += Δ * (x - xN)'* (x - xN)
-        J += Δ * (u[1:2] .* [10.0, 1.0])' * u[1:2]
+        # J += Δ * (x - xN)'* (x - xN)
+        J += Δ * (u[1:2] .* [5.0, 1.0])' * u[1:2]
         return J
     end
 
-    term_cost = x -> 1e3 * (x - xN)' * (x - xN)
+    term_cost = x -> 5e2 * (x - xN)' * (x - xN)
 
     function cost(x, u)
         J = 0.0
@@ -134,12 +130,11 @@ for seed = 1:n_ocp
     x1 = rand(4) .* [0.0; 0.0; π / 2; 0.0]
     fix.(x[1, :], x1, force = true)
     
-    xs_init = LinRange(x1, xN, N)[2:end]
-    ū = [[1.0e-1 .* (rand(2) .- 0.5); π / 2 .* (rand(2) .- 0.5)] for k = 1:N-1]
+    ū = [1.0e-1 .* (rand(2) .- 0.5) for k = 1:N-1]
     
     x̄ = [x1]
     for k in 2:N
-        push!(x̄, [xs_init[k-1]; ū[k-1][3:4]])
+        push!(x̄, RK4(x̄[k-1], ū[k-1], g))
     end
     
     for k = 1:N
@@ -157,12 +152,6 @@ for seed = 1:n_ocp
     for k = 1:N-1
         for j = 1:num_obstacles
             set_start_value(s_obs[k, j], 0.01)
-        end
-        for j = 1:2
-            set_start_value(s_x[k, j], xs_init[k][j])
-        end
-        for j = 1:2
-            set_start_value(s_x[k, 2+j], ū[k][nu + j])
         end
     end
     

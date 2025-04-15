@@ -16,7 +16,7 @@ print_level = output ? 5 : 4
 N = 76
 
 x1 = [0.0, 0.0, 0.0, 0.0]
-n_ocp = 100
+n_ocp = 500
 
 results = Vector{Vector{Any}}()
 
@@ -26,9 +26,8 @@ for seed = 1:n_ocp
     Random.seed!(seed)
 
     model = Model(
-        optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_method" => "none",
+        optimizer_with_attributes(Ipopt.Optimizer,
             "print_level" => print_level, "print_timing_statistics" => "yes"
-            , "max_resto_iter" => 0, "max_filter_resets" => 0
             )
         );
 
@@ -42,15 +41,7 @@ for seed = 1:n_ocp
     vel_lim = 3.0 + rand()
     r_push = 0.01 + 0.005 * (rand() - 0.5)
 
-    # obs1 = [0.2, 0.2, 0.05] + [0.05 * (rand() - 0.5), 0.05 * (rand() - 0.5), 0.005 * (rand() - 0.5)]
-    # obs2 = [0.0, 0.4, 0.05] + [0.025 * rand(), 0.05 * (rand() - 0.5), 0.005 *  (rand() - 0.5)]
-    # obs3 = [0.3, 0.0, 0.05] + [0.05 * (rand() - 0.5), 0.025 * rand(), 0.005 *  (rand() - 0.5)]
-
-    # xyr_obs = [obs1, obs2, obs3]
-    xyr_obs = []
-    n_obs = length(xyr_obs)
-
-    nu = 9 + n_obs
+    nu = 9
     nx = 4
 
     @variable(model, x[1:N, 1:nx]);
@@ -58,8 +49,8 @@ for seed = 1:n_ocp
 
     # ## control limits
 
-    ul = [[0.0, -force_lim, 0.0, 0.0, 0.0, 0.0, -Inf, -Inf, -0.9]; zeros(n_obs)]
-    uu = [[force_lim, force_lim, vel_lim, vel_lim, Inf, Inf, Inf, Inf, 0.9]; Inf .* ones(n_obs)]
+    ul = [0.0, -force_lim, 0.0, 0.0, 0.0, 0.0, -Inf, -Inf, -0.9]
+    uu = [force_lim, force_lim, vel_lim, vel_lim, Inf, Inf, Inf, Inf, 0.9]
 
     for t = 1:N-1
         for i = 1:nu
@@ -94,12 +85,6 @@ for seed = 1:n_ocp
         return x + Δ .* fc(x, u)
     end
 
-    obs_dist(obs_xy) = (x, u) -> begin
-        xp = x[1:2]
-        xy_diff = xp - obs_xy
-        return xy_diff' * xy_diff
-    end
-
     function constr(x, u)
         [
         μ_fric * u[1] - u[2] - u[5];
@@ -107,14 +92,12 @@ for seed = 1:n_ocp
         u[5] * u[3] + u[7];
         u[6] * u[4] + u[8];
         f(x, u)[4] - u[9]  # bound constraint on ϕ_t
-        # [(obs[3] + r_push)^2 - obs_dist(obs[1:2])(x, u) + u[9 + i]
-        #     for (i, obs) in enumerate(xyr_obs)]
         ]
     end
 
     for k = 1:N-1
         @constraint(model, x[k+1, :] == f(x[k, :], u[k, :]))
-        @constraint(model, constr(x[k, :], u[k, :]) == zeros(5 + n_obs))
+        @constraint(model, constr(x[k, :], u[k, :]) == zeros(5))
     end
 
     # objective
@@ -142,7 +125,7 @@ for seed = 1:n_ocp
     fix.(x[1, :], x1, force = true)
     
     xs_init = LinRange(x1, xN, N)[2:end]
-    ū = [[0.1 * rand(); 0.1 * (rand() - 0.5); 1e-2 .* ones(7 + n_obs)] for k = 1:N-1]
+    ū = [[0.1 * rand(); 0.1 * (rand() - 0.5); 1e-2 .* ones(7)] for k = 1:N-1]
     
     x̄ = [x1]
     for k in 2:N

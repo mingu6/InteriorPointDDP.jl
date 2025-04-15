@@ -34,10 +34,9 @@ for seed = 1:n_ocp
     Random.seed!(seed)
 
     model = Model(
-            optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_method" => "none",
-                "print_level" => print_level, "print_timing_statistics" => "yes"
-                , "max_resto_iter" => 0, "max_filter_resets" => 0)
-            );
+            optimizer_with_attributes(Ipopt.Optimizer, 
+                "print_level" => print_level, "print_timing_statistics" => "yes")
+            )
 
     cartpole = Cartpole{Float64}(2, 1,
         0.8 + 0.4 * rand(),

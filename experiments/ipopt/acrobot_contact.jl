@@ -55,7 +55,7 @@ for seed = 1:n_ocp
 	nu = nτ + nq + 2 * nc
 
 	model = Model(
-		optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_method" => "none",
+		optimizer_with_attributes(Ipopt.Optimizer, "tol" => 1e-6,
 			"print_level" => print_level, "print_timing_statistics" => "yes")
 		);
 
@@ -91,7 +91,7 @@ for seed = 1:n_ocp
 
 	# ## Constraints
 
-	constr = (x, u) -> implicit_contact_dynamics(acrobot_impact, x, u, Δ, 0.0)
+	constr = (x, u) -> implicit_contact_dynamics(acrobot_impact, x, u, Δ, 1e-7)
 
 	@variable(model, x[1:N, 1:nx]);
 	@variable(model, u[1:N-1, 1:nu]);

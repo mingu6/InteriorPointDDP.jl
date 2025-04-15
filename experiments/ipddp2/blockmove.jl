@@ -6,7 +6,6 @@ using Printf
 
 benchmark = false
 verbose = true
-quasi_newton = false
 n_benchmark = 10
 
 T = Float64
@@ -16,9 +15,9 @@ x1 = T[0.0; 0.0]
     
 num_state = 2  # position and velocity
 num_control = 3  # pushing force, 2x slacks for + and - components of abs work
-n_ocp = 1
+n_ocp = 500
 
-options = Options{T}(quasi_newton=quasi_newton, verbose=verbose)
+options = Options{T}(verbose=verbose)
 
 results = Vector{Vector{Any}}()
 
@@ -34,10 +33,10 @@ for seed = 1:n_ocp
 
     # ## Objective
 
-    # xN_y = T(1.0) + rand(T) * T(0.2)
-    # xN_v = (rand(T) - T(0.5)) * T(0.2)
-    # xN = T[xN_y; xN_v]
-    xN = T[1.5, -0.2]
+    xN_y = T(1.0) + rand(T) * T(0.2)
+    xN_v = (rand(T) - T(0.5)) * T(0.2)
+    xN = T[xN_y; xN_v]
+
     stage_cost = Objective((x, u) -> Δ * (u[2] + u[3]), 2, 3)
     objective = [
         [stage_cost for k = 1:N-1]...,
@@ -62,7 +61,7 @@ for seed = 1:n_ocp
     
     # ## Initialise solver and solve
     
-    ū = [T(1.0e-2) * ones(T, 3) for k = 1:N-1]
+    ū = [T(1.0e-1) * rand(T, 3) for k = 1:N-1]
     solve!(solver, x1, ū)
 
     if benchmark
@@ -83,8 +82,7 @@ for seed = 1:n_ocp
 end
 
 
-fname = quasi_newton ? "results/blockmove_QN.txt" : "results/blockmove.txt"
-open(fname, "w") do io
+open("results/blockmove.txt", "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")
     for i = 1:n_ocp
         if benchmark
