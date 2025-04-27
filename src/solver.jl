@@ -68,31 +68,32 @@ function initialize_trajectory!(solver::Solver{T}, controls::Vector{Vector{T}}, 
     u_tmp2 = solver.update_rule.u_tmp2
 
     for (t, ut) in enumerate(controls)
-        # project primal variables within bounds
+        # project primal variables within Bounds
 
-        # bt = bounds[t]
-        # ūt = ū[t]
-        # ūt .= ut
+        nu = length(controls[t])
+        for i in 1:nu
+            if !isinf(bounds[t].lower[i]) && isinf(bounds[t].upper[i])
+                u_tmp1[t][i] = max(bounds[t].lower[i], 1.0)
+                u_tmp1[t][i] *= options.κ_1
+                u_tmp1[t][i] += bounds[t].lower[i]
+                ū[t][i] = max(controls[t][i], u_tmp1[t][i])
+            elseif !isinf(bounds[t].upper[i]) && isinf(bounds[t].lower[i])
+                u_tmp1[t][i] = max(bounds[t].upper[i], 1.0)
+                u_tmp1[t][i] *= -options.κ_1
+                u_tmp1[t][i] += bounds[t].upper[i]
+                replace!(u_tmp1[t][i], NaN=>Inf)
+                ū[t][i] = min(controls[t][i], u_tmp1[t])
+            elseif !isinf(bounds[t].upper[i]) && !isinf(bounds[t].lower[i])
+                u_tmp1[t][i] = bounds[t].lower[i] + min(options.κ_1 * max(1.0, abs(bounds[t].lower[i])),
+                                    options.κ_2 * (bounds[t].upper[i] - bounds[t].lower[i]))
+                u_tmp2[t][i] = bounds[t].upper[i] - min(options.κ_1 * max(1.0, abs(bounds[t].upper[i])),
+                                    options.κ_2 * (bounds[t].upper[i] - bounds[t].lower[i]))
+                ū[t][i] = min(max(controls[t][i], u_tmp1[t][i]), u_tmp2[t][i])
+            else
+                ū[t][i] = controls[t][i]
+            end
+        end
 
-        # for i in bt.indices_lower
-        #     ūt[i] = max(ut[i], bt.lower[i] + options.κ_1 * max(1.0, bt.lower[i]))
-        # end
-
-        # for i in bt.indices_upper
-        #     ūt[i] = min(ut[i], bt.upper[i] - options.κ_1 * max(1.0, bt.upper[i]))
-        # end
-
-        u_tmp1[t] .= max.(bounds[t].lower, 1.0)
-        # println("pppp t", t, " ", u_tmp1[t])
-        u_tmp1[t] .*= options.κ_1
-        u_tmp1[t] .+= bounds[t].lower
-        ū[t] .= max.(controls[t], u_tmp1[t])
-
-        u_tmp1[t] .= max.(bounds[t].upper, 1.0)
-        u_tmp1[t] .*= -options.κ_1
-        u_tmp1[t] .+= bounds[t].upper
-        replace!(u_tmp1[t], NaN=>Inf)
-        ū[t] .= min.(ū[t], u_tmp1[t])
         # initialise inequality constraints
 
         ūl[t] .= ū[t]
