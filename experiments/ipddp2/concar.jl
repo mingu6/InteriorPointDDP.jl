@@ -19,7 +19,7 @@ visualise && include("../visualise/concar.jl")
 
 num_state = 4
 num_control = 2
-n_ocp = 500
+n_ocp = 100
 
 results = Vector{Vector{Any}}()
 
@@ -53,15 +53,13 @@ for seed = 1:n_ocp
         [x[4] * cos(x[3]); x[4] * sin(x[3]); u[2]; u[1]]
     end
 
-    function RK4(x, u, g)
+    function RK2(x, u, g)
         k1 = g(x, u)
         k2 = g(x + Δ * 0.5 * k1, u)
-        k3 = g(x + Δ * 0.5 * k2, u)
-        k4 = g(x + Δ * k3, u)
-        return x + Δ / 6 * (k1 + k2 + k3 + k4)
+        return x + Δ * k2
     end
 
-    f = (x, u) -> RK4(x, u, g)
+    f = (x, u) -> RK2(x, u, g)
 
     car = Dynamics(f, num_state, num_primal)
     dynamics = [car for k = 1:N-1]
@@ -145,7 +143,6 @@ for seed = 1:n_ocp
     end
     visualise && savefig("plots/concar_IPDDP_$seed.pdf")
 end
-
 
 open("results/concar.txt", "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")

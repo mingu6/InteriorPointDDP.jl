@@ -33,8 +33,6 @@ for seed = 1:n_ocp
 
     # ## Objective
 
-    # xN_y = T(1.0) + rand(T) * T(0.2)
-    # xN_v = (rand(T) - T(0.5)) * T(0.2)
     xN_y = T(1.0)
     xN_v = T(0.0)
     xN = T[xN_y; xN_v]
@@ -83,8 +81,7 @@ for seed = 1:n_ocp
     end
 end
 
-
-open("results/blockmove.txt", "w") do io
+open("results/double_integrator.txt", "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")
     for i = 1:n_ocp
         if benchmark

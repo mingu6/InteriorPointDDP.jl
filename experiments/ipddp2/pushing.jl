@@ -13,9 +13,9 @@ n_benchmark = 10
 T = Float64
 Δ = 0.04
 N = 76
-n_ocp = 500
+n_ocp = 100
 
-options = Options{Float64}(verbose=verbose, μ_init=0.1)
+options = Options{Float64}(verbose=verbose, μ_init=2.0)
 
 results = Vector{Vector{Any}}()
 
@@ -125,7 +125,7 @@ for seed = 1:n_ocp
 	end
 end
 
-open("results/pushing1.txt", "w") do io
+open("results/pushing.txt", "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")
     for i = 1:length(results)
         if benchmark

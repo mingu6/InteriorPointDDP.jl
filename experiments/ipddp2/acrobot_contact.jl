@@ -14,7 +14,7 @@ n_benchmark = 10
 T = Float64
 Δ = 0.05
 N = 101
-n_ocp = 500
+n_ocp = 100
 
 include("../models/acrobot.jl")
 
@@ -109,7 +109,7 @@ for seed = 1:n_ocp
 	q_init = [zeros(T, 2) for k = 1:N-1]
 	ū = [[zeros(T, nτ); q_init[k]; T(0.01) * ones(T, nc); T(0.01) * ones(T, 2 * nc)] for k = 1:N-1]
 	solve!(solver, x1, ū)
-			
+
 	if benchmark
 		solver.options.verbose = false
 		solver_time = 0.0

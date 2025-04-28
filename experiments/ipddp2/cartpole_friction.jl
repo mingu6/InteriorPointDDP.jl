@@ -6,14 +6,14 @@ using MeshCat
 using Printf
 
 visualise = false
-benchmark = true
+benchmark = false
 verbose = true
 n_benchmark = 10
 
 T = Float64
 Δ = 0.05
 N = 101
-n_ocp = 500
+n_ocp = 100
 
 include("../models/cartpole.jl")
 
