@@ -50,13 +50,13 @@ function solve!(solver::Solver{T}) where T
         data.status != 0 && break
         # check (outer) overall problem convergence
 
-        data.dual_inf = dual_error(update_rule)
+        data.dual_inf = dual_error(update_rule, problem, options)
         data.primal_inf = primal_error(problem)
-        data.cs_inf = cs_error(update_rule, problem, T(0.0))
+        data.cs_inf = cs_error(update_rule, problem, options, T(0.0))
         
         # check (inner) barrier problem convergence and update barrier parameter if so
 
-        cs_inf_μ = cs_error(update_rule, problem, data.μ)
+        cs_inf_μ = cs_error(update_rule, problem, options, data.μ)
         opt_err_μ = max(data.dual_inf, cs_inf_μ, data.primal_inf)
 
         (data.μ < options.optimality_tolerance) && (opt_err_μ < options.optimality_tolerance) && break
@@ -118,17 +118,31 @@ function primal_error(problem::ProblemData{T}) where T
     return primal_inf
 end
 
-function dual_error(update_rule::UpdateRuleData{T}) where T
+function dual_error(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
+                    options::Options{T}) where T
     Q̂u = update_rule.hamiltonian.gradient_control
-    Ns = length(Q̂u)
+    N = problem.horizon
+    bounds = problem.bounds
+    ϕ, zl, zu = dual_trajectories(problem, mode=:nominal)
+
+    num_ineq = 0
+    z_norm::T = 0.0
+    ϕ_norm::T = 0.0
+    num_constr = problem.constraints_data.num_constraints[1]
     dual_inf::T = 0     # dual infeasibility (stationarity of Lagrangian of barrier subproblem)
-    for t = Ns:-1:1
+    for t = N-1:-1:1
         dual_inf = max(dual_inf, norm(Q̂u[t], Inf))
+        z_norm += sum(zl[t])
+        z_norm += sum(zu[t])
+        ϕ_norm += norm(ϕ[t], 1)
+        num_ineq += bounds[t].num_lower + bounds[t].num_upper
     end
-    return dual_inf
+    scaling = max(options.s_max, (ϕ_norm + z_norm) / max(num_ineq + num_constr, 1.0))  / options.s_max
+    return dual_inf / scaling
 end
 
-function cs_error(update_rule::UpdateRuleData{T}, problem::ProblemData{T}, μ::T) where T
+function cs_error(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
+                    options::Options{T}, μ::T) where T
     u_tmp1 = update_rule.u_tmp1
     u_tmp2 = update_rule.u_tmp2
     N = problem.horizon
@@ -136,8 +150,11 @@ function cs_error(update_rule::UpdateRuleData{T}, problem::ProblemData{T}, μ::T
     _, _, _, il, iu = primal_trajectories(problem, mode=:nominal)
     _, zl, zu = dual_trajectories(problem, mode=:nominal)
 
+    num_ineq::T = 0
+    z_norm::T = 0
     cs_inf::T = 0     # dual infeasibility (stationarity of Lagrangian of barrier subproblem)
     for t = N-1:-1:1
+        num_ineq += bounds[t].num_lower + bounds[t].num_upper
         (bounds[t].num_upper == 0 && bounds[t].num_lower == 0) && continue
         
         u_tmp1[t] .= il[t] 
@@ -150,8 +167,11 @@ function cs_error(update_rule::UpdateRuleData{T}, problem::ProblemData{T}, μ::T
         u_tmp2[t] .-= μ
         replace!(u_tmp2[t], NaN=>0.0)
         cs_inf = max(cs_inf, norm(u_tmp2[t], Inf))
+        z_norm += sum(zl[t])
+        z_norm += sum(zu[t])
     end
-    return cs_inf
+    scaling = max(options.s_max, z_norm / max(num_ineq, 1.0))  / options.s_max
+    return cs_inf / scaling
 end
 
 function reset_duals!(problem::ProblemData{T}) where T
