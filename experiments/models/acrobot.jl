@@ -116,3 +116,24 @@ function implicit_contact_dynamics(model::DoublePendulum{T}, x, u, Δ, μ=0.0) w
     ]
 end
 
+function implicit_contact_dynamics_slack(model::DoublePendulum{T}, x, u, Δ) where T
+    nq = model.nq
+    nτ = model.nu
+    nc = model.nc
+
+    q⁻ = x[1:nq]
+    q = x[nq .+ (1:nq)]
+    q⁺ = u[nτ .+ (1:nq)]
+
+    τ = u[nτ]
+    λ = u[(nτ + nq) .+ (1:nc)]
+    s = u[(nτ + nq + nc) .+ (1:nc)]
+    sc = u[(nτ + nq + 2 * nc) .+ (1:nc)]
+
+    [
+        manipulator_fd(model, Δ , q⁻, q, q⁺, τ, λ);
+        (s .- ϕ_func(model, q⁺));
+        λ .* s - sc;
+    ]
+end
+
