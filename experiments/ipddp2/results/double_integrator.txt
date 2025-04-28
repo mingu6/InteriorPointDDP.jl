@@ -1,0 +1,2 @@
+ seed  iterations  status     objective           primal        wall (ms)   solver(ms)  
+  1        39       true    1.26574686e+00    3.85414367e-10      10.7          9.5  
