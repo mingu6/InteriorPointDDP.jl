@@ -19,7 +19,7 @@ visualise && include("../visualise/concar.jl")
 
 num_state = 4
 num_control = 2
-n_ocp = 50
+n_ocp = 500
 
 results = Vector{Vector{Any}}()
 
@@ -70,7 +70,6 @@ for seed = 1:n_ocp
 
     stage_cost = (x, u) -> begin
         J = 0.0
-        # J += Δ * dot(x - xN, x - xN)
         J += Δ * dot(u[1:2] .* [5.0, 1.0], u[1:2])
         return J
     end
@@ -122,7 +121,7 @@ for seed = 1:n_ocp
     end
     
     x1 = rand(T, num_state) .* T[0.0; 0.0; π / 2; 0.0]
-    ū = [[T(1e-1) .* (rand(T, num_control) .- 0.5); T(1e-2) * ones(T, num_obstacles)] for k = 1:N-1]
+    ū = [[zeros(T, num_control); T(1e-2) * ones(T, num_obstacles)] for k = 1:N-1]
 
     solve!(solver, x1, ū)
     

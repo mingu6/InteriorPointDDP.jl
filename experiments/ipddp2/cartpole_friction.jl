@@ -6,7 +6,7 @@ using MeshCat
 using Printf
 
 visualise = false
-benchmark = false
+benchmark = true
 verbose = true
 n_benchmark = 10
 
@@ -23,52 +23,70 @@ if visualise
 	render(vis)
 end
 
-xN = T[0.0; π; 0.0; 0.0]
-
-options = Options{T}(verbose=verbose)
+options = Options{T}(verbose=verbose, κ_ϵ=100.0, μ_init=10.0)
 
 results = Vector{Vector{Any}}()
 
 for seed = 1:n_ocp
     Random.seed!(seed)
 
-    cartpole = Cartpole{T}(2, 1,
-        T(0.8) + T(0.4) * rand(T),
-        T(0.2) + T(0.2) * rand(T),
-        T(0.4) + T(0.2) * rand(T),
-        T(9.81))
+    qN = T[0.0; π]
+
+    cartpole = Cartpole{T}(2, 1, 2,
+        T(0.9) + T(0.2) * rand(T),
+        T(0.15) + T(0.1) * rand(T),
+        T(0.45) + T(0.1) * rand(T),
+        T(9.81),
+        T(0.05) .+ T(0.1) * rand(T, 2))
 
     nq = cartpole.nq
     nF = cartpole.nu
+    nc = cartpole.nc
     nx = 2 * nq
-    nu = nF + nq  # torque and acceleration now decision variables/"controls"
+    nu = nF + nq + 6 * nc + 6
 
     # ## Dynamics - forward Euler
 
-    f = (x, u) -> x + Δ * [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]]
+    f = (x, u) -> [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]]
     cartpole_dyn = Dynamics(f, nx, nu)
     dynamics = [cartpole_dyn for k = 1:N-1]
 
     # ## Objective
 
-    stage = Objective((x, u) -> 0.1 * Δ * dot(u[1], u[1]), nx, nu)
-    objective = [
-        [stage for k = 1:N-1]...,
-        Objective((x, u) -> 100.0 * dot(x - xN, x - xN), nx, 0)
-    ] 
+    function stage_obj(x, u)
+		F = u[1]
+        s = u[(nF + nq + 6 * nc) .+ (1:6)]
+		J = 0.01 * Δ * F * F + 50. * dot(s, s)
+		return J
+	end
+
+	function term_obj(x, u)
+		J = 0.0 
+		
+		q⁻ = x[1:cartpole.nq] 
+		q = x[cartpole.nq .+ (1:cartpole.nq)] 
+		q̇ᵐ⁻ = (q - q⁻) ./ Δ
+
+		J += 200.0 * dot(q̇ᵐ⁻, q̇ᵐ⁻)
+		J += 700.0 * dot(q - qN, q - qN)
+		return J
+	end
+
+	stage = Objective(stage_obj, nx, nu)
+	objective = [[stage for k = 1:N-1]..., Objective(term_obj, nx, 0)]
 
     # ## Constraints
 
-    path_constr = Constraint((x, u) -> implicit_dynamics(cartpole, x, u) * Δ, nx, nu)
+    path_constr = Constraint((x, u) -> implicit_contact_dynamics_slack(cartpole, x, u, Δ), nx, nu)
 
     constraints = [path_constr for k = 1:N-1]
 
     # ## Bounds
 
-    limit = T(2.0) * rand(T) + T(4.0)  # bound is in [4, 6]
+    limit = T(10.0)
     bound = Bound(
-        [-limit * ones(T, nF); -T(Inf) * ones(T, nq)],
-        [limit * ones(T, nF); T(Inf) * ones(T, nq)]
+        [-limit * ones(T, nF); -T(Inf) * ones(T, nq); zeros(T, 6 * nc); -T(Inf) * ones(T, 6)],
+        [limit * ones(T, nF); T(Inf) * ones(T, nq); Inf * ones(T, 6 * nc); T(Inf) * ones(T, 6)]
     )
     bounds = [bound for k in 1:N-1]
 
@@ -77,8 +95,13 @@ for seed = 1:n_ocp
     
     # ## Initialise solver and solve
     
-    x1 = (rand(T, 4) .- T(0.5)) .* T[0.05, 0.05, 0.05, 0.05]
-    ū = [T(1.0e-2) * (rand(T, nu) .- T(0.5)) for k = 1:N-1]
+    q1 = zeros(T, 2)
+	q1_plus = zeros(T, 2)
+	x1 = [q1; q1_plus]
+
+    q_init = [zeros(T, 2) for k = 1:N-1]
+    ū = [[zeros(T, nF); q_init[k]; T(0.01) * rand(T, 6 * nc); T(0.01) * ones(T, 6)] for k = 1:N-1]
+
     solve!(solver, x1, ū)
 
     if benchmark
@@ -99,7 +122,7 @@ for seed = 1:n_ocp
 
     # ## Visualise solution
 
-    if visualise && seed == 1
+    if visualise && seed == n_ocp
         x_sol, u_sol = get_trajectory(solver)
         
         q_sol = [x[1:nq] for x in x_sol]
@@ -107,8 +130,7 @@ for seed = 1:n_ocp
     end
 end
 
-
-open("results/cartpole_inverse.txt", "w") do io
+open("results/cartpole_friction.txt", "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")
     for i = 1:n_ocp
         if benchmark

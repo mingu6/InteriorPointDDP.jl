@@ -6,7 +6,7 @@ using MeshCat
 using Printf
 
 visualise = false
-benchmark = false
+benchmark = true
 verbose = true
 n_benchmark = 10
 
@@ -15,7 +15,7 @@ T = Float64
 N = 76
 n_ocp = 500
 
-options = Options{Float64}(verbose=verbose, μ_init=0.1)
+options = Options{Float64}(verbose=verbose, μ_init=2.5)
 
 results = Vector{Vector{Any}}()
 
@@ -37,6 +37,8 @@ for seed = 1:n_ocp
     ]
     xyc = block_params[rand(1:length(block_params))]
 
+    obstacle = [T(0.2) + T(0.1) * (rand(T) - T(0.5)); T(0.2) + T(0.1) * (rand(T) - T(0.5)); T(0.05) + T(0.02) * (rand(T) - T(0.5))]
+
     zx = xyc[1]
     zy = xyc[2]
     c = xyc[3]  # ellipsoidal approximation ratio
@@ -45,8 +47,10 @@ for seed = 1:n_ocp
     μ_fric = T(0.2) + T(0.1) * (rand(T) - T(0.5)) # friction coefficient b/w pusher and slider
     force_lim = T(0.3)
     vel_lim = T(3.0)
+    r_push = T(0.01)
+    r_total = max(zx, zy) + r_push
 
-    nu = 9
+    nu = 10
     nx = 4
 
     # dynamics
@@ -81,6 +85,13 @@ for seed = 1:n_ocp
         Objective((x, u) -> 10.0 * dot(x - xN, x - xN), nx, 0),
     ]
 
+    # constraints
+
+    function obs_constr(x, u)
+        xdiff = x[1:2] - obstacle[1:2]
+        return (obstacle[3] + r_total)^2 - xdiff' * xdiff + u[10]
+    end
+
     function constr(x, u)
         [
         μ_fric * u[1] - u[2] - u[5];
@@ -88,6 +99,7 @@ for seed = 1:n_ocp
         u[5] * u[3] + u[7];
         u[6] * u[4] + u[8];
         x[4] - u[9];  # bound constraint on ϕ_t
+        obs_constr(x, u)
         ]
     end
 
@@ -96,8 +108,8 @@ for seed = 1:n_ocp
 
     # Bounds
 
-    bound = Bound(T[0.0, -force_lim, 0.0, 0.0, 0.0, 0.0, -Inf, -Inf, -0.9],
-                T[force_lim, force_lim, vel_lim, vel_lim, Inf, Inf, Inf, Inf, 0.9])
+    bound = Bound(T[0.0, -force_lim, 0.0, 0.0, 0.0, 0.0, -Inf, -Inf, -0.9, 0.0],
+                T[force_lim, force_lim, vel_lim, vel_lim, Inf, Inf, Inf, Inf, 0.9, Inf])
     bounds = [bound for k = 1:N-1]
 
     solver = Solver(Float64, dynamics, objective, constraints, bounds, options=options)
@@ -105,7 +117,7 @@ for seed = 1:n_ocp
         
     # ## Initialise solver and solve
     
-    ū = [1e-2 .* ones(T, nu) for k = 1:N-1]
+    ū = [0.01 .* ones(T, nu) for k = 1:N-1]
     solve!(solver, x1, ū)
 
     if benchmark
@@ -125,7 +137,7 @@ for seed = 1:n_ocp
 	end
 end
 
-open("results/pushing1.txt", "w") do io
+open("results/pushing_1_obs.txt", "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")
     for i = 1:length(results)
         if benchmark

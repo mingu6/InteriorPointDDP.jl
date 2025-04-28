@@ -26,7 +26,7 @@ end
 
 qN = T[π; 0.0]
 
-options = Options{T}(verbose=verbose, optimality_tolerance=1e-6, κ_ϵ=100.0, μ_init=10.0)
+options = Options{T}(verbose=verbose, κ_ϵ=100.0, μ_init=10.0)
 
 results = Vector{Vector{Any}}()
 
@@ -37,20 +37,20 @@ for seed = 1:n_ocp
 
 	acrobot_impact = DoublePendulum{T}(2, 1, 2,
 		T(0.9) + 0.2 * rand(T),
-		T(0.3) + 0.1 * rand(T), 
+		T(0.333), 
 		T(0.9) + 0.2 * rand(T),
-		T(0.4) + 0.2 * rand(T),
+		T(0.5),
 		T(0.9) + 0.2 * rand(T),
-		T(0.3) + 0.1 * rand(T), 
+		T(0.333), 
 		T(0.9) + 0.2 * rand(T),
-		T(0.4) + 0.2 * rand(T),
+		T(0.5),
 		9.81, 0.0, 0.0)
 
 	nq = acrobot_impact.nq
 	nc = acrobot_impact.nc
 	nτ = acrobot_impact.nu
 	nx = 2 * nq
-	nu = nτ + nq + 2 * nc
+	nu = nτ + nq + 3 * nc
 
 	# ## Dynamics - implicit variational integrator (midpoint)
 
@@ -61,7 +61,8 @@ for seed = 1:n_ocp
 
 	function stage_obj(x, u)
 		τ = u[1]
-		J = 0.01 * Δ * τ * τ
+		s = u[(nτ + nq + 2 * nc) .+ (1:nc)]
+		J = 0.01 * Δ * τ * τ + 50. * dot(s, s)
 		return J
 	end
 
@@ -73,7 +74,7 @@ for seed = 1:n_ocp
 		q̇ᵐ⁻ = (q - q⁻) ./ Δ
 
 		J += 200.0 * dot(q̇ᵐ⁻, q̇ᵐ⁻)
-		J += 500.0 * dot(q - qN, q - qN)
+		J += 700.0 * dot(q - qN, q - qN)
 		return J
 	end
 
@@ -82,17 +83,17 @@ for seed = 1:n_ocp
 
 	# ## Constraints
 
-	path_constr = Constraint((x, u) -> implicit_contact_dynamics(acrobot_impact, x, u, Δ),
-				nx, nu, indices_compl=[5, 6])
+	path_constr = Constraint((x, u) -> implicit_contact_dynamics_slack(acrobot_impact, x, u, Δ),
+				nx, nu)
 
 	constraints = [path_constr for k = 1:N-1]
 
 	# ## Bounds
 
-	limit = T(5.0) * rand(T) + T(10.0)
+	limit = T(8.0)
 	bound = Bound(
-		[-limit; -T(Inf) * ones(T, nq); zeros(T, nc); zeros(T, nc)],
-		[limit; T(Inf) * ones(T, nq); T(Inf) * ones(T, nc); T(Inf) * ones(T, nc)]
+		[-limit; -T(Inf) * ones(T, nq); zeros(T, nc); zeros(T, nc); -T(Inf) * ones(T, nc)],
+		[limit; T(Inf) * ones(T, nq); T(Inf) * ones(T, nc); T(Inf) * ones(T, 2 * nc)]
 	)
 	bounds = [bound for k in 1:N-1]
 
@@ -101,12 +102,12 @@ for seed = 1:n_ocp
 
 	# ## Initialise solver and solve
 	
-	q1 = 0.1 .* (rand(T, 2) .- 0.5)
-	q1_plus = 0.1 .* (rand(T, 2) .- 0.5)
+	q1 = zeros(T, 2)
+	q1_plus = zeros(T, 2)
 	x1 = [q1; q1_plus]
 
-	q_init = LinRange(q1, qN, N)[2:end]
-	ū = [[T(1.0e-1) * (rand(T, nτ) .- 0.5); q_init[k]; T(0.01) * ones(T, nc); T(0.01) * ones(T, nc)] for k = 1:N-1]
+	q_init = [zeros(T, 2) for k = 1:N-1]
+	ū = [[zeros(T, nτ); q_init[k]; T(0.01) * ones(T, nc); T(0.01) * ones(T, 2 * nc)] for k = 1:N-1]
 	solve!(solver, x1, ū)
 			
 	if benchmark
@@ -146,7 +147,6 @@ for seed = 1:n_ocp
 		visualize!(vis, acrobot_impact, q_sol, Δt=Δ);
 	end
 end
-
 
 open("results/acrobot_contact.txt", "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")

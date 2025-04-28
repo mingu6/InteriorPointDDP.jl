@@ -15,9 +15,9 @@ x1 = T[0.0; 0.0]
     
 num_state = 2  # position and velocity
 num_control = 3  # pushing force, 2x slacks for + and - components of abs work
-n_ocp = 500
+n_ocp = 1
 
-options = Options{T}(verbose=verbose)
+options = Options{T}(verbose=verbose, max_iterations=1000)
 
 results = Vector{Vector{Any}}()
 
@@ -33,8 +33,10 @@ for seed = 1:n_ocp
 
     # ## Objective
 
-    xN_y = T(1.0) + rand(T) * T(0.2)
-    xN_v = (rand(T) - T(0.5)) * T(0.2)
+    # xN_y = T(1.0) + rand(T) * T(0.2)
+    # xN_v = (rand(T) - T(0.5)) * T(0.2)
+    xN_y = T(1.0)
+    xN_v = T(0.0)
     xN = T[xN_y; xN_v]
 
     stage_cost = Objective((x, u) -> Δ * (u[2] + u[3]), 2, 3)
@@ -61,7 +63,7 @@ for seed = 1:n_ocp
     
     # ## Initialise solver and solve
     
-    ū = [T(1.0e-1) * rand(T, 3) for k = 1:N-1]
+    ū = [[0.01; 0.01; 0.01] for k = 1:N-1]
     solve!(solver, x1, ū)
 
     if benchmark
