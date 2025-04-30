@@ -189,7 +189,6 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
             V̂xx[t] .+= Q̂xx[t]
             V̂xx[t] .= Symmetric(V̂xx[t])
 
-
             # Vx = Q̂x + β' * Q̂u + [Q̂uu β + Q̂ux]^T α
             mul!(V̂x[t], transpose(β[t]), Q̂u[t])
             mul!(V̂x[t], transpose(ω[t]), h[t], 1.0, 1.0)
