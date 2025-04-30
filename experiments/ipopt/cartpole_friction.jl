@@ -9,6 +9,7 @@ using Printf
 visualise = false
 output = false
 benchmark = false
+bfgs = false
 n_benchmark = 10
 
 print_level = output ? 5 : 4
@@ -24,35 +25,63 @@ end
 
 Δ = 0.05
 N = 101
-n_ocp = 500
-
-xN = [0.0; π; 0.0; 0.0]
+n_ocp = 100
 
 results = Vector{Vector{Any}}()
 
 for seed = 1:n_ocp
     Random.seed!(seed)
 
-    model = Model(
-            optimizer_with_attributes(Ipopt.Optimizer, 
-                "print_level" => print_level, "print_timing_statistics" => "yes")
-            )
+    qN = [0.0; π]
 
-    cartpole = Cartpole{Float64}(2, 1,
-        0.8 + 0.4 * rand(),
-        0.2 + 0.2 * rand(),
-        0.4 + 0.2 * rand(),
-        9.81)
+    if bfgs
+        model = Model(
+                optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 1000,
+                    "nlp_scaling_method" => "none",
+                    "print_level" => print_level, "print_timing_statistics" => "yes",
+                    "hessian_approximation" => "limited-memory")
+                );
+    else
+        model = Model(
+                optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 1000,
+                    "nlp_scaling_method" => "none",
+                    "print_level" => print_level, "print_timing_statistics" => "yes")
+                );
+    end
+
+    cartpole = Cartpole{Float64}(2, 1, 2,
+        0.9 + 0.2 * rand(),
+        0.15 + 0.1 * rand(),
+        0.45 + 0.1 * rand(),
+        9.81,
+        0.05 .+ 0.1 * rand(2))
 
     nq = cartpole.nq
     nF = cartpole.nu
+    nc = cartpole.nc
     nx = 2 * nq
-    nu = nF + nq
+    nu = nF + nq + 6 * nc + 6
 
     # ## Objective
 
-    stage_obj = (x, u) -> 0.1 * Δ * u[1] * u[1]
-    term_obj = (x, u) -> 100. * (x - xN)' * (x - xN)
+    function stage_obj(x, u)
+		F = u[1]
+        s = u[(nF + nq + 6 * nc) .+ (1:6)]
+		J = 0.01 * Δ * F * F + 2. * sum(s)
+		return J
+	end
+
+    function term_obj(x, u)
+		J = 0.0 
+		
+		q⁻ = x[1:cartpole.nq] 
+		q = x[cartpole.nq .+ (1:cartpole.nq)] 
+		q̇ᵐ⁻ = (q - q⁻) ./ Δ
+
+		J += 200.0 * q̇ᵐ⁻' * q̇ᵐ⁻
+		J += 700.0 * (q - qN)' * (q - qN)
+		return J
+	end
 
     cost = (x, u) -> begin
         J = 0.0
@@ -65,19 +94,22 @@ for seed = 1:n_ocp
 
     # ## Dynamics - forward Euler
 
-    f = (x, u) -> x + Δ * [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]]  # forward Euler
-    dyn_con = (x, u) -> implicit_dynamics(cartpole, x, u)
+    f = (x, u) -> [x[nq .+ (1:nq)]; u[nF .+ (1:nq)]]  # forward Euler
+    dyn_con = (x, u) -> implicit_contact_dynamics_slack(cartpole, x, u, Δ)
 
     # ## Constraints
 
     @variable(model, x[1:N, 1:nx]);
     @variable(model, u[1:N-1, 1:nu]);
 
-    limit = 2.0 * rand() + 4.0  # bound is in [8, 12]
+    limit = 10.0
     for t = 1:N-1
         for i = 1:nF
             set_lower_bound(u[t, i], -limit)
             set_upper_bound(u[t, i], limit)
+        end
+        for i = nF + nq .+ (1:6*nc+6)
+            set_lower_bound(u[t, i], 0.0)
         end
     end
 
@@ -90,9 +122,13 @@ for seed = 1:n_ocp
     
     # ## Initialise variables and solve
     
-    x1 = (rand(4) .- 0.5) .* [0.05, 0.05, 0.05, 0.05]
+    q1 = zeros(2)
+	q1_plus = zeros(2)
+	x1 = [q1; q1_plus]
     fix.(x[1, :], x1, force = true)
-    ū = [1.0e-2 * (rand(nu) .- 0.5) for k = 1:N-1]
+
+    q_init = [zeros(2) for k = 1:N-1]
+    ū = [[zeros(nF); q_init[k]; 0.01 * ones(6 * nc); 0.01 * ones(6)] for k = 1:N-1]
     
     x̄ = [x1]
     for k in 2:N
@@ -140,7 +176,8 @@ for seed = 1:n_ocp
     end
 end
 
-open("results/cartpole_inverse.txt", "w") do io
+fname = bfgs ? "results/bfgs_cartpole_friction.txt" : "results/cartpole_friction.txt"
+open(fname, "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")
     for i = 1:n_ocp
         if benchmark

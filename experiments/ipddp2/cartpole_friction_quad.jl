@@ -6,7 +6,7 @@ using MeshCat
 using Printf
 
 visualise = false
-benchmark = false
+benchmark = true
 verbose = true
 n_benchmark = 10
 
@@ -26,7 +26,6 @@ end
 options = Options{T}(verbose=verbose, μ_init=0.2)
 
 results = Vector{Vector{Any}}()
-params = Vector{Vector{T}}()
 
 for seed = 1:n_ocp
     Random.seed!(seed)
@@ -57,7 +56,7 @@ for seed = 1:n_ocp
     function stage_obj(x, u)
 		F = u[1]
         s = u[(nF + nq + 6 * nc) .+ (1:6)]
-		J = 0.01 * Δ * F * F + sum(s)
+		J = 0.01 * Δ * F * F + 50. * dot(s, s)
 		return J
 	end
 
@@ -86,7 +85,7 @@ for seed = 1:n_ocp
 
     limit = T(10.0)
     bound = Bound(
-        [-limit * ones(T, nF); -T(Inf) * ones(T, nq); zeros(T, 6 * nc); zeros(T, 6)],
+        [-limit * ones(T, nF); -T(Inf) * ones(T, nq); zeros(T, 6 * nc); -T(Inf) * ones(T, 6)],
         [limit * ones(T, nF); T(Inf) * ones(T, nq); Inf * ones(T, 6 * nc); T(Inf) * ones(T, 6)]
     )
     bounds = [bound for k in 1:N-1]
@@ -121,8 +120,6 @@ for seed = 1:n_ocp
         push!(results, [seed, solver.data.k, solver.data.status, solver.data.objective, solver.data.primal_inf])
     end
 
-    push!(params, [cartpole.mc, cartpole.mp, cartpole.l, cartpole.friction[1], cartpole.friction[2]])
-
     # ## Visualise solution
 
     if visualise && seed == n_ocp
@@ -133,7 +130,7 @@ for seed = 1:n_ocp
     end
 end
 
-open("results/cartpole_friction.txt", "w") do io
+open("results/cartpole_friction_quad.txt", "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")
     for i = 1:n_ocp
         if benchmark
@@ -144,11 +141,3 @@ open("results/cartpole_friction.txt", "w") do io
         end
     end
 end
-
-# save parameters of each experiment for ProxDDP comparison
-open("params/cartpole_friction.txt", "w") do io
-    for i = 1:n_ocp
-        println(io, join(string.(params[i]), " "))
-    end
-end
-
