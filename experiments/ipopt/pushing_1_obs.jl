@@ -8,6 +8,7 @@ using Printf
 
 output = false
 benchmark = false
+bfgs = false
 n_benchmark = 10
 
 print_level = output ? 5 : 4
@@ -15,8 +16,7 @@ print_level = output ? 5 : 4
 Δ = 0.04
 N = 76
 
-x1 = [0.0, 0.0, 0.0, 0.0]
-n_ocp = 500
+n_ocp = 100
 
 results = Vector{Vector{Any}}()
 
@@ -25,23 +25,50 @@ include("ipopt_parse.jl")
 for seed = 1:n_ocp
     Random.seed!(seed)
 
-    model = Model(
-        optimizer_with_attributes(Ipopt.Optimizer,
-            "print_level" => print_level, "print_timing_statistics" => "yes"
-            )
-        );
+    if bfgs
+        model = Model(
+                optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 1000,
+                    "nlp_scaling_method" => "none",
+                    "print_level" => print_level, "print_timing_statistics" => "yes",
+                    "hessian_approximation" => "limited-memory")
+                );
+    else
+        model = Model(
+                optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 1000,
+                    "nlp_scaling_method" => "none",
+                    "print_level" => print_level, "print_timing_statistics" => "yes")
+                );
+    end
 
-    xl = 0.07 + (rand() - 0.5) * 0.02
-    xr = 0.12 + (rand() - 0.5) * 0.03
-    c = 0.03711 + 0.01 * (rand() - 0.5)  # ellipsoidal approximation ratio
+    x1 = [0.0, 0.0, 0.0, 0.0]
+    
+    block_params = [
+        [0.07; 0.12; 0.03711],
+        [0.06; 0.12; 0.0355938],
+        [0.08; 0.12; 0.0387237],
+        [0.07; 0.13; 0.0393039],
+        [0.06; 0.13; 0.0378424],
+        [0.08; 0.13; 0.0366212],
+        [0.07; 0.11; 0.0349493],
+        [0.06; 0.11; 0.0333738],
+        [0.08; 0.11; 0.0408633]
+    ]
+    xyc = block_params[rand(1:length(block_params))]
+
+    obstacle = [0.2 + 0.1 * (rand() - 0.5); 0.2 + 0.1 * (rand() - 0.5); 0.05 + 0.02 * (rand() - 0.5)]
+
+    zx = xyc[1]
+    zy = xyc[2]
+    c = xyc[3]  # ellipsoidal approximation ratio
 
     xN = [0.3, 0.4, 1.5 * pi, 0.0]
-    μ_fric = 0.2 + 0.05 * (rand() - 0.5) # friction coefficient b/w pusher and slider
-    force_lim = 0.3 + 0.1 * (rand() - 0.5)
-    vel_lim = 3.0 + rand()
-    r_push = 0.01 + 0.005 * (rand() - 0.5)
+    μ_fric = 0.2 + 0.1 * (rand() - 0.5) # friction coefficient b/w pusher and slider
+    force_lim = 0.3
+    vel_lim = 3.0
+    r_push = 0.01
+    r_total = max(zx, zy) + r_push
 
-    nu = 9
+    nu = 11
     nx = 4
 
     @variable(model, x[1:N, 1:nx]);
@@ -49,8 +76,8 @@ for seed = 1:n_ocp
 
     # ## control limits
 
-    ul = [0.0, -force_lim, 0.0, 0.0, 0.0, 0.0, -Inf, -Inf, -0.9]
-    uu = [force_lim, force_lim, vel_lim, vel_lim, Inf, Inf, Inf, Inf, 0.9]
+    ul = [0.0, -force_lim, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.9, 0.0, 0.0]
+    uu = [force_lim, force_lim, vel_lim, vel_lim, Inf, Inf, Inf, Inf, 0.9, Inf, Inf]
 
     for t = 1:N-1
         for i = 1:nu
@@ -72,7 +99,7 @@ for seed = 1:n_ocp
     L = [1.0; 1.0; c^(-2)]
 
     function Jc(ϕ)
-        return [[1.0; 0.0] [0.0; 1.0] [xl / 2 * tan(ϕ); -xl / 2]]
+        return [[1.0; 0.0] [0.0; 1.0] [zx / 2 * tan(ϕ); -zx / 2]]
     end
 
     function fc(x, u)
@@ -85,30 +112,36 @@ for seed = 1:n_ocp
         return x + Δ .* fc(x, u)
     end
 
+    function obs_constr(x, u)
+        xdiff = x[1:2] - obstacle[1:2]
+        return (obstacle[3] + r_total)^2 - xdiff' * xdiff + u[10] - u[11]
+    end
+
     function constr(x, u)
         [
         μ_fric * u[1] - u[2] - u[5];
         μ_fric * u[1] + u[2] - u[6];
-        u[5] * u[3] + u[7];
-        u[6] * u[4] + u[8];
-        f(x, u)[4] - u[9]  # bound constraint on ϕ_t
+        u[5] * u[3] - u[7];
+        u[6] * u[4] - u[8];
+        x[4] - u[9]  # bound constraint on ϕ_t
+        obs_constr(x, u)
         ]
     end
 
     for k = 1:N-1
         @constraint(model, x[k+1, :] == f(x[k, :], u[k, :]))
-        @constraint(model, constr(x[k, :], u[k, :]) == zeros(5))
+        @constraint(model, constr(x[k, :], u[k, :]) == zeros(6))
     end
 
     # objective
 
     stage_cost = (x, u) -> begin
         J = 0.0
-        J += 1e-2 * u[1:2]' * u[1:2] + 50. * u[7:8]' * u[7:8]
+        J += 1e-2 * u[1:2]' * u[1:2] + 2. * sum(u[7:8]) + 2. * u[11]
         return J
     end
 
-    term_cost = x -> 10. * (x - xN)' * (x - xN)
+    term_cost = x -> 20. * (x - xN)' * (x - xN)
 
     function cost(x, u)
         J = 0.0
@@ -125,7 +158,7 @@ for seed = 1:n_ocp
     fix.(x[1, :], x1, force = true)
     
     xs_init = LinRange(x1, xN, N)[2:end]
-    ū = [[0.1 * rand(); 0.1 * (rand() - 0.5); 1e-2 .* ones(7)] for k = 1:N-1]
+    ū = [1e-2 .* ones(nu) for k = 1:N-1]
     
     x̄ = [x1]
     for k in 2:N
@@ -165,7 +198,8 @@ for seed = 1:n_ocp
     end
 end
 
-open("results/pushing.txt", "w") do io
+fname = bfgs ? "results/bfgs_pushing_1_obs.txt" : "results/pushing_1_obs.txt"
+open(fname, "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")
     for i = 1:n_ocp
         if benchmark

@@ -13,11 +13,12 @@ n_benchmark = 10
 T = Float64
 Δ = 0.04
 N = 76
-n_ocp = 500
+n_ocp = 100
 
-options = Options{Float64}(verbose=verbose, μ_init=2.5)
+options = Options{Float64}(verbose=verbose, μ_init=0.2)
 
 results = Vector{Vector{Any}}()
+params = Vector{Vector{T}}()
 
 for seed = 1:n_ocp
 	Random.seed!(seed)
@@ -50,7 +51,7 @@ for seed = 1:n_ocp
     r_push = T(0.01)
     r_total = max(zx, zy) + r_push
 
-    nu = 10
+    nu = 11
     nx = 4
 
     # dynamics
@@ -79,25 +80,25 @@ for seed = 1:n_ocp
 
     # objective
 
-    stage_objective = Objective((x, u) -> 1e-2 * dot(u[1:2], u[1:2]) + 50. * dot(u[7:8], u[7:8]), nx, nu)
+    stage_objective = Objective((x, u) -> 1e-2 * dot(u[1:2], u[1:2]) + 2. * sum(u[7:8]) + 2. * sum(u[11]), nx, nu)
     objective = [
         [stage_objective for k = 1:N-1]...,
-        Objective((x, u) -> 10.0 * dot(x - xN, x - xN), nx, 0),
+        Objective((x, u) -> 20.0 * dot(x - xN, x - xN), nx, 0),
     ]
 
     # constraints
 
     function obs_constr(x, u)
         xdiff = x[1:2] - obstacle[1:2]
-        return (obstacle[3] + r_total)^2 - xdiff' * xdiff + u[10]
+        return (obstacle[3] + r_total)^2 - xdiff' * xdiff + u[10] - u[11]
     end
 
     function constr(x, u)
         [
         μ_fric * u[1] - u[2] - u[5];
         μ_fric * u[1] + u[2] - u[6];
-        u[5] * u[3] + u[7];
-        u[6] * u[4] + u[8];
+        u[5] * u[3] - u[7];
+        u[6] * u[4] - u[8];
         x[4] - u[9];  # bound constraint on ϕ_t
         obs_constr(x, u)
         ]
@@ -108,8 +109,8 @@ for seed = 1:n_ocp
 
     # Bounds
 
-    bound = Bound(T[0.0, -force_lim, 0.0, 0.0, 0.0, 0.0, -Inf, -Inf, -0.9, 0.0],
-                T[force_lim, force_lim, vel_lim, vel_lim, Inf, Inf, Inf, Inf, 0.9, Inf])
+    bound = Bound(T[0.0, -force_lim, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.9, 0.0, 0.0],
+                T[force_lim, force_lim, vel_lim, vel_lim, Inf, Inf, Inf, Inf, 0.9, Inf, Inf])
     bounds = [bound for k = 1:N-1]
 
     solver = Solver(Float64, dynamics, objective, constraints, bounds, options=options)
@@ -135,6 +136,8 @@ for seed = 1:n_ocp
 	else
 		push!(results, [seed, solver.data.k, solver.data.status, solver.data.objective, solver.data.primal_inf])
 	end
+
+    push!(params, [xyc; μ_fric; obstacle])
 end
 
 open("results/pushing_1_obs.txt", "w") do io
@@ -149,3 +152,9 @@ open("results/pushing_1_obs.txt", "w") do io
     end
 end
 
+# save parameters of each experiment for ProxDDP comparison
+open("params/pushing_1_obs.txt", "w") do io
+    for i = 1:n_ocp
+        println(io, join(string.(params[i]), " "))
+    end
+end

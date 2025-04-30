@@ -1,0 +1,210 @@
+import numpy as np
+
+import aligator
+from aligator import constraints, dynamics, manifolds
+import casadi as cs
+
+dt = 0.04
+force_lim = 0.3
+vel_lim = 3.0
+r_push = 0.01
+
+nx = 4
+nu = 9
+N = 76
+
+tol = 1e-5
+mu_init = 0.01
+
+verbose = aligator.VerboseLevel.VERBOSE
+solver = aligator.SolverProxDDP(tol, mu_init, verbose=verbose)
+solver.max_iters = 500
+solver.reg_min = 1e-5
+
+res = []
+
+with open("../ipddp2/params/pushing_1_obs.txt", 'r') as file:
+    for exper_ind, line in enumerate(file):
+        params = [float(num_str) for num_str in line.split()]
+        zx, zy, c, mu_fric = params[:4]
+        obstacle = params[4:]
+        r_total = max(zx, zy) + r_push
+
+        class Constraint(aligator.StageFunction):
+            def __init__(self) -> None:
+                super().__init__(nx, nu, 4)
+                u = cs.SX.sym('u', nu)
+                f = cs.vertcat(
+                    mu_fric * u[0] - u[1] - u[4],
+                    mu_fric * u[0] + u[1] - u[5],
+                    u[4] * u[2] - u[6],
+                    u[5] * u[3] - u[7]
+                )
+                Ju = cs.jacobian(f, u)
+                self.f = cs.Function('f', [u], [f])
+                self.Ju = cs.Function('Ju', [u], [Ju])
+
+            def evaluate(self, x, u, data):
+                data.value[:] = self.f(u).toarray()[:, 0]
+
+            def computeJacobians(self, x, u, data):
+                data.Jx[:, :] = 0.0
+                data.Ju[:] = self.Ju(u).toarray()
+
+
+        class NonNeg(aligator.StageFunction):
+            def __init__(self) -> None:
+                super().__init__(nx, nu, 6)
+                x = cs.SX.sym('x', nx)
+                u = cs.SX.sym('u', nu)
+                obs = (obstacle[2] + r_total) ** 2 - cs.sumsqr(x[:2] - obstacle[:2]) - u[8]
+                self.obs = cs.Function('obs', [x, u], [obs])
+                Jx = cs.jacobian(obs, x)
+                Ju = cs.jacobian(obs, u)
+                self.Ju = cs.Function('Ju', [x, u], [Ju])
+                self.Jx = cs.Function('Jx', [x, u], [Jx])
+
+            def evaluate(self, x, u, data):
+                data.value[:5] = -u[4:]
+                data.value[5] = self.obs(x, u)
+
+            def computeJacobians(self, x, u, data):
+                data.Jx[:, :] = self.Jx(x, u).toarray()
+                for i in range(5):
+                    data.Ju[i, 4+i] = -1.0
+                data.Ju[5, :] = self.Ju(x, u).toarray()
+
+
+        class Limit(aligator.StageFunction):
+            def __init__(self) -> None:
+                super().__init__(nx, nu, 5)
+
+            def evaluate(self, x, u, data):
+                data.value[:4] = u[:4]
+                data.value[4] = x[3]
+
+            def computeJacobians(self, x, u, data):
+                data.Ju[:, :] = 0.0
+                data.Jx[:, :] = 0.0
+                data.Jx[4, 3] = 1.0
+                for i in range(4):
+                    data.Ju[i, i] = 1.0
+
+
+        class Dynamics(dynamics.ODEAbstract):
+            def __init__(self) -> None:
+                space = manifolds.VectorSpace(nx)
+                super().__init__(space, nu)
+                self.L = np.array([1.0, 1.0, c ** -2.0])
+                x = cs.SX.sym('x', nx)
+                u = cs.SX.sym('u', nu)
+
+                R = cs.SX(3, 3)
+                R[0, 0] = cs.cos(x[2])
+                R[0, 1] = -cs.sin(x[2])
+                R[1, 0] = cs.sin(x[2])
+                R[1, 1] = cs.cos(x[2])
+                R[2, 2] = 1.0
+
+                Jc = cs.SX(2, 3)
+                Jc[0, 0] = 1.0
+                Jc[0, 2] = 0.5 * zx * cs.tan(x[3])
+                Jc[1, 1] = 1.0
+                Jc[1, 2] = -0.5 * zx
+
+                xdot = cs.vertcat(R @ (self.L * (Jc.T @ u[:2])), u[2] - u[3])
+                self.xdot = cs.Function('xdot', [x, u], [xdot])
+
+                Jx = cs.jacobian(xdot, x)
+                Ju = cs.jacobian(xdot, u)
+                self.Jx = cs.Function('Jx', [x, u], [Jx])
+                self.Ju = cs.Function('Ju', [x, u], [Ju])
+
+            def forward(self, x, u, data):
+                data.xdot[:] = self.xdot(x, u).toarray()[:, 0]
+
+            def dForward(self, x, u, data):
+                data.Ju[:, :] = self.Ju(x, u).toarray()
+                data.Jx[:, :] = self.Jx(x, u).toarray()
+
+
+        class Cost(aligator.CostAbstract):
+            def __init__(self):
+                space = manifolds.VectorSpace(nx)
+                super().__init__(space, nu)
+
+            def evaluate(self, x, u, data):
+                data.value = 1e-2 * np.dot(u[:2], u[:2]) + 2.0 * np.sum(u[6:])
+
+            def computeGradients(self, x, u, data):
+                data.Lu[:] = 0.0
+                data.Lu[:2] = 2e-2 * u[:2]
+                data.Lu[6:] = 2.0
+
+            def computeHessians(self, x, u, data):
+                data.Lxx[:, :] = 0.0
+                data.Lxu[:, :] = 0.0
+                data.Luu[:, :] = 0.0
+                data.Luu[:, :] = np.diag([2e-2, 2e-2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+
+
+        x0 = np.zeros(nx)
+        x_tar = np.array([0.3, 0.4, 1.5 * np.pi, 0.0])
+        wterm = np.array([20.0, 20.0, 20.0, 20.0])
+        space = manifolds.VectorSpace(nx)
+
+        term_cost = aligator.QuadraticStateCost(space, nu, x_tar, 2 * np.diag(wterm))
+        problem = aligator.TrajOptProblem(x0, nu, space, term_cost=term_cost)
+        dynmodelc = Dynamics()
+        dynmodel = dynamics.IntegratorEuler(dynmodelc, dt)
+
+        # bound constraint
+
+        rcost = Cost()
+        constr = Constraint()
+        nonneg = NonNeg()
+        limit = Limit()
+
+        for i in range(N-1):
+            stage = aligator.StageModel(rcost, dynmodel)
+            stage.addConstraint(constr, constraints.EqualityConstraintSet())
+            stage.addConstraint(nonneg, constraints.NegativeOrthant())
+            stage.addConstraint(limit, constraints.BoxConstraint(
+                np.array([0.0, -force_lim, 0.0, 0.0, -0.9]),
+                np.array([force_lim, force_lim, vel_lim, vel_lim, 0.9]))
+                )
+            problem.addStage(stage)
+
+        us_init = [0.01 * np.ones(nu)] * (N-1)
+        xs_init = aligator.rollout(dynmodel, x0, us_init)
+
+        solver.setup(problem)
+        solver.run(problem, xs_init, us_init)
+
+        results = solver.results
+
+        converged = 'true' if results.conv else 'false'
+        res.append([str(exper_ind+1), str(results.num_iters), converged,
+                    str(results.traj_cost), str(results.primal_infeas)])
+        if exper_ind == 30:
+            break
+
+iters = 0
+cost = 0.0
+viol = 0.0
+succ = 0
+for r in res:
+    iters += int(r[1])
+    cost += float(r[3])
+    viol += float(r[4])
+    if r[2] == 'true':
+        succ += 1
+
+print("Average number of iterations: ", iters / len(res))
+print("Average cost: ", cost / len(res))
+print("Average violation: ", viol / len(res))
+print("Successes: ", succ)
+
+with open("results/pushing_1_obs.txt", 'w') as file:
+    for line in res:
+        file.write(f"{' '.join(line)}\n")
