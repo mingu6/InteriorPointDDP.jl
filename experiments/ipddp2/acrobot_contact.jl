@@ -26,9 +26,10 @@ end
 
 qN = T[π; 0.0]
 
-options = Options{T}(verbose=verbose, κ_ϵ=100.0, μ_init=10.0)
+options = Options{T}(verbose=verbose, μ_init=0.2)
 
 results = Vector{Vector{Any}}()
+params = Vector{Vector{T}}()
 
 for seed = 1:n_ocp
 	Random.seed!(seed)
@@ -62,7 +63,7 @@ for seed = 1:n_ocp
 	function stage_obj(x, u)
 		τ = u[1]
 		s = u[(nτ + nq + 2 * nc) .+ (1:nc)]
-		J = 0.01 * Δ * τ * τ + 50. * dot(s, s)
+		J = 0.01 * Δ * τ * τ + 2. * sum(s)
 		return J
 	end
 
@@ -92,7 +93,7 @@ for seed = 1:n_ocp
 
 	limit = T(8.0)
 	bound = Bound(
-		[-limit; -T(Inf) * ones(T, nq); zeros(T, nc); zeros(T, nc); -T(Inf) * ones(T, nc)],
+		[-limit; -T(Inf) * ones(T, nq); zeros(T, nc); zeros(T, nc); zeros(T, nc)],
 		[limit; T(Inf) * ones(T, nq); T(Inf) * ones(T, nc); T(Inf) * ones(T, 2 * nc)]
 	)
 	bounds = [bound for k in 1:N-1]
@@ -126,6 +127,9 @@ for seed = 1:n_ocp
 		push!(results, [seed, solver.data.k, solver.data.status, solver.data.objective, solver.data.primal_inf])
 	end
 
+	push!(params, T[acrobot_impact.m1, acrobot_impact.I1, acrobot_impact.l1, acrobot_impact.lc1,
+				acrobot_impact.m2, acrobot_impact.I2, acrobot_impact.l2, acrobot_impact.lc2])
+
 	# ## Plot solution
 	if seed == 1
 		x_sol, u_sol = get_trajectory(solver)
@@ -157,5 +161,12 @@ open("results/acrobot_contact.txt", "w") do io
         else
             @printf(io, " %2s     %5s      %5s    %.8e    %.8e \n",  Int64(results[i][1]), Int64(results[i][2]), Int64(results[i][3]) == 0, results[i][4], results[i][5])
         end
+    end
+end
+
+# save parameters of each experiment for ProxDDP comparison
+open("params/acrobot_contact.txt", "w") do io
+    for i = 1:n_ocp
+        println(io, join(string.(params[i]), " "))
     end
 end

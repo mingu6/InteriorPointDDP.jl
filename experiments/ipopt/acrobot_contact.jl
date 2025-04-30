@@ -10,13 +10,14 @@ using LaTeXStrings
 visualise = false
 output = false
 benchmark = false
+bfgs = false
 n_benchmark = 10
 
 print_level = output ? 5 : 4
 
 Δ = 0.05
 N = 101
-n_ocp = 500
+n_ocp = 100
 
 include("../models/acrobot.jl")
 include("ipopt_parse.jl")
@@ -30,8 +31,6 @@ end
 qN = [π; 0.0]
 xN = [qN; qN]
 
-n_ocp = 500
-
 results = Vector{Vector{Any}}()
 
 for seed = 1:n_ocp
@@ -39,25 +38,35 @@ for seed = 1:n_ocp
 
 	acrobot_impact = DoublePendulum{Float64}(2, 1, 2,
 		0.9 + 0.2 * rand(),
-		0.3 + 0.1 * rand(), 
+		0.333, 
 		0.9 + 0.2 * rand(),
-		0.4 + 0.2 * rand(),
+		0.5,
 		0.9 + 0.2 * rand(),
-		0.3 + 0.1 * rand(), 
+		0.333, 
 		0.9 + 0.2 * rand(),
-		0.4 + 0.2 * rand(),
+		0.5,
 		9.81, 0.0, 0.0)
 
 	nq = acrobot_impact.nq
 	nc = acrobot_impact.nc
 	nτ = acrobot_impact.nu
 	nx = 2 * nq
-	nu = nτ + nq + 2 * nc
+	nu = nτ + nq + 3 * nc
 
-	model = Model(
-		optimizer_with_attributes(Ipopt.Optimizer, "tol" => 1e-6,
-			"print_level" => print_level, "print_timing_statistics" => "yes")
-		);
+	if bfgs
+        model = Model(
+                optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 1000,
+					"nlp_scaling_method" => "none",
+                    "print_level" => print_level, "print_timing_statistics" => "yes",
+                    "hessian_approximation" => "limited-memory")
+                );
+    else
+        model = Model(
+                optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 1000,
+					"nlp_scaling_method" => "none",
+                    "print_level" => print_level, "print_timing_statistics" => "yes")
+                );
+    end
 
 	f = (x, u) -> [x[nq .+ (1:nq)]; u[nτ .+ (1:nq)]]
 
@@ -65,7 +74,8 @@ for seed = 1:n_ocp
 
 	function stage_obj(x, u)
 		τ = u[1]
-		J = 0.01 * Δ * τ * τ
+		s = u[(nτ + nq + 2 * nc) .+ (1:nc)]
+		J = 0.01 * Δ * τ * τ + 2. * (s[1] + s[2])
 		return J
 	end
 
@@ -77,7 +87,7 @@ for seed = 1:n_ocp
 		q̇ᵐ⁻ = (q - q⁻) ./ Δ
 
 		J += 200.0 * q̇ᵐ⁻' * q̇ᵐ⁻
-		J += 500.0 * (q - qN)' * (q - qN)
+		J += 700.0 * (q - qN)' * (q - qN)
 		return J
 	end
 
@@ -91,16 +101,16 @@ for seed = 1:n_ocp
 
 	# ## Constraints
 
-	constr = (x, u) -> implicit_contact_dynamics(acrobot_impact, x, u, Δ, 1e-7)
+	constr = (x, u) -> implicit_contact_dynamics_slack(acrobot_impact, x, u, Δ)
 
 	@variable(model, x[1:N, 1:nx]);
 	@variable(model, u[1:N-1, 1:nu]);
 
-	limit = 5.0 * rand() + 10.0  # bound is in [10, 15]
+	limit = 8.0
 	for t = 1:N-1
 		set_lower_bound(u[t, 1], -limit)
 		set_upper_bound(u[t, 1], limit)
-		for i = (nτ + nq) .+ (1:2*nc)
+		for i = (nτ + nq) .+ (1:3*nc)
 			set_lower_bound(u[t, i], 0.0)
 		end
 	end
@@ -108,8 +118,8 @@ for seed = 1:n_ocp
 	@objective(model, Min, cost(x, u))
 
 
-	q1 = 0.1 .* (rand(2) .- 0.5)
-	q1_plus = 0.1 .* (rand(2) .- 0.5)
+	q1 = zeros(2)
+	q1_plus = zeros(2)
 	x1 = [q1; q1_plus]
 	fix.(x[1, :], x1, force = true)
 	for k = 1:N-1
@@ -119,9 +129,8 @@ for seed = 1:n_ocp
 	
 	# ## Initialise variables and solve
 	
-	q1 = 0.1 .* (rand(2) .- 0.5)
-	q_init = LinRange(q1, qN, N)[2:end]
-	ū = [[1.0e-1 * (rand(nτ) .- 0.5); q_init[k]; 0.01 * ones(nc); 0.01 * ones(nc)] for k = 1:N-1]
+	q_init = [zeros(2) for k = 1:N-1]
+	ū = [[zeros(nτ); q_init[k]; 0.01 * ones(nc); 0.01 * ones(2 * nc)] for k = 1:N-1]
 	
 	x̄ = [x1]
 	for k in 2:N
@@ -162,7 +171,7 @@ for seed = 1:n_ocp
 	end
 
 	# ## Plot solution
-	if seed == 1
+	if seed == n_ocp
 		xv = value.(x)
 		x_sol = [xv[k, :] for k in 1:N]
 		uv = value.(u)
@@ -181,13 +190,14 @@ for seed = 1:n_ocp
 
 	# ## Visualise trajectory using MeshCat
 
-	if visualise && seed == 1
+	if visualise && seed == n_ocp
 		q_sol = state_to_configuration(x_sol)
 		visualize!(vis, acrobot_impact, q_sol, Δt=Δ);
 	end
 end
 
-open("results/acrobot_contact.txt", "w") do io
+fname = bfgs ? "results/bfgs_acrobot_contact.txt" : "results/acrobot_contact.txt"
+open(fname, "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")
     for i = 1:n_ocp
         if benchmark
