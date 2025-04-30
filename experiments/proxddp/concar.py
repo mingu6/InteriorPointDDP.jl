@@ -12,7 +12,7 @@ dt = 0.05
 r_car = 0.02
 
 tol = 1e-6
-mu_init = 0.1
+mu_init = 0.05
 
 verbose = aligator.VerboseLevel.VERBOSE
 solver = aligator.SolverProxDDP(tol, mu_init, verbose=verbose)
@@ -21,9 +21,8 @@ solver.reg_min = 1e-5
 
 res = []
 
-exper_ind = 0
 with open("../ipddp2/params/concar.txt", 'r') as file:
-    for line in file:
+    for exper_ind, line in enumerate(file):
         params = [float(num_str) for num_str in line.split()]
         F_lim, tau_lim = params[:2]
         obs_1 = params[2:5]
@@ -45,7 +44,7 @@ with open("../ipddp2/params/concar.txt", 'r') as file:
                     np.array(obs_4)
                 ]
 
-                obs_constr = [(obs[i][2] + r_car) ** 2 - cs.sumsqr(x[:2] - obs[i][:2]) + u[2+i] for i in range(4)]
+                obs_constr = [(obs[i][2] + r_car) ** 2 - cs.sumsqr(x[:2] - obs[i][:2]) - u[2+i] for i in range(4)]
                 obs_constr_ = cs.vertcat(*obs_constr)
 
                 Jx = cs.jacobian(obs_constr_, x)
@@ -110,11 +109,35 @@ with open("../ipddp2/params/concar.txt", 'r') as file:
                 for i in range(4):
                     data.Ju[i, 2+i] = -1.0
 
+
+        class Cost(aligator.CostAbstract):
+            def __init__(self):
+                space = manifolds.VectorSpace(nx)
+                super().__init__(space, nu)
+                u = cs.SX.sym('u', nu)
+                L = dt * (5.0 * u[0] * u[0] + u[1] * u[1]) + 50. * cs.sum(u[2:])
+                self.L = cs.Function('L', [u], [L])
+                self.Lu = cs.Function('Lu', [u], [cs.jacobian(L, u)])
+                self.Luu = cs.Function('Luu', [u], [cs.hessian(L, u)[0]])
+
+            def evaluate(self, x, u, data):
+                data.value = self.L(u).toarray()[0][0]
+
+            def computeGradients(self, x, u, data):
+                data.Lx[:] = 0.0
+                data.Lu[:] = self.Lu(u).toarray()
+
+            def computeHessians(self, x, u, data):
+                data.Lxx[:, :] = 0.0
+                data.Lxu[:, :] = 0.0
+                data.Luu[:, :] = self.Luu(u)
+
+                
         x_tar = np.array([1.0, 1.0, np.pi / 4, 0.0])
-        wterm = 50.0 * np.ones(4)
+        wterm = 200.0 * np.ones(4)
         space = manifolds.VectorSpace(nx)
 
-        stage_cost = aligator.QuadraticCost(np.zeros((nx, nx)), 2 * dt * np.diag([5.0, 1.0, 0.0, 0.0, 0.0, 0.0]))
+        stage_cost = Cost()
         term_cost = aligator.QuadraticStateCost(space, nu, x_tar, 2 * np.diag(wterm))
         dynmodelc = Dynamics()
         dynmodel = dynamics.IntegratorRK2(dynmodelc, dt)
@@ -127,7 +150,7 @@ with open("../ipddp2/params/concar.txt", 'r') as file:
 
         for i in range(N-1):
             stage = aligator.StageModel(stage_cost, dynmodel)
-            stage.addConstraint(constr, constraints.EqualityConstraintSet())
+            stage.addConstraint(constr, constraints.NegativeOrthant())
             stage.addConstraint(nonneg, constraints.NegativeOrthant())
             stage.addConstraint(limit, constraints.BoxConstraint(
                 np.array([-F_lim, -tau_lim]),
@@ -146,7 +169,6 @@ with open("../ipddp2/params/concar.txt", 'r') as file:
         converged = 'true' if results.conv else 'false'
         res.append([str(exper_ind+1), str(results.num_iters), converged,
                     str(results.traj_cost), str(results.primal_infeas)])
-        exper_ind += 1
 
 
 with open("results/concar.txt", 'w') as file:
@@ -179,11 +201,15 @@ plt.savefig("concar_test.png")
 iters = 0
 cost = 0.0
 viol = 0.0
+succ = 0
 for r in res:
     iters += int(r[1])
     cost += float(r[3])
     viol += float(r[4])
+    if r[2] == 'true':
+        succ += 1
 
 print("Average number of iterations: ", iters / len(res))
 print("Average cost: ", cost / len(res))
 print("Average violation: ", viol / len(res))
+print("Successes: ", succ)

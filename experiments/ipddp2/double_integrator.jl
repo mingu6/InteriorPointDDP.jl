@@ -4,7 +4,7 @@ using Random
 using Plots
 using Printf
 
-benchmark = false
+benchmark = true
 verbose = true
 n_benchmark = 10
 
@@ -17,7 +17,7 @@ num_state = 2  # position and velocity
 num_control = 3  # pushing force, 2x slacks for + and - components of abs work
 n_ocp = 1
 
-options = Options{T}(verbose=verbose, max_iterations=1000)
+options = Options{T}(verbose=verbose, μ_init=0.2)
 
 results = Vector{Vector{Any}}()
 

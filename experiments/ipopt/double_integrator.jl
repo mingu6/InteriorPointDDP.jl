@@ -6,7 +6,8 @@ using Suppressor
 using Printf
 
 output = false
-benchmark = false
+benchmark = true
+bfgs = false
 n_benchmark = 10
 
 print_level = output ? 5 : 4
@@ -16,7 +17,7 @@ include("ipopt_parse.jl")
 Δ = 0.01
 N = 101
 x1 = [0.0; 0.0]
-n_ocp = 500
+n_ocp = 1
 
 nx = 2  # num. state
 nu = 3  # num. control
@@ -26,15 +27,24 @@ results = Vector{Vector{Any}}()
 for seed = 1:n_ocp
     Random.seed!(seed)
 
-    xN_y = 1.0 + rand() * 0.2
-    xN_v = (rand() - 0.5) * 0.2
+    xN_y = 1.0
+    xN_v = 0.0
     xN = [xN_y; xN_v]
 
-    model = Model(
-            optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_method" => "none",
-                "print_level" => print_level, "print_timing_statistics" => "yes"
-                , "max_resto_iter" => 0, "max_filter_resets" => 0)
-            );
+    if bfgs
+        model = Model(
+                optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 1000,
+                    "nlp_scaling_method" => "none",
+                    "print_level" => print_level, "print_timing_statistics" => "yes",
+                    "hessian_approximation" => "limited-memory")
+                );
+    else
+        model = Model(
+                optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 1000,
+                    "nlp_scaling_method" => "none",
+                    "print_level" => print_level, "print_timing_statistics" => "yes")
+                );
+    end
 
     f = (x, u) -> x + Δ * [x[2], u[1]]  # forward Euler
 
@@ -50,7 +60,7 @@ for seed = 1:n_ocp
     @variable(model, x[1:N, 1:nx]);
     @variable(model, u[1:N-1, 1:nu]);
 
-    limit = 5.0 * rand() + 5.0  # bound is in [5, 10]
+    limit = 10.0  # bound is in [5, 10]
     for t = 1:N-1
         set_lower_bound(u[t, 1], -limit)
         set_upper_bound(u[t, 1], limit)
@@ -69,7 +79,7 @@ for seed = 1:n_ocp
     
     # ## Initialise variables and solve
     
-    ū = [[1.0e-0 * (randn(1) .- 0.5); 0.01 * ones(2)] for k = 1:N-1]
+    ū = [0.01 * ones(3) for k = 1:N-1]
     x̄ = [x1]
     for k in 2:N
         push!(x̄, f(x̄[k-1],  ū[k-1]))
@@ -109,7 +119,8 @@ for seed = 1:n_ocp
     end
 end
 
-open("results/blockmove.txt", "w") do io
+fname = bfgs ? "results/bfgs_double_integrator.txt" : "results/double_integrator.txt"
+open(fname, "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")
     for i = 1:n_ocp
         if benchmark
