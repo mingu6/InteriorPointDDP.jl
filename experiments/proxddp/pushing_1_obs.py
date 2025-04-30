@@ -14,7 +14,7 @@ nu = 9
 N = 76
 
 tol = 1e-5
-mu_init = 0.01
+mu_init = 0.005
 
 verbose = aligator.VerboseLevel.VERBOSE
 solver = aligator.SolverProxDDP(tol, mu_init, verbose=verbose)
@@ -186,8 +186,6 @@ with open("../ipddp2/params/pushing_1_obs.txt", 'r') as file:
         converged = 'true' if results.conv else 'false'
         res.append([str(exper_ind+1), str(results.num_iters), converged,
                     str(results.traj_cost), str(results.primal_infeas)])
-        if exper_ind == 30:
-            break
 
 iters = 0
 cost = 0.0
