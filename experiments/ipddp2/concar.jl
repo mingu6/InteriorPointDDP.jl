@@ -4,16 +4,17 @@ using Plots
 using Random
 using Printf
 
-benchmark = false
+benchmark = true
 verbose = true
-visualise = false
+visualise = true
 n_benchmark = 10
 
 T = Float64
 N = 101
 Δ = 0.05
 r_car = 0.02
-options = Options{T}(verbose=verbose, μ_init=2.0, optimality_tolerance=1e-6)
+
+options = Options{T}(verbose=verbose, μ_init=0.2)
 
 visualise && include("../visualise/concar.jl")
 
@@ -22,6 +23,7 @@ num_control = 2
 n_ocp = 100
 
 results = Vector{Vector{Any}}()
+params = Vector{Vector{T}}()
 
 for seed = 1:n_ocp
     Random.seed!(seed)
@@ -44,9 +46,9 @@ for seed = 1:n_ocp
 
     xyr_obs = [obs_1, obs_2, obs_3, obs_4]
     num_obstacles = length(xyr_obs)
-    num_primal = num_control + num_obstacles
+    num_primal = num_control + 2 * num_obstacles
 
-    # ## Dynamics - RK4
+    # ## Dynamics - RK2
 
     # continuous time dynamics
     function g(x, u)
@@ -67,13 +69,15 @@ for seed = 1:n_ocp
     # ## objective
 
     stage_cost = (x, u) -> begin
+        s = u[num_control .+ (1:num_obstacles)]    
         J = 0.0
         J += Δ * dot(u[1:2] .* [5.0, 1.0], u[1:2])
+        J += 50.0 * sum(s)
         return J
     end
     objective = [
         [Objective(stage_cost, num_state, num_primal) for k = 1:N-1]...,
-        Objective((x, u) -> 5e2 * dot(x - xN, x - xN), num_state, 0)
+        Objective((x, u) -> 200.0 * dot(x - xN, x - xN), num_state, 0)
     ]
 
     # ## constraints
@@ -87,7 +91,7 @@ for seed = 1:n_ocp
     [
         # obstacle avoidance constraints w/slack variable,
         # i.e., d_obs^2 - d_thresh^2 >= 0 and d_obs^2 - d_thresh^2 + s = 0, s >= 0
-        [(obs[3] + r_car)^2 - obs_dist(obs[1:2])(x, u) + u[num_control + i]
+        [(obs[3] + r_car)^2 - obs_dist(obs[1:2])(x, u) - u[num_control + i] + u[num_control + num_obstacles + i] 
             for (i, obs) in enumerate(xyr_obs)];
     ]
     end
@@ -99,8 +103,8 @@ for seed = 1:n_ocp
 
     # [control limits; obs slack; bound slack]
     bound = Bound(
-        [ul; zeros(T, num_obstacles)],
-        [uu; T(Inf) * ones(T, num_obstacles)]
+        [ul; zeros(T, num_obstacles); zeros(T, num_obstacles)],
+        [uu; T(Inf) * ones(T, num_obstacles); T(Inf) * ones(T, num_obstacles)]
     )
     bounds = [bound for k in 1:N-1]
 
@@ -118,14 +122,14 @@ for seed = 1:n_ocp
         end
     end
     
-    x1 = rand(T, num_state) .* T[0.0; 0.0; π / 2; 0.0]
-    ū = [[zeros(T, num_control); T(1e-2) * ones(T, num_obstacles)] for k = 1:N-1]
+    x1 = T[0.0; 0.0; π / 8; 0.0] + rand(T, num_state) .* T[0.0; 0.0; π / 4; 0.0]
+    ū = [[0.00 * rand(T, 2); T(1e-2) * ones(T, 2 * num_obstacles)] for k = 1:N-1]
 
     solve!(solver, x1, ū)
     
     x_sol, u_sol = get_trajectory(solver)
     visualise && plotTrajectory!(x_sol)
-    
+
     if benchmark
         solver.options.verbose = false
         solver_time = 0.0
@@ -142,6 +146,8 @@ for seed = 1:n_ocp
         push!(results, [seed, solver.data.k, solver.data.status, solver.data.objective, solver.data.primal_inf])
     end
     visualise && savefig("plots/concar_IPDDP_$seed.pdf")
+
+    push!(params, [F_lim; τ_lim; obs_1; obs_2; obs_3; obs_4; x1])
 end
 
 open("results/concar.txt", "w") do io
@@ -153,5 +159,12 @@ open("results/concar.txt", "w") do io
         else
             @printf(io, " %2s     %5s      %5s    %.8e    %.8e \n",  Int64(results[i][1]), Int64(results[i][2]), Int64(results[i][3]) == 0, results[i][4], results[i][5])
         end
+    end
+end
+
+# save parameters of each experiment for ProxDDP comparison
+open("params/concar.txt", "w") do io
+    for i = 1:n_ocp
+        println(io, join(string.(params[i]), " "))
     end
 end

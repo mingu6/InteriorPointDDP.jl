@@ -8,6 +8,7 @@ using Printf
 
 output = false
 benchmark = false
+bfgs = false
 visualise = false
 n_benchmark = 10
 
@@ -22,7 +23,7 @@ visualise && include("../visualise/concar.jl")
 
 nx = 4  # num. state
 nu = 2  # num. control
-n_ocp = 500
+n_ocp = 100
 
 results = Vector{Vector{Any}}()
 
@@ -32,10 +33,20 @@ include("ipopt_parse.jl")
 for seed = 1:n_ocp
     Random.seed!(seed)
 
-    model = Model(
-        optimizer_with_attributes(Ipopt.Optimizer, "tol" => 1e-6,
-            "print_level" => print_level, "print_timing_statistics" => "yes")
-        );
+    if bfgs
+        model = Model(
+                optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 1000, 
+                    "nlp_scaling_method" => "none",
+                    "print_level" => print_level, "print_timing_statistics" => "yes",
+                    "hessian_approximation" => "limited-memory")
+                );
+    else
+        model = Model(
+                optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 1000,
+                    "nlp_scaling_method" => "none",
+                    "print_level" => print_level, "print_timing_statistics" => "yes")
+                );
+    end
 
     @variable(model, x[1:N, 1:nx]);
     @variable(model, u[1:N-1, 1:nu]);
@@ -66,20 +77,19 @@ for seed = 1:n_ocp
     num_obstacles = length(xyr_obs)
 
     @variable(model, s_obs[1:N-1, 1:num_obstacles] .>= 0.0);  # slacks for obstacle constraints
+    @variable(model, s[1:N-1, 1:num_obstacles] .>= 0.0);  # upper bound slack variables
 
-    # ## Dynamics - RK4
+    # ## Dynamics - RK2
 
     # continuous time dynamics
     function g(x, u)
         [x[4] * cos(x[3]); x[4] * sin(x[3]); u[2]; u[1]]
     end
 
-    function RK4(x, u, g)
+    function RK2(x, u, g)
         k1 = g(x, u)
         k2 = g(x + Δ * 0.5 * k1, u)
-        k3 = g(x + Δ * 0.5 * k2, u)
-        k4 = g(x + Δ * k3, u)
-        return x + Δ / 6 * (k1 + k2 + k3 + k4)
+        return x + Δ * k2
     end
 
     # ## constraints
@@ -91,31 +101,31 @@ for seed = 1:n_ocp
     end
 
     for k = 1:N-1
-        @constraint(model, RK4(x[k, :], u[k, :], g) == x[k+1, :])
+        @constraint(model, RK2(x[k, :], u[k, :], g) == x[k+1, :])
         for (i, obs) in enumerate(xyr_obs)
-            @constraint(model, (obs[3] + r_car)^2 - obs_dist(obs[1:2])(x[k, :]) + s_obs[k, i] == 0.0)
+            @constraint(model, (obs[3] + r_car)^2 - obs_dist(obs[1:2])(x[k, :]) + s_obs[k, i] <= s[k, i])
         end
     end
 
-    stage_cost = (x, u) -> begin
+    stage_cost = (x, u, s) -> begin
         J = 0.0
-        # J += Δ * (x - xN)'* (x - xN)
         J += Δ * (u[1:2] .* [5.0, 1.0])' * u[1:2]
+        J += 50.0 * sum(s)
         return J
     end
 
-    term_cost = x -> 5e2 * (x - xN)' * (x - xN)
+    term_cost = x -> 200.0 * (x - xN)' * (x - xN)
 
-    function cost(x, u)
+    function cost(x, u, s)
         J = 0.0
         for k = 1:N-1
-            J += stage_cost(x[k, :], u[k, :])
+            J += stage_cost(x[k, :], u[k, :], s[k, :])
         end
         J += term_cost(x[N, :])
         return J
     end
         
-    @objective(model, Min, cost(x, u))
+    @objective(model, Min, cost(x, u, s))
 
     # ## Plots
 
@@ -127,14 +137,14 @@ for seed = 1:n_ocp
     end
 
     set_attribute(model, "print_level", print_level)
-    x1 = rand(4) .* [0.0; 0.0; π / 2; 0.0]
+    x1 = [0.0; 0.0; π / 8; 0.0] + rand(4) .* [0.0; 0.0; π / 4; 0.0]
     fix.(x[1, :], x1, force = true)
     
-    ū = [1.0e-1 .* (rand(2) .- 0.5) for k = 1:N-1]
+    ū = [zeros(nu) for k = 1:N-1]
     
     x̄ = [x1]
     for k in 2:N
-        push!(x̄, RK4(x̄[k-1], ū[k-1], g))
+        push!(x̄, RK2(x̄[k-1], ū[k-1], g))
     end
     
     for k = 1:N
@@ -152,6 +162,7 @@ for seed = 1:n_ocp
     for k = 1:N-1
         for j = 1:num_obstacles
             set_start_value(s_obs[k, j], 0.01)
+            set_start_value(s[k, j], 0.01)
         end
     end
     
@@ -183,7 +194,8 @@ for seed = 1:n_ocp
     visualise && savefig("plots/concar_IPOPT_$seed.pdf")
 end
 
-open("results/concar.txt", "w") do io
+fname = bfgs ? "results/bfgs_concar.txt" : "results/concar.txt"
+open(fname, "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")
     for i = 1:n_ocp
         if benchmark
