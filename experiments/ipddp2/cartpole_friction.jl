@@ -4,6 +4,7 @@ using Random
 using Plots
 using MeshCat
 using Printf
+using LaTeXStrings
 
 visualise = false
 benchmark = false
@@ -23,7 +24,7 @@ if visualise
 	render(vis)
 end
 
-options = Options{T}(verbose=verbose, μ_init=0.2)
+options = Options{T}(verbose=verbose, optimality_tolerance=1e-6)
 
 results = Vector{Vector{Any}}()
 params = Vector{Vector{T}}()
@@ -125,12 +126,29 @@ for seed = 1:n_ocp
 
     # ## Visualise solution
 
-    if visualise && seed == n_ocp
+    if visualise && seed == 1
         x_sol, u_sol = get_trajectory(solver)
         
         q_sol = [x[1:nq] for x in x_sol]
         visualize!(vis, cartpole, q_sol, Δt=Δ);
     end
+
+    # ## Plot solution
+	if seed == 1
+		x_sol, u_sol = get_trajectory(solver)
+		# qdotplus = map(xu -> (xu[2][2:3] - xu[1][3:4]) / Δ , zip(x_sol[1:end-1], u_sol))
+        qdotplus = map(x -> (x[3:4] - x[1:2]) / Δ , x_sol[1:end-1])
+        qd1 = map(q -> q[1], qdotplus)
+        qd2 = map(q -> q[2], qdotplus)
+		λ1 = map(u -> (u[4] - u[5]) * 3.5, u_sol)
+		λ2 = map(u -> (u[6] - u[7]) * 15, u_sol)
+        F = map(u -> u[1], u_sol)
+		plot(range(0, Δ * (N-1), N-1), [qd1 qd2 λ1 λ2 F], xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylims=(-9,9),
+			legendfontsize=10, linewidth=2, xlabelfontsize=14, linestyle=[:solid :solid :dot :dot :solid], linecolor=[1 2 1 2 3], 
+            legendposition=:bottom, legendtitleposition=:left,
+			background_color_legend = nothing, label=[L"$p_t^{vm+}$" L"$\theta_t^{vm+}$" L"$\lambda^{(1)}_t$" L"$\lambda^{(2)}_t$" L"F_t"])
+		savefig("plots/cartpole_friction_IPDDP.pdf")
+	end
 end
 
 open("results/cartpole_friction.txt", "w") do io

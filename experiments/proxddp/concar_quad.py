@@ -5,13 +5,13 @@ from aligator import constraints, dynamics, manifolds
 import casadi as cs
 
 nx = 4
-nu = 2 + 4
+nu = 6
 N = 101
 
 dt = 0.05
 r_car = 0.02
 
-tol = 1e-6
+tol = 1e-4
 mu_init = 0.1
 
 verbose = aligator.VerboseLevel.VERBOSE
@@ -31,43 +31,17 @@ with open("../ipddp2/params/concar.txt", 'r') as file:
         obs_4 = params[11:14]
         x0 = np.array(params[14:18])
 
-        class Constraint(aligator.StageFunction):
-            def __init__(self) -> None:
-                super().__init__(nx, nu, 4)
-                x = cs.SX.sym('x', nx)
-                u = cs.SX.sym('u', nu)
-
-                obs = [
-                    np.array(obs_1),
-                    np.array(obs_2),
-                    np.array(obs_3),
-                    np.array(obs_4)
-                ]
-
-                obs_constr = [(obs[i][2] + r_car) ** 2 - cs.sumsqr(x[:2] - obs[i][:2]) - u[2+i] for i in range(4)]
-                obs_constr_ = cs.vertcat(*obs_constr)
-
-                Jx = cs.jacobian(obs_constr_, x)
-                Ju = cs.jacobian(obs_constr_, u)
-                self.obs = cs.Function('obs', [x, u], [obs_constr_])
-                self.Jx = cs.Function('Jx', [x, u], [Jx])
-                self.Ju = cs.Function('Ju', [x, u], [Ju])
-
-            def evaluate(self, x, u, data):
-                data.value[:] = self.obs(x, u).toarray()[:, 0]
-
-            def computeJacobians(self, x, u, data):
-                data.Jx[:] = self.Jx(x, u).toarray()
-                data.Ju[:] = self.Ju(x, u).toarray()
-
-
         class Dynamics(dynamics.ODEAbstract):
             def __init__(self) -> None:
                 space = manifolds.VectorSpace(nx)
                 super().__init__(space, nu)
                 x = cs.SX.sym('x', nx)
-                u = cs.SX.sym('u', nu)
-                dyn = cs.vertcat(x[3] * cs.cos(x[2]), x[3] * cs.sin(x[2]), u[1], u[0])
+                F = cs.SX.sym('F', 1)
+                tau = cs.SX.sym('tau', 1)
+                s = cs.SX.sym('s', 4)
+                u = cs.vertcat(F, tau, s)
+
+                dyn = cs.vertcat(x[3] * cs.cos(x[2]), x[3] * cs.sin(x[2]), tau, F)
                 self.dyn = cs.Function('dyn', [x, u], [dyn])
                 Jx = cs.jacobian(dyn, x)
                 Ju = cs.jacobian(dyn, u)
@@ -98,24 +72,44 @@ with open("../ipddp2/params/concar.txt", 'r') as file:
 
         class NonNeg(aligator.StageFunction):
             def __init__(self) -> None:
-                super().__init__(nx, nu, 4)
+                super().__init__(nx, nu, 8)
+                x = cs.SX.sym('x', nx)
+                F = cs.SX.sym('F', 1)
+                tau = cs.SX.sym('tau', 1)
+                s = cs.SX.sym('s', 4)
+                u = cs.vertcat(F, tau, s)
+
+                obs = [
+                    np.array(obs_1),
+                    np.array(obs_2),
+                    np.array(obs_3),
+                    np.array(obs_4)
+                ]
+
+                obs_constr = cs.vertcat(*[(obs[i][2] + r_car) ** 2 - cs.sumsqr(x[:2] - obs[i][:2]) - s[i] for i in range(4)])
+                constr = cs.vertcat(obs_constr, -s)
+                self.constr = cs.Function('constr', [x, u], [constr])
+                self.Jx = cs.Function('Jx', [x, u], [cs.jacobian(constr, x)])
+                self.Ju = cs.Function('Ju', [x, u], [cs.jacobian(constr, u)])
 
             def evaluate(self, x, u, data):
-                data.value[:] = -u[2:]
+                data.value[:] = self.constr(x, u).toarray()[:, 0]
 
             def computeJacobians(self, x, u, data):
-                data.Jx[:, :] = 0.0
-                data.Ju[:, :] = 0.0
-                for i in range(4):
-                    data.Ju[i, 2+i] = -1.0
+                data.Jx[:, :] = self.Jx(x, u).toarray()
+                data.Ju[:, :] = self.Ju(x, u).toarray()
 
 
         class Cost(aligator.CostAbstract):
             def __init__(self):
                 space = manifolds.VectorSpace(nx)
                 super().__init__(space, nu)
-                u = cs.SX.sym('u', nu)
-                L = dt * (5.0 * u[0] * u[0] + u[1] * u[1]) + 1000. * cs.sumsqr(u[2:])
+                F = cs.SX.sym('F', 1)
+                tau = cs.SX.sym('tau', 1)
+                s = cs.SX.sym('s', 4)
+                u = cs.vertcat(F, tau, s)
+
+                L = dt * (5.0 * F ** 2 + tau ** 2) + 1000. * cs.sumsqr(s)
                 self.L = cs.Function('L', [u], [L])
                 self.Lu = cs.Function('Lu', [u], [cs.jacobian(L, u)])
                 self.Luu = cs.Function('Luu', [u], [cs.hessian(L, u)[0]])
@@ -142,7 +136,6 @@ with open("../ipddp2/params/concar.txt", 'r') as file:
         dynmodelc = Dynamics()
         dynmodel = dynamics.IntegratorRK2(dynmodelc, dt)
 
-        constr = Constraint()
         nonneg = NonNeg()
         limit = Limit()
 
@@ -150,7 +143,6 @@ with open("../ipddp2/params/concar.txt", 'r') as file:
 
         for i in range(N-1):
             stage = aligator.StageModel(stage_cost, dynmodel)
-            stage.addConstraint(constr, constraints.NegativeOrthant())
             stage.addConstraint(nonneg, constraints.NegativeOrthant())
             stage.addConstraint(limit, constraints.BoxConstraint(
                 np.array([-F_lim, -tau_lim]),
@@ -158,7 +150,7 @@ with open("../ipddp2/params/concar.txt", 'r') as file:
                 )
             problem.addStage(stage)
 
-        us_init = [np.concatenate((np.zeros(2), 0.01 * np.ones(4)))] * (N-1)
+        us_init = [np.array([0., 0., 0.01, 0.01, 0.01, 0.01])] * (N-1)
         xs_init = aligator.rollout(dynmodel, x0, us_init)
 
         solver.setup(problem)

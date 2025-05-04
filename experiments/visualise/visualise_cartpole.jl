@@ -7,25 +7,25 @@ function _create_cartpole!(vis, model;
     tl = 1.0,
     color = Colors.RGBA(0, 0, 0, tl))
 
-l2 = Cylinder(Point3f0(-model.l * 10.0, 0.0, 0.0),
-    Point3f0(model.l * 10.0, 0.0, 0.0),
+l2 = Cylinder(Point3d(-model.l * 10.0, 0.0, 0.0),
+    Point3d(model.l * 10.0, 0.0, 0.0),
     convert(Float32, 0.0125))
 
 setobject!(vis["slider_$i"], l2, MeshPhongMaterial(color = Colors.RGBA(0.0, 0.0, 0.0, tl)))
 
-l1 = Cylinder(Point3f0(0.0, 0.0, 0.0),
-    Point3f0(0.0, 0.0, model.l),
+l1 = Cylinder(Point3d(0.0, 0.0, 0.0),
+    Point3d(0.0, 0.0, model.l),
     convert(Float32, 0.025))
 
 setobject!(vis["arm_$i"], l1,
     MeshPhongMaterial(color = Colors.RGBA(0.0, 0.0, 0.0, tl)))
 
-setobject!(vis["base_$i"], HyperSphere(Point3f0(0.0),
-    convert(Float32, 0.1)),
+setobject!(vis["base_$i"], HyperSphere(Point3d(0.0),
+    convert(Float64, 0.1)),
     MeshPhongMaterial(color = color))
 
-setobject!(vis["ee_$i"], HyperSphere(Point3f0(0.0),
-    convert(Float32, 0.05)),
+setobject!(vis["ee_$i"], HyperSphere(Point3d(0.0),
+    convert(Float64, 0.05)),
     MeshPhongMaterial(color = color))
 end
 
@@ -47,7 +47,7 @@ function visualize!(vis, model, q;
 default_background!(vis)
 _create_cartpole!(vis, model, i = i, color = color, tl = tl)
 
-anim = MeshCat.Animation(convert(Int, floor(1.0 / Δt)))
+anim = MeshCat.Animation(vis; fps=convert(Int, floor(1.0 / Δt)))
 nq = length(q)
 
 for t = 1:nq

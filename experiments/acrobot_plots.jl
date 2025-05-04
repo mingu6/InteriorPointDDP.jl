@@ -1,6 +1,9 @@
 using StatsPlots
+using Statistics
 
 problemclass = "acrobot_contact"
+fs = 16
+fs_y = 12
 
 include("utils.jl")
 
@@ -15,47 +18,61 @@ min_objs = min(minimum(objs_ipd), minimum(objs_ipo))
 max_objs = max(maximum(objs_ipd), maximum(objs_ipo))
 objs_range = max_objs - min_objs
 ymin = 0.0
-ymax = 2.5
+ymax = 2.8
 
 # objective function value
 
 bplots = []
-push!(bplots, boxplot(objs_ipd, title=names[1], titlefontsize=10, legend=false, ylims=(ymin, ymax), xticks=[]))
-push!(bplots, boxplot(objs_ipo, title=names[2], titlefontsize=10, legend=false, ylims=(ymin, ymax), xticks=[]))
-push!(bplots, boxplot(objs_ipob, title=names[3], titlefontsize=10, legend=false, yaxis=:log10, ylims=(1e-1, 1e4), xticks=[]))
-push!(bplots, boxplot(objs_al, title=names[4], titlefontsize=10, legend=false, xticks=[], yaxis=:log10, ylims=(1e-1, 1e4)))
-plot!(bplots..., size=(400, 300), layout=(1, 4))
+push!(bplots, boxplot(objs_ipd, title=names[1], titlefontsize=fs, ytickfontsize=fs_y, legend=false, ylims=(ymin, ymax), xticks=[]))
+push!(bplots, boxplot(objs_ipo, title=names[2], titlefontsize=fs, ytickfontsize=fs_y, legend=false, ylims=(ymin, ymax), xticks=[]))
+push!(bplots, boxplot(objs_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, yaxis=:log10, ylims=(1e-1, 3e4), xticks=[]))
+push!(bplots, boxplot(objs_al, title=names[4], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], yaxis=:log10, ylims=(1e-1, 3e4)))
+plot!(bplots..., size=(650, 350), layout=(1, 4))
 savefig("plots/$problemclass/objective.pdf")
 
 # constraint violation value
 
 bplots = []
-push!(bplots, boxplot(constrs_ipd, title=names[1], titlefontsize=10, legend=false, xticks=[], yaxis=:log10,
+push!(bplots, boxplot(constrs_ipd, title=names[1], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], yaxis=:log10,
                         ylims=(1e-16, 1e1), yticks=[1e-16, 1e-12, 1e-8, 1e-4, 1]))
-push!(bplots, boxplot(constrs_ipo, title=names[2], titlefontsize=10, legend=false, xticks=[], yaxis=:log10,
+push!(bplots, boxplot(constrs_ipo, title=names[2], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], yaxis=:log10,
                         ylims=(1e-16, 1e1), yticks=[1e-16, 1e-12, 1e-8, 1e-4, 1]))
-push!(bplots, boxplot(constrs_ipob, title=names[3], titlefontsize=10, legend=false, xticks=[], yaxis=:log10,
+push!(bplots, boxplot(constrs_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], yaxis=:log10,
                         ylims=(1e-16, 1e1), yticks=[1e-16, 1e-12, 1e-8, 1e-4, 1]))
-push!(bplots, boxplot(constrs_al, title=names[4], titlefontsize=10, legend=false, yaxis=:log10, xticks=[],
+push!(bplots, boxplot(constrs_al, title=names[4], titlefontsize=fs, ytickfontsize=fs_y, legend=false, yaxis=:log10, xticks=[],
                         ylims=(1e-16, 1e1), yticks=[1e-16, 1e-12, 1e-8, 1e-4, 1]))
-plot(bplots..., size=(420, 300), layout=(1, 4))
+plot(bplots..., size=(650, 350), layout=(1, 4))
 savefig("plots/$problemclass/constr.pdf")
 
 # iteration count
 
 bplots = []
-push!(bplots, boxplot(iters_ipd, title=names[1], titlefontsize=10, legend=false, xticks=[], ylims=(0, 1050)))
-push!(bplots, boxplot(iters_ipo, title=names[2], titlefontsize=10, legend=false, xticks=[], ylims=(0, 1050)))
-push!(bplots, boxplot(iters_ipob, title=names[3], titlefontsize=10, legend=false, xticks=[], ylims=(0, 1050)))
-push!(bplots, boxplot(iters_al, title=names[4], titlefontsize=10, legend=false, xticks=[], ylims=(0, 2050)))
-plot(bplots..., size=(400, 300), layout=(1, 4))
+push!(bplots, boxplot(iters_ipd, title=names[1], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 1150)))
+push!(bplots, boxplot(iters_ipo, title=names[2], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 1150)))
+push!(bplots, boxplot(iters_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 1150)))
+push!(bplots, boxplot(iters_al, title=names[4], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 2150)))
+plot(bplots..., size=(650, 350), layout=(1, 4))
 savefig("plots/$problemclass/iterations.pdf")
 
-# wall time
+# wall time per iteration
 
 bplots = []
-push!(bplots, boxplot(wall_ipd, title=names[1], titlefontsize=10, legend=false, xticks=[], ylims=(0, 2000)))
-push!(bplots, boxplot(wall_ipo, title=names[2], titlefontsize=10, legend=false, xticks=[], ylims=(0, 2000)))
-push!(bplots, boxplot(wall_ipob, title=names[3], titlefontsize=10, legend=false, xticks=[], ylims=(0, 5000)))
-plot(bplots..., size=(300, 300), layout=(1, 3))
+push!(bplots, boxplot(wall_ipd ./ iters_ipd, title=names[1], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 4.9)))
+push!(bplots, boxplot(wall_ipo ./ iters_ipo, title=names[2], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 4.9)))
+push!(bplots, boxplot(wall_ipob ./ iters_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 4.9)))
+plot(bplots..., size=(500, 350), layout=(1, 3))
 savefig("plots/$problemclass/time.pdf")
+
+println("Acrobot")
+println()
+println("Objective (rel IPOPT): ", median(objs_ipd ./ objs_ipob))
+println("Iteration Count (rel IPOPT): ", median(iters_ipd ./ iters_ipob))
+println("Wall Time per iteration (rel IPOPT): ", median((wall_ipd ./ iters_ipd) ./ (wall_ipo ./ iters_ipo)))
+println()
+println("Objective (rel IPOPT BFGS): ", median(objs_ipd ./ objs_ipob))
+println("Iteration Count (rel IPOPT BFGS): ", median(iters_ipd ./ iters_ipob))
+println("Wall Time per iteration (rel IPOPT BFGS): ", median((wall_ipd ./ iters_ipd) ./ (wall_ipob ./ iters_ipob)))
+println()
+println("Objective (rel ProxDDP): ", median(objs_ipd ./ objs_al))
+println("Iteration Count (rel ProxDDP): ", median(iters_ipd ./ iters_al))
+println()

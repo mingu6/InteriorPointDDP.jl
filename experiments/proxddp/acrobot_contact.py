@@ -11,10 +11,10 @@ g = 9.81
 nq = 2
 nc = 2
 nx = 2 * nq
-nu = 1 + nq + 3 * nc
+nu = 1 + nq + 2 * nc
 
-tol = 1e-8
-mu_init = 0.01
+tol = 1e-4
+mu_init = 0.03
 
 verbose = aligator.VerboseLevel.VERBOSE
 solver = aligator.SolverProxDDP(tol, mu_init, verbose=verbose)
@@ -30,7 +30,7 @@ with open("../ipddp2/params/acrobot_contact.txt", 'r') as file:
 
         class Constraint(aligator.StageFunction):
             def __init__(self) -> None:
-                super().__init__(nx, nu, 6)
+                super().__init__(nx, nu, 4)
                 q = cs.SX.sym('q', 2)
                 qdot = cs.SX.sym('qd', 2)
 
@@ -68,10 +68,9 @@ with open("../ipddp2/params/acrobot_contact.txt", 'r') as file:
 
                 tau = cs.SX.sym('tau', 1)
                 lam = cs.SX.sym('lam', 2)
-                s = cs.SX.sym('s', 2)
                 sc = cs.SX.sym('sc', 2)
 
-                u = cs.vertcat(tau, qp, lam, s, sc)
+                u = cs.vertcat(tau, qp, lam, sc)
 
                 phi = cs.vertcat(
                     0.5 * np.pi - qp[1], qp[1] + 0.5 * np.pi
@@ -82,8 +81,7 @@ with open("../ipddp2/params/acrobot_contact.txt", 'r') as file:
 
                 constr = cs.vertcat(
                     dyn,
-                    s - phi,
-                    lam * s - sc
+                    lam * phi - sc
                 )
                 Jx = cs.jacobian(constr, x)
                 Ju = cs.jacobian(constr, u)
@@ -102,14 +100,31 @@ with open("../ipddp2/params/acrobot_contact.txt", 'r') as file:
         class NonNeg(aligator.StageFunction):
             def __init__(self) -> None:
                 super().__init__(nx, nu, 6)
+                qp = cs.SX.sym('qp', 2)
+
+                tau = cs.SX.sym('tau', 1)
+                lam = cs.SX.sym('lam', 2)
+                sc = cs.SX.sym('sc', 2)
+
+                u = cs.vertcat(tau, qp, lam, sc)
+
+                phi = cs.vertcat(
+                    0.5 * np.pi - qp[1], qp[1] + 0.5 * np.pi
+                )
+                constr = cs.vertcat(
+                    -phi,
+                    -lam,
+                    -sc
+                )
+                self.constr = cs.Function('c', [u], [constr])
+                self.Ju = cs.Function('Ju', [u], [cs.jacobian(constr, u)])
 
             def evaluate(self, x, u, data):
-                data.value[:] = -u[3:]
+                data.value[:] = self.constr(u).toarray()[:, 0]
 
             def computeJacobians(self, x, u, data):
                 data.Jx[:, :] = 0.0
-                for i in range(6):
-                    data.Ju[i, i+3] = -1.0
+                data.Ju[:, :] = self.Ju(u).toarray()
 
 
         class Limit(aligator.StageFunction):
@@ -129,8 +144,15 @@ with open("../ipddp2/params/acrobot_contact.txt", 'r') as file:
             def __init__(self):
                 space = manifolds.VectorSpace(nx)
                 super().__init__(space, nu)
-                u = cs.SX.sym('u', nu)
-                J = dt * 1e-2 * u[0] ** 2 + 2.0 * cs.sum(u[1 + nq + 2 * nc:])
+                qp = cs.SX.sym('qp', 2)
+
+                tau = cs.SX.sym('tau', 1)
+                lam = cs.SX.sym('lam', 2)
+                sc = cs.SX.sym('sc', 2)
+
+                u = cs.vertcat(tau, qp, lam, sc)
+
+                J = dt * 1e-2 * tau ** 2 + 2.0 * cs.sum(sc)
                 self.J = cs.Function('J', [u], [J])
                 self.Ju = cs.Function('Ju', [u], [cs.jacobian(J, u)])
                 self.Juu = cs.Function('Juu', [u], [cs.hessian(J, u)[0]])
@@ -206,7 +228,7 @@ with open("../ipddp2/params/acrobot_contact.txt", 'r') as file:
             problem.addStage(stage)
 
         q_init = np.linspace(np.zeros(2), qN, N)
-        us_init = [np.concatenate((np.zeros(3), 0.01 * np.ones(6)))] * (N-1)
+        us_init = [np.concatenate((np.zeros(3), 0.01 * np.ones(4)))] * (N-1)
         xs_init = aligator.rollout(dynmodel, x0, us_init)
 
         solver.setup(problem)
@@ -237,3 +259,34 @@ print("Successes: ", succ)
 with open("results/acrobot_contact.txt", 'w') as file:
     for line in res:
         file.write(f"{' '.join(line)}\n")
+
+# 0.1
+# Average number of iterations:  400.0
+# Average cost:  839.7110418710809
+# Average violation:  0.4820552951316643
+# Successes:  0
+
+# 0.2
+# Average number of iterations:  400.0
+# Average cost:  539.4411790073649
+# Average violation:  0.6980029165676495
+# Successes:  0
+
+# 0.05
+# Convergence failure.
+# Average number of iterations:  399.83870967741933
+# Average cost:  1165.6889138998554
+# Average violation:  0.2886359030019276
+# Successes:  1
+
+# 0.03
+# Average number of iterations:  383.9032258064516
+# Average cost:  1347.9924837684196
+# Average violation:  0.2116171759276446
+# Successes:  2
+
+# 0.02
+# Average number of iterations:  400.0
+# Average cost:  1295.7719105686285
+# Average violation:  0.27289239509892066
+# Successes:  0

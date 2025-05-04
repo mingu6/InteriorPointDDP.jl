@@ -56,14 +56,14 @@ for seed = 1:n_ocp
 	if bfgs
         model = Model(
                 optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 1000,
-					"nlp_scaling_method" => "none",
+					"nlp_scaling_method" => "none", "tol" => 1e-6,
                     "print_level" => print_level, "print_timing_statistics" => "yes",
                     "hessian_approximation" => "limited-memory")
                 );
     else
         model = Model(
                 optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 1000,
-					"nlp_scaling_method" => "none",
+					"nlp_scaling_method" => "none", "tol" => 1e-6,
                     "print_level" => print_level, "print_timing_statistics" => "yes")
                 );
     end

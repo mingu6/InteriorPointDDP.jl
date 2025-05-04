@@ -10,15 +10,15 @@ vel_lim = 3.0
 r_push = 0.01
 
 nx = 4
-nu = 9
+nu = 7
 N = 76
 
-tol = 1e-5
-mu_init = 0.005
+tol = 1e-4
+mu_init = 0.05
 
 verbose = aligator.VerboseLevel.VERBOSE
 solver = aligator.SolverProxDDP(tol, mu_init, verbose=verbose)
-solver.max_iters = 500
+solver.max_iters = 2000
 solver.reg_min = 1e-5
 
 res = []
@@ -32,13 +32,17 @@ with open("../ipddp2/params/pushing_1_obs.txt", 'r') as file:
 
         class Constraint(aligator.StageFunction):
             def __init__(self) -> None:
-                super().__init__(nx, nu, 4)
-                u = cs.SX.sym('u', nu)
+                super().__init__(nx, nu, 2)
+                fN = cs.SX.sym('fN', 1)
+                ft = cs.SX.sym('ft', 1)
+                phidot = cs.SX.sym('phidot', 2)
+                sc = cs.SX.sym('sc', 2)
+                so = cs.SX.sym('so', 1)
+                u = cs.vertcat(fN, ft, phidot, sc, so)
+
                 f = cs.vertcat(
-                    mu_fric * u[0] - u[1] - u[4],
-                    mu_fric * u[0] + u[1] - u[5],
-                    u[4] * u[2] - u[6],
-                    u[5] * u[3] - u[7]
+                    (mu_fric * fN - ft) * phidot[0] - sc[0],
+                    (mu_fric * fN + ft) * phidot[1] - sc[1]
                 )
                 Ju = cs.jacobian(f, u)
                 self.f = cs.Function('f', [u], [f])
@@ -56,23 +60,34 @@ with open("../ipddp2/params/pushing_1_obs.txt", 'r') as file:
             def __init__(self) -> None:
                 super().__init__(nx, nu, 6)
                 x = cs.SX.sym('x', nx)
-                u = cs.SX.sym('u', nu)
-                obs = (obstacle[2] + r_total) ** 2 - cs.sumsqr(x[:2] - obstacle[:2]) - u[8]
-                self.obs = cs.Function('obs', [x, u], [obs])
-                Jx = cs.jacobian(obs, x)
-                Ju = cs.jacobian(obs, u)
+
+                fN = cs.SX.sym('fN', 1)
+                ft = cs.SX.sym('ft', 1)
+                phidot = cs.SX.sym('phidot', 2)
+                sc = cs.SX.sym('sc', 2)
+                so = cs.SX.sym('so', 1)
+                u = cs.vertcat(fN, ft, phidot, sc, so)
+
+                obs = (obstacle[2] + r_total) ** 2 - cs.sumsqr(x[:2] - obstacle[:2]) - so
+                constr = cs.vertcat(
+                    obs,
+                    -(mu_fric * fN - ft),
+                    -(mu_fric * fN + ft),
+                    -sc,
+                    -so
+                )
+                self.constr = cs.Function('constr', [x, u], [constr])
+                Jx = cs.jacobian(constr, x)
+                Ju = cs.jacobian(constr, u)
                 self.Ju = cs.Function('Ju', [x, u], [Ju])
                 self.Jx = cs.Function('Jx', [x, u], [Jx])
 
             def evaluate(self, x, u, data):
-                data.value[:5] = -u[4:]
-                data.value[5] = self.obs(x, u)
+                data.value[:] = self.constr(x, u).toarray()[:, 0]
 
             def computeJacobians(self, x, u, data):
                 data.Jx[:, :] = self.Jx(x, u).toarray()
-                for i in range(5):
-                    data.Ju[i, 4+i] = -1.0
-                data.Ju[5, :] = self.Ju(x, u).toarray()
+                data.Ju[:, :] = self.Ju(x, u).toarray()
 
 
         class Limit(aligator.StageFunction):
@@ -97,7 +112,12 @@ with open("../ipddp2/params/pushing_1_obs.txt", 'r') as file:
                 super().__init__(space, nu)
                 self.L = np.array([1.0, 1.0, c ** -2.0])
                 x = cs.SX.sym('x', nx)
-                u = cs.SX.sym('u', nu)
+                fN = cs.SX.sym('fN', 1)
+                ft = cs.SX.sym('ft', 1)
+                phidot = cs.SX.sym('phidot', 2)
+                sc = cs.SX.sym('sc', 2)
+                so = cs.SX.sym('so', 1)
+                u = cs.vertcat(fN, ft, phidot, sc, so)
 
                 R = cs.SX(3, 3)
                 R[0, 0] = cs.cos(x[2])
@@ -112,7 +132,7 @@ with open("../ipddp2/params/pushing_1_obs.txt", 'r') as file:
                 Jc[1, 1] = 1.0
                 Jc[1, 2] = -0.5 * zx
 
-                xdot = cs.vertcat(R @ (self.L * (Jc.T @ u[:2])), u[2] - u[3])
+                xdot = cs.vertcat(R @ (self.L * (Jc.T @ u[:2])), phidot[0] - phidot[1])
                 self.xdot = cs.Function('xdot', [x, u], [xdot])
 
                 Jx = cs.jacobian(xdot, x)
@@ -132,20 +152,27 @@ with open("../ipddp2/params/pushing_1_obs.txt", 'r') as file:
             def __init__(self):
                 space = manifolds.VectorSpace(nx)
                 super().__init__(space, nu)
+                fN = cs.SX.sym('fN', 1)
+                ft = cs.SX.sym('ft', 1)
+                phidot = cs.SX.sym('phidot', 2)
+                sc = cs.SX.sym('sc', 2)
+                so = cs.SX.sym('so', 1)
+                u = cs.vertcat(fN, ft, phidot, sc, so)
+                J = 1e-2 * cs.sumsqr(u[:2]) + 2.0 * (cs.sum(sc) + so)
+                self.cost = cs.Function('J', [u], [J])
+                self.Ju = cs.Function('Ju', [u], [cs.jacobian(J, u)])
+                self.Juu = cs.Function('Juu', [u], [cs.hessian(J, u)[0]])
 
             def evaluate(self, x, u, data):
-                data.value = 1e-2 * np.dot(u[:2], u[:2]) + 2.0 * np.sum(u[6:])
+                data.value = self.cost(u).toarray()[0][0]
 
             def computeGradients(self, x, u, data):
-                data.Lu[:] = 0.0
-                data.Lu[:2] = 2e-2 * u[:2]
-                data.Lu[6:] = 2.0
+                data.Lu[:] = self.Ju(u).toarray()
 
             def computeHessians(self, x, u, data):
                 data.Lxx[:, :] = 0.0
                 data.Lxu[:, :] = 0.0
-                data.Luu[:, :] = 0.0
-                data.Luu[:, :] = np.diag([2e-2, 2e-2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+                data.Luu[:, :] = self.Juu(u).toarray()
 
 
         x0 = np.zeros(nx)

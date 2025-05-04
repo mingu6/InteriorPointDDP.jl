@@ -6,7 +6,7 @@ using MeshCat
 using Printf
 
 visualise = false
-benchmark = true
+benchmark = false
 verbose = true
 n_benchmark = 10
 
@@ -15,7 +15,7 @@ T = Float64
 N = 76
 n_ocp = 100
 
-options = Options{Float64}(verbose=verbose, μ_init=0.2)
+options = Options{T}(verbose=verbose, optimality_tolerance=1e-6, μ_init=0.2, κ_ϵ=10.0)
 
 results = Vector{Vector{Any}}()
 params = Vector{Vector{T}}()

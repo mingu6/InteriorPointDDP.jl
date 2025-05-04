@@ -9,11 +9,11 @@ N = 101
 
 nq = 2
 nx = 2 * nq
-nu = 1 + nq + 6 * 2 + 6
+nu = 15
 N = 101
 
-tol = 1e-8
-mu_init = 0.01
+tol = 1e-4
+mu_init = 0.05
 
 verbose = aligator.VerboseLevel.VERBOSE
 solver = aligator.SolverProxDDP(tol, mu_init, verbose=verbose)
@@ -31,7 +31,7 @@ with open("../ipddp2/params/cartpole_friction.txt", 'r') as file:
 
         class Constraint(aligator.StageFunction):
             def __init__(self) -> None:
-                super().__init__(nx, nu, 14)
+                super().__init__(nx, nu, 8)
                 q = cs.SX.sym('q', 2)
                 qdot = cs.SX.sym('qdot', 2)
 
@@ -62,12 +62,9 @@ with open("../ipddp2/params/cartpole_friction.txt", 'r') as file:
                 F = cs.SX.sym('F', 1)
                 beta1 = cs.SX.sym('beta1', 2)
                 beta2 = cs.SX.sym('beta2', 2)
-                eta1 = cs.SX.sym('eta1', 2)
-                eta2 = cs.SX.sym('eta2', 2)
                 psi = cs.SX.sym('psi', 2)
-                s = cs.SX.sym('s', 2)
                 sc = cs.SX.sym('sc', 6)
-                u = cs.vertcat(F, qp, beta1, beta2, eta1, eta2, psi, s, sc)
+                u = cs.vertcat(F, qp, beta1, beta2, psi, sc)
 
                 lam = cs.vertcat(beta1[0] - beta1[1], beta2[0] - beta2[1])
                 gamma1 = cfslide * (mp + mc) * g * dt
@@ -77,16 +74,19 @@ with open("../ipddp2/params/cartpole_friction.txt", 'r') as file:
                 Chat = 0.5 * (Cf(qmp, qdp) + Cf(qmm, qdm))
                 dyn = Mhat + dt * (Chat - B * F - P.T @ lam)
 
+                eta1 = cs.vertcat(
+                    qdp[0] + psi[0],
+                    -qdp[0] + psi[0]
+                )
+                eta2 = cs.vertcat(
+                    qdp[1] + psi[1],
+                    -qdp[1] + psi[1]
+                )
+
                 constr = cs.vertcat(
                     dyn,
-                    qdp[0] + psi[0] - eta1[0],
-                    -qdp[0] + psi[0] - eta1[1],
-                    qdp[1] + psi[1] - eta2[0],
-                    -qdp[1] + psi[1] - eta2[1],
-                    gamma1 - cs.sum(beta1) - s[0],
-                    gamma2 - cs.sum(beta2) - s[1],
-                    psi[0] * s[0] - sc[0],
-                    psi[1] * s[1] - sc[1],
+                    psi[0] * (gamma1 - cs.sum(beta1)) - sc[0],
+                    psi[1] * (gamma2 - cs.sum(beta2)) - sc[1],
                     beta1 * eta1 - sc[2:4],
                     beta2 * eta2 - sc[4:6]
                 )
@@ -106,15 +106,52 @@ with open("../ipddp2/params/cartpole_friction.txt", 'r') as file:
 
         class NonNeg(aligator.StageFunction):
             def __init__(self) -> None:
-                super().__init__(nx, nu, 18)
+                super().__init__(nx, nu, 16)
+                qm = cs.SX.sym('qm', 2)
+                qc = cs.SX.sym('qc', 2)
+                qp = cs.SX.sym('qp', 2)
+                x = cs.vertcat(qm, qc)
+                qdp = (qp - qc) / dt
+
+                F = cs.SX.sym('F', 1)
+                beta1 = cs.SX.sym('beta1', 2)
+                beta2 = cs.SX.sym('beta2', 2)
+
+                psi = cs.SX.sym('psi', 2)
+                sc = cs.SX.sym('sc', 6)
+                u = cs.vertcat(F, qp, beta1, beta2, psi, sc)
+
+                gamma1 = cfslide * (mp + mc) * g * dt
+                gamma2 = cfarm * mp * g * l * dt
+
+                eta1 = cs.vertcat(
+                    qdp[0] + psi[0],
+                    -qdp[0] + psi[0]
+                )
+                eta2 = cs.vertcat(
+                    qdp[1] + psi[1],
+                    -qdp[1] + psi[1]
+                )
+
+                nonneg = cs.vertcat(
+                    -(gamma1 - cs.sum(beta1)),
+                    -(gamma2 - cs.sum(beta2)),
+                    -eta1,
+                    -eta2,
+                    -beta1,
+                    -beta2,
+                    -sc
+                )
+                self.nonneg = cs.Function('nonneg', [x, u], [nonneg])
+                self.Ju = cs.Function('Ju', [x, u], [cs.jacobian(nonneg, u)])
+                self.Jx = cs.Function('Jx', [x, u], [cs.jacobian(nonneg, x)])
 
             def evaluate(self, x, u, data):
-                data.value[:] = -u[3:]
+                data.value[:] = self.nonneg(x, u).toarray()[:, 0]
 
             def computeJacobians(self, x, u, data):
-                data.Jx[:, :] = 0.0
-                for i in range(18):
-                    data.Ju[i, i+3] = -1.0
+                data.Jx[:, :] = self.Jx(x, u).toarray()
+                data.Ju[:, :] = self.Ju(x, u).toarray()
 
 
         class Limit(aligator.StageFunction):
@@ -134,8 +171,18 @@ with open("../ipddp2/params/cartpole_friction.txt", 'r') as file:
             def __init__(self):
                 space = manifolds.VectorSpace(nx)
                 super().__init__(space, nu)
-                u = cs.SX.sym('u', nu)
-                J = dt * 1e-2 * u[0] ** 2 + 2.0 * cs.sum(u[1 + nq + 6 * 2:])
+                qc = cs.SX.sym('qc', 2)
+                qp = cs.SX.sym('qp', 2)
+
+                F = cs.SX.sym('F', 1)
+                beta1 = cs.SX.sym('beta1', 2)
+                beta2 = cs.SX.sym('beta2', 2)
+
+                psi = cs.SX.sym('psi', 2)
+                sc = cs.SX.sym('sc', 6)
+                u = cs.vertcat(F, qp, beta1, beta2, psi, sc)
+
+                J = dt * 1e-2 * F ** 2 + 2.0 * cs.sum(sc)
                 self.J = cs.Function('J', [u], [J])
                 self.Ju = cs.Function('Ju', [u], [cs.jacobian(J, u)])
                 self.Juu = cs.Function('Juu', [u], [cs.hessian(J, u)[0]])
@@ -209,7 +256,7 @@ with open("../ipddp2/params/cartpole_friction.txt", 'r') as file:
                 )
             problem.addStage(stage)
 
-        us_init = [np.concatenate((np.zeros(3), 0.01 * np.ones(18)))] * (N-1)
+        us_init = [np.concatenate((np.zeros(3), 0.01 * np.ones(12)))] * (N-1)
         xs_init = aligator.rollout(dynmodel, x0, us_init)
 
         solver.setup(problem)
@@ -240,3 +287,27 @@ print("Successes: ", succ)
 with open("results/cartpole_friction.txt", 'w') as file:
     for line in res:
         file.write(f"{' '.join(line)}\n")
+
+# 0.2
+# Average number of iterations:  400.0
+# Average cost:  -26.579939469264307
+# Average violation:  1.268376354684198
+# Successes:  0
+
+# 0.1
+# Average number of iterations:  400.0
+# Average cost:  -15.466324732092522
+# Average violation:  0.9680251436890063
+# Successes:  0
+
+# 0.05
+# Average number of iterations:  400.0
+# Average cost:  -11.174169111939454
+# Average violation:  0.1969890013851635
+# Successes:  0
+
+# 0.02
+# Average number of iterations:  400.0
+# Average cost:  -5.173604400506558
+# Average violation:  0.07509319788098151
+# Successes:  0

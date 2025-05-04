@@ -66,10 +66,10 @@ function implicit_contact_dynamics(model::Cartpole{T}, x, u, Δ, μ=0.0) where T
     q̇ᵐ⁺ = (q⁺ - q) / Δ
 
     F = u[nF]
-    β1 = u[(nF + nq) .+ (1:nc)]
-    β2 = u[(nF + nq + nc) .+ (1:nc)]
-    η1 = u[(nF + nq + 2 * nc) .+ (1:nc)]
-    η2 = u[(nF + nq + 3 * nc) .+ (1:nc)]
+    β1 = u[(nF + nq) .+ (1:2)]
+    β2 = u[(nF + nq + nc) .+ (1:2)]
+    η1 = u[(nF + nq + 2 * nc) .+ (1:2)]
+    η2 = u[(nF + nq + 3 * nc) .+ (1:2)]
     ψ = u[(nF + nq + 4 * nc) .+ (1:nc)]
     s = u[(nF + nq + 5 * nc) .+ (1:nc)]
 
@@ -101,10 +101,11 @@ function implicit_contact_dynamics_slack(model::Cartpole{T}, x, u, Δ) where T
     q⁺ = u[nF .+ (1:nq)]
 
     q̇ᵐ⁺ = (q⁺ - q) / Δ
+    # q̇ᵐ⁺ = (q - q⁻) / Δ
 
     F = u[nF]
-    β1 = u[(nF + nq) .+ (1:nc)]
-    β2 = u[(nF + nq + nc) .+ (1:nc)]
+    β1 = u[(nF + nq) .+ (1:2)]
+    β2 = u[(nF + nq + nc) .+ (1:2)]
     η1 = u[(nF + nq + 2 * nc) .+ (1:nc)]
     η2 = u[(nF + nq + 3 * nc) .+ (1:nc)]
     ψ = u[(nF + nq + 4 * nc) .+ (1:nc)]
@@ -113,8 +114,8 @@ function implicit_contact_dynamics_slack(model::Cartpole{T}, x, u, Δ) where T
 
     λ = [β1[1] - β1[2]; β2[1] - β2[2]]
 
-    γ1 = model.friction[1] * (model.mp + model.mc) * model.g * Δ
-    γ2 = model.friction[2] * model.mp * model.g * model.l * Δ
+    γ1 = model.friction[1] * (model.mp + model.mc) * model.g
+    γ2 = model.friction[2] * model.mp * model.g * model.l
 
     [
         manipulator_fd(model, Δ , q⁻, q, q⁺, F, λ);

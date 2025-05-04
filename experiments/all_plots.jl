@@ -1,6 +1,5 @@
 include("acrobot_plots.jl")
 include("cartpole_plots.jl")
-include("cartpole_quad_plots.jl")
 include("concar_plots.jl")
 include("concar_quad_plots.jl")
 include("pushing_plots.jl")

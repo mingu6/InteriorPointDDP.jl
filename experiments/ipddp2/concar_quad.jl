@@ -14,7 +14,7 @@ N = 101
 Δ = 0.05
 r_car = 0.02
 
-options = Options{T}(verbose=verbose, μ_init=0.2)
+options = Options{T}(verbose=verbose, optimality_tolerance=1e-6)
 
 visualise && include("../visualise/concar.jl")
 
