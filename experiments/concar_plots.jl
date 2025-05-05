@@ -18,7 +18,7 @@ min_objs = min(minimum(objs_ipd), minimum(objs_ipo))
 max_objs = max(maximum(objs_ipd), maximum(objs_ipo))
 objs_range = max_objs - min_objs
 ymin = 0.0
-ymax = 12.3
+ymax = 19.3
 
 # objective function value
 
@@ -26,19 +26,17 @@ bplots = []
 push!(bplots, boxplot(objs_ipd, title=names[1], titlefontsize=fs, ytickfontsize=fs_y, legend=false, ylims=(ymin, ymax), xticks=[]))
 push!(bplots, boxplot(objs_ipo, title=names[2], titlefontsize=fs, ytickfontsize=fs_y, legend=false, ylims=(ymin, ymax), xticks=[]))
 push!(bplots, boxplot(objs_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, ylims=(ymin, ymax),xticks=[]))
-push!(bplots, boxplot(objs_al, title=names[4], titlefontsize=fs, ytickfontsize=fs_y, legend=false, ylims=(1e-2, 2000), yaxis=:log10,
-            yticks=[1e-1, 1, 1e1, 1e2, 1e3], xticks=[]))
+push!(bplots, boxplot(objs_al, title=names[4], titlefontsize=fs, ytickfontsize=fs_y, legend=false, ylims=(ymin, ymax), xticks=[]))
 plot!(bplots..., size=(650, 350), layout=(1, 4))
 savefig("plots/$problemclass/objective.pdf")
 
 # constraint violation value
 
 bplots = []
-push!(bplots, boxplot(constrs_ipd, title=names[1], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], yaxis=:log10, ylims=(1e-16, 5e-9)))
-push!(bplots, boxplot(constrs_ipo, title=names[2], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], yaxis=:log10, ylims=(1e-16, 5e-9)))
-push!(bplots, boxplot(constrs_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], yaxis=:log10, ylims=(1e-16, 5e-9)))
-push!(bplots, boxplot(constrs_al, title=names[4], titlefontsize=fs, ytickfontsize=fs_y, legend=false, yaxis=:log10,
-            yticks=[1e-2, 1e-1, 1, 1e1], xticks=[], ylims=(0.5e-2, 2e1)))
+push!(bplots, boxplot(constrs_ipd, title=names[1], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], yaxis=:log10, ylims=(1e-16, 5e-3)))
+push!(bplots, boxplot(constrs_ipo, title=names[2], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], yaxis=:log10, ylims=(1e-16, 5e-3)))
+push!(bplots, boxplot(constrs_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], yaxis=:log10, ylims=(1e-16, 5e-3)))
+push!(bplots, boxplot(constrs_al, title=names[4], titlefontsize=fs, ytickfontsize=fs_y, legend=false, yaxis=:log10, xticks=[], ylims=(1e-16, 11), yticks=[1e-10, 1e-5, 1]))
 plot(bplots..., size=(650, 350), layout=(1, 4))
 savefig("plots/$problemclass/constr.pdf")
 
@@ -63,8 +61,8 @@ savefig("plots/$problemclass/time.pdf")
 
 println("Car Obstacle Avoidance (Linear)")
 println()
-println("Objective (rel IPOPT): ", median(objs_ipd ./ objs_ipob))
-println("Iteration Count (rel IPOPT): ", median(iters_ipd ./ iters_ipob))
+println("Objective (rel IPOPT): ", median(objs_ipd ./ objs_ipo))
+println("Iteration Count (rel IPOPT): ", median(iters_ipd ./ iters_ipo))
 println("Wall Time per iteration (rel IPOPT): ", median((wall_ipd ./ iters_ipd) ./ (wall_ipo ./ iters_ipo)))
 println()
 println("Objective (rel IPOPT BFGS): ", median(objs_ipd ./ objs_ipob))
