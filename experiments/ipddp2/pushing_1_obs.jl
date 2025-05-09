@@ -4,6 +4,7 @@ using Random
 using Plots
 using MeshCat
 using Printf
+using LaTeXStrings
 
 visualise = false
 benchmark = false
@@ -138,6 +139,24 @@ for seed = 1:n_ocp
 	end
 
     push!(params, [xyc; μ_fric; obstacle])
+
+    # ## Plot solution
+	if seed == 1
+		x_sol, u_sol = get_trajectory(solver)
+        phidot = map(u -> u[3] - u[4] , u_sol)
+        fric_lim = map(u -> μ_fric * u[1], u_sol)
+        negfric_lim = map(u -> -μ_fric * u[1], u_sol)
+        ft = map(u -> u[2], u_sol)
+        plot(range(0, Δ * (N-1), N-1), phidot, xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylabel="meters per second",
+			legendfontsize=14, linewidth=2, xlabelfontsize=14, ylabelfontsize=14, linestyle=:solid, linecolor=1, 
+            legendposition=:bottom, legendtitleposition=:left, ylims=(-10, 10),
+			background_color_legend = nothing, label=L"$\dot{\phi}_t$")
+        plot!(twinx(), range(0, Δ * (N-1), N-1), [ft fric_lim negfric_lim], xtickfontsize=14, ytickfontsize=14, ylabel="Newtons (N)",
+			legendfontsize=14, linewidth=2, xlabelfontsize=14, ylabelfontsize=14, linestyle=[:dot :solid :solid], linecolor=[2 3 3], 
+            legendposition=:top, legendtitleposition=:left, ylims=(-0.1, 0.1), alpha=[1. 0.5 0.5],
+			background_color_legend = nothing, label= [L"$f_t^T$" L"$c_f f_t^n$" L"$-c_f f_t^n$"])
+		savefig("plots/pushing_IPDDP.pdf")
+	end
 end
 
 open("results/pushing_1_obs.txt", "w") do io
