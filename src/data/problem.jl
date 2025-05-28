@@ -8,6 +8,7 @@ mutable struct ProblemData{T}
     eq_duals::Vector{Vector{T}}
     ineq_duals_lo::Vector{Vector{T}}
     ineq_duals_up::Vector{Vector{T}}
+    dyn_duals::Vector{Vector{T}}
 
     # nominal trajectory
     nominal_states::Vector{Vector{T}}
@@ -18,6 +19,7 @@ mutable struct ProblemData{T}
     nominal_eq_duals::Vector{Vector{T}}
     nominal_ineq_duals_lo::Vector{Vector{T}}
     nominal_ineq_duals_up::Vector{Vector{T}}
+    nominal_dyn_duals::Vector{Vector{T}}
 
     # model data
     model::ModelData{T}
@@ -47,6 +49,7 @@ function problem_data(T, dynamics::Model, objectives::Objectives, constraints::C
     eq_duals = deepcopy(constr)
     ineq_duals_lo = deepcopy(controls)
     ineq_duals_up = deepcopy(controls)
+    dyn_duals = deepcopy(states)
 
     nominal_states = deepcopy(states)
     nominal_controls = deepcopy(controls)
@@ -56,6 +59,7 @@ function problem_data(T, dynamics::Model, objectives::Objectives, constraints::C
     nominal_eq_duals = deepcopy(constr)
     nominal_ineq_duals_lo = deepcopy(controls)
     nominal_ineq_duals_up = deepcopy(controls)
+    nominal_dyn_duals = deepcopy(states)
 
     model = model_data(T, dynamics)
     objectives_dat = objectives_data(T, constraints, objectives)
@@ -67,8 +71,8 @@ function problem_data(T, dynamics::Model, objectives::Objectives, constraints::C
     horizon = length(objectives)
     
     ProblemData(states, controls, constr, ineq_lo, ineq_up,
-        eq_duals, ineq_duals_lo, ineq_duals_up,
+        eq_duals, ineq_duals_lo, ineq_duals_up, dyn_duals,
         nominal_states, nominal_controls, nominal_constr, nominal_ineq_lo, nominal_ineq_up,
-        nominal_eq_duals, nominal_ineq_duals_lo, nominal_ineq_duals_up,
+        nominal_eq_duals, nominal_ineq_duals_lo, nominal_ineq_duals_up, nominal_dyn_duals,
         model, objectives_dat, constr_data, bounds, horizon)
 end

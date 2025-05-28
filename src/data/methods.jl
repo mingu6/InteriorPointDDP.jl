@@ -79,6 +79,7 @@ function update_nominal_trajectory!(data::ProblemData)
         data.nominal_eq_duals[t] .= data.eq_duals[t]
         data.nominal_ineq_duals_lo[t] .= data.ineq_duals_lo[t]
         data.nominal_ineq_duals_up[t] .= data.ineq_duals_up[t]
+        data.nominal_dyn_duals[t] .= data.dyn_duals[t]
     end
 end
 
@@ -95,5 +96,6 @@ function dual_trajectories(problem::ProblemData; mode=:nominal)
     ϕ = mode == :nominal ? problem.nominal_eq_duals : problem.eq_duals
     zl = mode == :nominal ? problem.nominal_ineq_duals_lo : problem.ineq_duals_lo
     zu = mode == :nominal ? problem.nominal_ineq_duals_up : problem.ineq_duals_up
-    return ϕ, zl, zu
+    λ = mode == :nominal ? problem.nominal_dyn_duals : problem.dyn_duals
+    return ϕ, zl, zu, λ
 end

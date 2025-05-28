@@ -46,7 +46,7 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
     u_tmp2 = update_rule.u_tmp2
     
     x, u, c, il, iu = primal_trajectories(problem, mode=mode)
-    ϕ, zl, zu = dual_trajectories(problem, mode=mode)
+    ϕ, zl, zu, λ = dual_trajectories(problem, mode=mode)
 
     μ = data.μ
     δ_c = 0.
@@ -102,7 +102,7 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
             if !options.quasi_newton
                 if t < N
                     fn_eval_time_ = time()
-                    tensor_contraction!(vfxx[t], vfux[t], vfuu[t], problem.model.dynamics[t], x[t], u[t], V̄x[t+1])
+                    tensor_contraction!(vfxx[t], vfux[t], vfuu[t], problem.model.dynamics[t], x[t], u[t], λ[t+1])
                     data.fn_eval_time += time() - fn_eval_time_
                     C[t] .+= vfxx[t]
                     B[t] .+= vfux[t]
@@ -180,9 +180,13 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
             # V̄x = Lx' + β' * ĝ + ω' c + fx' V̄x+
             V̄x[t] .= lx[t]
             mul!(V̄x[t], transpose(cx[t]), ϕ[t], 1.0, 1.0)
+            λ[t] .= V̄x[t]
             mul!(V̄x[t], transpose(β[t]), ĝ[t], 1.0, 1.0)
             mul!(V̄x[t], transpose(ω[t]), c[t], 1.0, 1.0)
             t < N && mul!(V̄x[t], transpose(fx[t]), V̄x[t+1], 1.0, 1.0)
+
+            # λ = Lx' + fx' λ+
+            t < N && mul!(λ[t], transpose(fx[t]), λ[t+1], 1.0, 1.0)
         end
         data.status == 0 && break
     end

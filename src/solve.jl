@@ -54,8 +54,9 @@ function solve!(solver::Solver{T}) where T
 
         cs_inf_μ = cs_error(update_rule, problem, options, data.μ)
         opt_err_μ = max(data.dual_inf, cs_inf_μ, data.primal_inf)
+        opt_err_0 = max(data.dual_inf, data.cs_inf, data.primal_inf)
 
-        (data.μ < options.optimality_tolerance) && (opt_err_μ < options.optimality_tolerance) && break
+        opt_err_0 < options.optimality_tolerance && break
 
         if opt_err_μ <= options.κ_ϵ * data.μ && num_bounds > 0 && data.μ > options.optimality_tolerance / 10.0
             data.μ = max(options.optimality_tolerance / 10.0, min(options.κ_μ * data.μ, data.μ ^ options.θ_μ))
@@ -115,10 +116,13 @@ end
 
 function dual_error(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
                     options::Options{T}) where T
-    ĝ = update_rule.ĝ
     N = problem.horizon
     bounds = problem.bounds
-    ϕ, zl, zu = dual_trajectories(problem, mode=:nominal)
+    ϕ, zl, zu, λ = dual_trajectories(problem, mode=:nominal)
+    lu = problem.objective_data.gradient_control
+    fu = problem.model.jacobian_control
+    cu = problem.constraints_data.jacobian_control
+    u_tmp1 = update_rule.u_tmp1
 
     num_ineq = 0
     z_norm::T = 0.0
@@ -126,7 +130,13 @@ function dual_error(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
     num_constr = problem.constraints_data.num_constraints[1]
     dual_inf::T = 0     # dual infeasibility (stationarity of Lagrangian of barrier subproblem)
     for t = N:-1:1
-        dual_inf = max(dual_inf, norm(ĝ[t], Inf))
+        u_tmp1[t] .= lu[t]
+        mul!(u_tmp1[t], transpose(cu[t]), ϕ[t], 1.0, 1.0)
+        u_tmp1[t] .-= zl[t]
+        u_tmp1[t] .+= zu[t]
+        t < N && mul!(u_tmp1[t], transpose(fu[t]), λ[t+1], 1.0, 1.0)
+        dual_inf = max(dual_inf, norm(u_tmp1[t], Inf))
+
         z_norm += sum(zl[t])
         z_norm += sum(zu[t])
         ϕ_norm += norm(ϕ[t], 1)
@@ -179,6 +189,7 @@ function reset_duals!(problem::ProblemData{T}) where T
         fill!(problem.nominal_ineq_duals_lo[t], 0.0)
         fill!(problem.ineq_duals_up[t], 0.0)
         fill!(problem.nominal_ineq_duals_up[t], 0.0)
+        fill!(problem.nominal_dyn_duals[t], 0.0)
         @views problem.ineq_duals_lo[t][bounds[t].indices_lower].= 1.0
         @views problem.ineq_duals_up[t][bounds[t].indices_upper] .= 1.0
         @views problem.nominal_ineq_duals_lo[t][bounds[t].indices_lower] .= 1.0
