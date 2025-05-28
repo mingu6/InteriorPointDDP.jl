@@ -28,7 +28,7 @@ push!(bplots, boxplot(objs_ipo, title=names[2], titlefontsize=fs, ytickfontsize=
 push!(bplots, boxplot(objs_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, ylims=(ymin, 15), xticks=[]))
 push!(bplots, boxplot(objs_al, title=names[4], titlefontsize=fs, ytickfontsize=fs_y, legend=false, ylims=(ymin, ymax), xticks=[]))
 plot!(bplots..., size=(650, 350), layout=(1, 4))
-savefig("plots/$problemclass/objective.pdf")
+savefig("plots/$problemclass/objective.svg")
 
 # constraint violation value
 
@@ -42,7 +42,7 @@ push!(bplots, boxplot(constrs_ipob, title=names[3], titlefontsize=fs, ytickfonts
 push!(bplots, boxplot(constrs_al, title=names[4], titlefontsize=fs, ytickfontsize=fs_y, legend=false, yaxis=:log10, xticks=[],
                         ylims=(1e-16, 1e1), yticks=[1e-16, 1e-12, 1e-8, 1e-4, 1]))
 plot(bplots..., size=(650, 350), layout=(1, 4))
-savefig("plots/$problemclass/constr.pdf")
+savefig("plots/$problemclass/constr.svg")
 
 # iteration count
 
@@ -52,7 +52,7 @@ push!(bplots, boxplot(iters_ipo, title=names[2], titlefontsize=fs, ytickfontsize
 push!(bplots, boxplot(iters_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 2200)))
 push!(bplots, boxplot(iters_al, title=names[4], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 2200)))
 plot(bplots..., size=(650, 350), layout=(1, 4))
-savefig("plots/$problemclass/iterations.pdf")
+savefig("plots/$problemclass/iterations.svg")
 
 # wall time per iteration
 
@@ -61,7 +61,7 @@ push!(bplots, boxplot(wall_ipd ./ iters_ipd, title=names[1], titlefontsize=fs, y
 push!(bplots, boxplot(wall_ipo ./ iters_ipo, title=names[2], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 5.9)))
 push!(bplots, boxplot(wall_ipob ./ iters_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 5.9)))
 plot(bplots..., size=(500, 350), layout=(1, 3))
-savefig("plots/$problemclass/time.pdf")
+savefig("plots/$problemclass/time.svg")
 
 println("Cartpole")
 println()

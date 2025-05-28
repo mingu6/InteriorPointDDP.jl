@@ -3,7 +3,7 @@ using Statistics
 
 function read_results(fname::String)
     regex_results = r"\s*(\d+)\s+(\d+)\s+(\w+)\s+(\d+.\d+e[+-]\d+)\s+(\d+.\d+e[+-]\d+)\s+(\d+.\d+)\s+(\d+.\d+)"
-    regex_no_bm = r"\s*(\d+)\s+(\d+)\s+(\w+)\s([+-]?\d+.\d+e?[+-]?\d+)?\s+(\d+.\d+e?[+-]?\d+)"
+    regex_no_bm = r"\s*(\d+)\s+(\d+)\s+(\w+)\s+([+-]?\d+.\d+e?[+-]?\d+)?\s+(\d+.\d+e?[+-]?\d+)"
     
     seeds = Int64[]
     iters = Int64[]

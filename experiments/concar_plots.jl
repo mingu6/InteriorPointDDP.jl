@@ -28,7 +28,7 @@ push!(bplots, boxplot(objs_ipo, title=names[2], titlefontsize=fs, ytickfontsize=
 push!(bplots, boxplot(objs_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, ylims=(ymin, ymax),xticks=[]))
 push!(bplots, boxplot(objs_al, title=names[4], titlefontsize=fs, ytickfontsize=fs_y, legend=false, ylims=(ymin, ymax), xticks=[]))
 plot!(bplots..., size=(650, 350), layout=(1, 4))
-savefig("plots/$problemclass/objective.pdf")
+savefig("plots/$problemclass/objective.svg")
 
 # constraint violation value
 
@@ -38,7 +38,7 @@ push!(bplots, boxplot(constrs_ipo, title=names[2], titlefontsize=fs, ytickfontsi
 push!(bplots, boxplot(constrs_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], yaxis=:log10, ylims=(1e-16, 5e-3)))
 push!(bplots, boxplot(constrs_al, title=names[4], titlefontsize=fs, ytickfontsize=fs_y, legend=false, yaxis=:log10, xticks=[], ylims=(1e-16, 11), yticks=[1e-10, 1e-5, 1]))
 plot(bplots..., size=(650, 350), layout=(1, 4))
-savefig("plots/$problemclass/constr.pdf")
+savefig("plots/$problemclass/constr.svg")
 
 # iteration count
 
@@ -48,7 +48,7 @@ push!(bplots, boxplot(iters_ipo, title=names[2], titlefontsize=fs, ytickfontsize
 push!(bplots, boxplot(iters_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 550)))
 push!(bplots, boxplot(iters_al, title=names[4], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 2200)))
 plot(bplots..., size=(650, 350), layout=(1, 4))
-savefig("plots/$problemclass/iterations.pdf")
+savefig("plots/$problemclass/iterations.svg")
 
 # wall time
 
@@ -57,12 +57,12 @@ push!(bplots, boxplot(wall_ipd ./ iters_ipd, title=names[1], titlefontsize=fs, y
 push!(bplots, boxplot(wall_ipo ./ iters_ipo, title=names[2], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 3.9)))
 push!(bplots, boxplot(wall_ipob ./ iters_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 3.9)))
 plot(bplots..., size=(500, 350), layout=(1, 3))
-savefig("plots/$problemclass/time.pdf")
+savefig("plots/$problemclass/time.svg")
 
 println("Car Obstacle Avoidance (Linear)")
 println()
 println("Objective (rel IPOPT): ", median(objs_ipd ./ objs_ipo))
-println("Iteration Count (rel IPOPT): ", median(iters_ipd ./ iters_ipo))
+println("Iteration Count (rel IPOPT): ", median(iters_ipd ./ iters_ipo), " ", median(iters_ipd), " ", median(iters_ipo))
 println("Wall Time per iteration (rel IPOPT): ", median((wall_ipd ./ iters_ipd) ./ (wall_ipo ./ iters_ipo)))
 println()
 println("Objective (rel IPOPT BFGS): ", median(objs_ipd ./ objs_ipob))
