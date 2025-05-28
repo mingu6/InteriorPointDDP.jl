@@ -16,7 +16,7 @@ T = Float64
 N = 76
 n_ocp = 100
 
-options = Options{T}(verbose=verbose, optimality_tolerance=1e-6, μ_init=0.2, κ_ϵ=10.0)
+options = Options{T}(verbose=verbose, optimality_tolerance=1e-6, μ_init=0.5)
 
 results = Vector{Vector{Any}}()
 params = Vector{Vector{T}}()
@@ -170,7 +170,7 @@ open("results/pushing_1_obs.txt", "w") do io
 end
 
 # save parameters of each experiment for ProxDDP comparison
-open("params/pushing_1_obs.txt", "w") do io
+open("params/pushing_1_obs1.txt", "w") do io
     for i = 1:n_ocp
         println(io, join(string.(params[i]), " "))
     end
