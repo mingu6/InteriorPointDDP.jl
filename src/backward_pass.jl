@@ -11,12 +11,12 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
     vfux = problem.model.vfux
     vfuu = problem.model.vfuu
     # Jacobian caches
-    hx = problem.constraints_data.jacobian_state
-    hu = problem.constraints_data.jacobian_control
+    cx = problem.constraints_data.jacobian_state
+    cu = problem.constraints_data.jacobian_control
     # Tensor contraction of constraints (DDP)
-    vhxx = problem.constraints_data.vhxx
-    vhux = problem.constraints_data.vhux
-    vhuu = problem.constraints_data.vhuu
+    vcxx = problem.constraints_data.vcxx
+    vcux = problem.constraints_data.vcux
+    vcuu = problem.constraints_data.vcuu
     # Objective gradients
     lx = problem.objective_data.gradient_state
     lu = problem.objective_data.gradient_control
@@ -24,13 +24,11 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
     lxx = problem.objective_data.hessian_state_state
     luu = problem.objective_data.hessian_control_control
     lux = problem.objective_data.hessian_control_state
-    # Hamiltonian approximation
-    Q̂x = update_rule.hamiltonian.gradient_state
-    Q̂u = update_rule.hamiltonian.gradient_control
-    Q̂xx = update_rule.hamiltonian.hessian_state_state
-    Q̂uu = update_rule.hamiltonian.hessian_control_control
-    Q̂ux = update_rule.hamiltonian.hessian_control_state
-    Q̃u = update_rule.Q̃u
+    # DDP intermediate variables
+    ĝ = update_rule.ĝ
+    C = update_rule.C
+    Ĥ = update_rule.Ĥ
+    B = update_rule.B
     # Update rule parameters
     α = update_rule.parameters.α
     β = update_rule.parameters.β
@@ -41,13 +39,13 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
     χu = update_rule.parameters.χu
     ζu = update_rule.parameters.ζu
     # Value function
-    V̂x = update_rule.value.gradient
-    V̂xx = update_rule.value.hessian
+    V̄x = update_rule.value.gradient
+    V̄xx = update_rule.value.hessian
 
     u_tmp1 = update_rule.u_tmp1
     u_tmp2 = update_rule.u_tmp2
     
-    x, u, h, il, iu = primal_trajectories(problem, mode=mode)
+    x, u, c, il, iu = primal_trajectories(problem, mode=mode)
     ϕ, zl, zu = dual_trajectories(problem, mode=mode)
 
     μ = data.μ
@@ -56,93 +54,85 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
     
     while reg <= options.reg_max
         data.status = 0
-        V̂xx[N] .= lxx[N]
-        V̂x[N] .= lx[N]
         
-        for t = N-1:-1:1
+        for t = N:-1:1
             num_control = length(u[t])
-            num_constr = length(h[t])
+            num_constr = length(c[t])
 
             u_tmp1[t] .= inv.(il[t])
             u_tmp2[t] .= inv.(iu[t])
-
-            # Q̂x = Lx + fx' * V̂x
-            Q̂x[t] .= lx[t]
-            mul!(Q̂x[t], transpose(fx[t]), V̂x[t+1], 1.0, 1.0)
-            mul!(Q̂x[t], transpose(hx[t]), ϕ[t], 1.0, 1.0)
-
-            # Q̂u = Lu + fu' * V̂x
-            Q̃u[t] .= lu[t]
-            mul!(Q̃u[t], transpose(fu[t]), V̂x[t+1], 1.0, 1.0)
-            mul!(Q̃u[t], transpose(hu[t]), ϕ[t], 1.0, 1.0)
 
             χl[t] .= u_tmp1[t]
             χl[t] .*= μ
             χu[t] .= u_tmp2[t]
             χu[t] .*= μ
 
-            Q̂u[t] .= χl[t]      # barrier term gradient
-            Q̂u[t] .*= -1.0      # barrier term gradient
-            Q̂u[t] .+= χu[t]     # barrier term gradient
-            Q̂u[t] .+= Q̃u[t]
-
-            Q̃u[t] .-= zl[t]
-            Q̃u[t] .+= zu[t]
+            # ĝ = Lu' -μŪ^{-1}e + fu' * V̂x
+            ĝ[t] .= lu[t]
+            mul!(ĝ[t], transpose(cu[t]), ϕ[t], 1.0, 1.0)
+            t < N && mul!(ĝ[t], transpose(fu[t]), V̄x[t+1], 1.0, 1.0)
+            ĝ[t] .-= χl[t]  # barrier gradient
+            ĝ[t] .+= χu[t]  # barrier gradient
             
-            # Q̂xx = Lxx + fx' * V̂xx * fx + V̂xx ⋅ fxx
-            mul!(update_rule.xx_tmp[t], transpose(fx[t]), V̂xx[t+1])
-            mul!(Q̂xx[t], update_rule.xx_tmp[t], fx[t])
-            Q̂xx[t] .+= lxx[t]
+            # C = Lxx + fx' * V̄xx * fx + V̄x ⋅ fxx
+            C[t] .= lxx[t]
+            if t < N
+                mul!(update_rule.xx_tmp[t], transpose(fx[t]), V̄xx[t+1])
+                mul!(C[t], update_rule.xx_tmp[t], fx[t], 1.0, 1.0)
+            end
     
-            # Q̂uu = luu + ϕ ⋅ huu + Σ + fu' * V̂xx * fu + V̂x ⋅ fuu
+            # Ĥ = Luu + Σ + fu' * V̄xx * fu + V̄x ⋅ fuu
             u_tmp1[t] .*= zl[t]   # Σ^L
             u_tmp2[t] .*= zu[t]   # Σ^U
-            fill!(Q̂uu[t], 0.0)
+            fill!(Ĥ[t], 0.0)
             for i = 1:num_control
-                Q̂uu[t][i, i] = u_tmp1[t][i] + u_tmp2[t][i]
+                Ĥ[t][i, i] = u_tmp1[t][i] + u_tmp2[t][i]
             end
-
-            mul!(update_rule.ux_tmp[t], transpose(fu[t]), V̂xx[t+1])
-            mul!(Q̂uu[t], update_rule.ux_tmp[t], fu[t], 1.0, 1.0)
-            Q̂uu[t] .+= luu[t]
+            if t < N
+                mul!(update_rule.ux_tmp[t], transpose(fu[t]), V̄xx[t+1])
+                mul!(Ĥ[t], update_rule.ux_tmp[t], fu[t], 1.0, 1.0)
+            end
+            Ĥ[t] .+= luu[t]
     
-            # Q̂xu = Lxu + fu' * V̂xx * fx + V̂x ⋅ fxu
-            mul!(Q̂ux[t], update_rule.ux_tmp[t], fx[t])
-            Q̂ux[t] .+= lux[t]
+            # B = Lux + fu' * V̄xx * fx + V̄x ⋅ fxu
+            B[t] .= lux[t]
+            t < N && mul!(B[t], update_rule.ux_tmp[t], fx[t], 1.0, 1.0)
             
             # apply second order tensor contraction terms to Q̂uu, Q̂ux, Q̂xx
             if !options.quasi_newton
-                fn_eval_time_ = time()
-                tensor_contraction!(vfxx[t], vfux[t], vfuu[t], problem.model.dynamics[t], x[t], u[t], V̂x[t+1])
-                data.fn_eval_time += time() - fn_eval_time_
-                Q̂xx[t] .+= vfxx[t]
-                Q̂ux[t] .+= vfux[t]
-                Q̂uu[t] .+= vfuu[t]
+                if t < N
+                    fn_eval_time_ = time()
+                    tensor_contraction!(vfxx[t], vfux[t], vfuu[t], problem.model.dynamics[t], x[t], u[t], V̄x[t+1])
+                    data.fn_eval_time += time() - fn_eval_time_
+                    C[t] .+= vfxx[t]
+                    B[t] .+= vfux[t]
+                    Ĥ[t] .+= vfuu[t]
+                end
 
-                Q̂uu[t] .+= vhuu[t]
-                Q̂ux[t] .+= vhux[t]
-                Q̂xx[t] .+= vhxx[t]
+                Ĥ[t] .+= vcuu[t]
+                B[t] .+= vcux[t]
+                C[t] .+= vcxx[t]
             end
             
             # inertia calculation and correction (regularisation)
             if reg > 0.0
                 for i in 1:num_control
-                    Q̂uu[t][i, i] += reg
+                    Ĥ[t][i, i] += reg
                 end
             end
 
             # setup linear system in backward pass
-            update_rule.lhs_tl[t] .= Q̂uu[t]
-            update_rule.lhs_tr[t] .= transpose(hu[t])
+            update_rule.lhs_tl[t] .= Ĥ[t]
+            update_rule.lhs_tr[t] .= transpose(cu[t])
             fill!(update_rule.lhs_br[t], 0.0)
 
-            α[t] .= Q̂u[t]
+            α[t] .= ĝ[t]
             α[t] .*= -1.0
-            ψ[t] .= h[t]
+            ψ[t] .= c[t]
             ψ[t] .*= -1.0
-            β[t] .= Q̂ux[t]
+            β[t] .= B[t]
             β[t] .*= -1.0
-            ω[t] .= hx[t]
+            ω[t] .= cx[t]
             ω[t] .*= -1.0
 
             if δ_c > 0.0
@@ -153,7 +143,6 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
 
             bk, data.status, reg, δ_c = inertia_correction!(update_rule.kkt_matrix_ws[t], update_rule.lhs[t], update_rule.D_cache[t],
                         num_control, μ, reg, data.reg_last, options)
-
             data.status != 0 && break
 
             ldiv!(bk, update_rule.parameters.eq[t])
@@ -183,16 +172,17 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
             χu[t] .+= u_tmp2[t]
 
             # Update return function approx. for next timestep 
-            # Vxx = Q̂xx + Q̂ux' * β + β * Q̂ux' + β' Q̂uu' * β
-            mul!(V̂xx[t], transpose(Q̂ux[t]), β[t])
-            mul!(V̂xx[t], transpose(hx[t]), ω[t], 1.0, 1.0)
-            V̂xx[t] .+= Q̂xx[t]
-            V̂xx[t] .= Symmetric(V̂xx[t])
+            # V̄xx = C + β' * B + ω' cx
+            mul!(V̄xx[t], transpose(β[t]), B[t])
+            mul!(V̄xx[t], transpose(ω[t]), cx[t], 1.0, 1.0)
+            V̄xx[t] .+= C[t]
 
-            # Vx = Q̂x + β' * Q̂u + [Q̂uu β + Q̂ux]^T α
-            mul!(V̂x[t], transpose(β[t]), Q̂u[t])
-            mul!(V̂x[t], transpose(ω[t]), h[t], 1.0, 1.0)
-            V̂x[t] .+= Q̂x[t]
+            # V̄x = Lx' + β' * ĝ + ω' c + fx' V̄x+
+            V̄x[t] .= lx[t]
+            mul!(V̄x[t], transpose(cx[t]), ϕ[t], 1.0, 1.0)
+            mul!(V̄x[t], transpose(β[t]), ĝ[t], 1.0, 1.0)
+            mul!(V̄x[t], transpose(ω[t]), c[t], 1.0, 1.0)
+            t < N && mul!(V̄x[t], transpose(fx[t]), V̄x[t+1], 1.0, 1.0)
         end
         data.status == 0 && break
     end

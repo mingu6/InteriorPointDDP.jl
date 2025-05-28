@@ -6,17 +6,6 @@ struct Value{T}
     hessian::Vector{Matrix{T}}
 end
 
-""" 
-    control-value function approximation 
-"""
-struct Hamiltonian{T}
-    gradient_state::Vector{Vector{T}}
-    gradient_control::Vector{Vector{T}}
-    hessian_state_state::Vector{Matrix{T}}
-    hessian_control_control::Vector{Matrix{T}}
-    hessian_control_state::Vector{Matrix{T}}
-end
-
 """
     Store all update rule parameters
 """
@@ -49,20 +38,22 @@ struct UpdateRuleData{T}
     # value function approximation
     value::Value{T}
 
-    # control-value (Q) function approximation
-    hamiltonian::Hamiltonian{T}
-    Q̃u::Vector{Vector{T}}
+    # intermediate variables for value function
+    ĝ::Vector{Vector{T}}
+    C::Vector{Matrix{T}}
+    Ĥ::Vector{Matrix{T}}
+    B::Vector{Matrix{T}}
 
     # pre-allocated memory
     x_tmp::Vector{Vector{T}}
     u_tmp1::Vector{Vector{T}}
     u_tmp2::Vector{Vector{T}}
-    h_tmp::Vector{Vector{T}}
+    c_tmp::Vector{Vector{T}}
 	uu_tmp::Vector{Matrix{T}}
 	ux_tmp::Vector{Matrix{T}}
     xx_tmp::Vector{Matrix{T}}
-	hu_tmp::Vector{Matrix{T}}
-	hx_tmp::Vector{Matrix{T}}
+	cu_tmp::Vector{Matrix{T}}
+	cx_tmp::Vector{Matrix{T}}
 
     lhs::Vector{Matrix{T}}
     lhs_tl::Vector{SubArray{T, 2, Matrix{T}, Tuple{UnitRange{Int64}, UnitRange{Int64}}, false}}
@@ -75,56 +66,50 @@ struct UpdateRuleData{T}
 end
 
 function update_rule_parameters(T, constraints::Constraints)
-    N = length(constraints) + 1
+    N = length(constraints)
 
     eq = [zeros(T, c.num_control + c.num_constraint, c.num_state + 1) for c in constraints]
     ineq = [zeros(T, 2 * c.num_control, c.num_state + 1) for c in constraints]
 
-    α = [@views eq[t][1:constraints[t].num_control, 1] for t in 1:N-1]
-    β = [@views eq[t][1:constraints[t].num_control, 2:end] for t in 1:N-1]
+    α = [@views eq[t][1:constraints[t].num_control, 1] for t in 1:N]
+    β = [@views eq[t][1:constraints[t].num_control, 2:end] for t in 1:N]
 
-	ψ = [@views eq[t][constraints[t].num_control+1:end, 1] for t in 1:N-1]
-    ω = [@views eq[t][constraints[t].num_control+1:end, 2:end] for t in 1:N-1]
+	ψ = [@views eq[t][constraints[t].num_control+1:end, 1] for t in 1:N]
+    ω = [@views eq[t][constraints[t].num_control+1:end, 2:end] for t in 1:N]
 
-    χl = [@views ineq[t][1:constraints[t].num_control, 1] for t in 1:N-1]
-    ζl = [@views ineq[t][1:constraints[t].num_control, 2:end] for t in 1:N-1]
+    χl = [@views ineq[t][1:constraints[t].num_control, 1] for t in 1:N]
+    ζl = [@views ineq[t][1:constraints[t].num_control, 2:end] for t in 1:N]
     
-    χu = [@views ineq[t][constraints[t].num_control+1:end, 1] for t in 1:N-1]
-    ζu = [@views ineq[t][constraints[t].num_control+1:end, 2:end] for t in 1:N-1]
+    χu = [@views ineq[t][constraints[t].num_control+1:end, 1] for t in 1:N]
+    ζu = [@views ineq[t][constraints[t].num_control+1:end, 2:end] for t in 1:N]
 
     return UpdateRuleParameters(eq, ineq, α, β, ψ, ω, χl, ζl, χu, ζu)
 end
 
-function update_rule_data(T, dynamics::Vector{Dynamics}, constraints::Constraints, bounds::Bounds)
+function update_rule_data(T, constraints::Constraints)
     parameters = update_rule_parameters(T, constraints)
 
     # value function approximation
-    V̂xx = [[zeros(T, d.num_state, d.num_state) for d in dynamics]..., 
-            zeros(T, dynamics[end].num_next_state, dynamics[end].num_next_state)]
-    V̂x =  [[zeros(T, d.num_state) for d in dynamics]..., 
-            zeros(T, dynamics[end].num_next_state)]
-    value = Value(V̂x, V̂xx)
+    V̄xx = [zeros(T, c.num_state, c.num_state) for c in constraints]
+    V̄x =  [zeros(T, c.num_state) for c in constraints]
+    value = Value(V̄x, V̄xx)
 
     # control-value function approximation
-    Q̂x = [zeros(T, d.num_state) for d in dynamics]
-    Q̂u = [zeros(T, d.num_control) for d in dynamics]
-    Q̂xx = [zeros(T, d.num_state, d.num_state) for d in dynamics]
-    Q̂uu = [zeros(T, d.num_control, d.num_control) for d in dynamics]
-    Q̂ux = [zeros(T, d.num_control, d.num_state) for d in dynamics]
+    ĝ = [zeros(T, c.num_control) for c in constraints]
+    C = deepcopy(V̄xx)
+    Ĥ = [zeros(T, c.num_control, c.num_control) for c in constraints]
+    B = [zeros(T, c.num_control, c.num_state) for c in constraints]
 
-    hamiltonian = Hamiltonian(Q̂x, Q̂u, Q̂xx, Q̂uu, Q̂ux)
-    Q̃u = [zeros(T, d.num_control) for d in dynamics]
+    x_tmp = deepcopy(V̄x)
+    u_tmp1 = [zeros(T, c.num_control) for c in constraints]
+    u_tmp2 = deepcopy(u_tmp1)
+	c_tmp = [zeros(T, c.num_constraint) for c in constraints]
+	uu_tmp = deepcopy(Ĥ)
+	ux_tmp = deepcopy(B)
+    xx_tmp = deepcopy(C)
 
-    x_tmp = [[zeros(T, d.num_state) for d in dynamics]..., zeros(T, dynamics[end].num_next_state)]
-    u_tmp1 = [zeros(T, d.num_control) for d in dynamics]
-    u_tmp2 = [zeros(T, d.num_control) for d in dynamics]
-	h_tmp = [zeros(T, c.num_constraint) for c in constraints]
-	uu_tmp = [zeros(T, d.num_control, d.num_control) for d in dynamics]
-	ux_tmp = [zeros(T, d.num_control, d.num_state) for d in dynamics]
-    xx_tmp = [zeros(T, d.num_state, d.num_state) for d in dynamics]
-
-    hu_tmp = [zeros(T, c.num_constraint, c.num_control) for c in constraints]
-    hx_tmp = [zeros(T, c.num_constraint, c.num_state) for c in constraints]
+    cu_tmp = [zeros(T, c.num_constraint, c.num_control) for c in constraints]
+    cx_tmp = [zeros(T, c.num_constraint, c.num_state) for c in constraints]
 
     lhs = [zeros(T, c.num_constraint + c.num_control, c.num_constraint + c.num_control) for c in constraints]
     lhs_tl = [@views lhs[t][1:c.num_control, 1:c.num_control] for (t, c) in enumerate(constraints)]
@@ -135,7 +120,7 @@ function update_rule_data(T, dynamics::Vector{Dynamics}, constraints::Constraint
     kkt_matrix_ws = [BunchKaufmanWs(L) for L in lhs]
     D_cache = [Pair(zeros(T, c.num_constraint + c.num_control), zeros(T, c.num_constraint + c.num_control)) for c in constraints]
 
-    UpdateRuleData{T}(parameters, value, hamiltonian, Q̃u,
-        x_tmp, u_tmp1, u_tmp2, h_tmp, uu_tmp, ux_tmp, xx_tmp, hu_tmp, hx_tmp,
+    UpdateRuleData{T}(parameters, value, ĝ, C, Ĥ, B,
+        x_tmp, u_tmp1, u_tmp2, c_tmp, uu_tmp, ux_tmp, xx_tmp, cu_tmp, cx_tmp,
         lhs, lhs_tl, lhs_tr, lhs_bl, lhs_br, kkt_matrix_ws, D_cache)
 end

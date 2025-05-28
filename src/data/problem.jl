@@ -36,35 +36,33 @@ end
 
 function problem_data(T, dynamics::Model, objectives::Objectives, constraints::Constraints, bounds::Union{Bounds, Nothing})
 
-    @assert length(dynamics) + 1 == length(objectives) == length(constraints) + 1
+    @assert length(dynamics) + 1 == length(objectives) == length(constraints)
     @assert isnothing(bounds) ? length(bounds) == length(constraints) : true
 
-	states = [[zeros(T, d.num_state) for d in dynamics]..., 
-            zeros(T, dynamics[end].num_next_state)]
-    controls = [zeros(T, d.num_control) for d in dynamics]
-    constr = [zeros(T, h.num_constraint) for h in constraints]
-    ineq_lo = [ones(T, d.num_control) for d in dynamics]
-    ineq_up = [ones(T, d.num_control) for d in dynamics]
-    eq_duals = [zeros(T, h.num_constraint) for h in constraints]
-    ineq_duals_lo = [ones(T, d.num_control) for d in dynamics]
-    ineq_duals_up = [ones(T, d.num_control) for d in dynamics]
+	states = [zeros(T, c.num_state) for c in constraints]
+    controls = [zeros(T, c.num_control) for c in constraints]
+    constr = [zeros(T, c.num_constraint) for c in constraints]
+    ineq_lo = deepcopy(controls)
+    ineq_up = deepcopy(controls)
+    eq_duals = deepcopy(constr)
+    ineq_duals_lo = deepcopy(controls)
+    ineq_duals_up = deepcopy(controls)
 
-    nominal_states = [[zeros(T, d.num_state) for d in dynamics]..., 
-                zeros(T, dynamics[end].num_next_state)]
-    nominal_controls = [zeros(T, d.num_control) for d in dynamics]
-    nominal_constr = [zeros(T, h.num_constraint) for h in constraints]
-    nominal_ineq_lo = [ones(T, d.num_control) for d in dynamics]
-    nominal_ineq_up = [ones(T, d.num_control) for d in dynamics]
-    nominal_eq_duals = [zeros(T, h.num_constraint) for h in constraints]
-    nominal_ineq_duals_lo = [ones(T, d.num_control) for d in dynamics]
-    nominal_ineq_duals_up = [ones(T, d.num_control) for d in dynamics]
+    nominal_states = deepcopy(states)
+    nominal_controls = deepcopy(controls)
+    nominal_constr = deepcopy(constr)
+    nominal_ineq_lo = deepcopy(controls)
+    nominal_ineq_up = deepcopy(controls)
+    nominal_eq_duals = deepcopy(constr)
+    nominal_ineq_duals_lo = deepcopy(controls)
+    nominal_ineq_duals_up = deepcopy(controls)
 
     model = model_data(T, dynamics)
-    objectives_dat = objectives_data(T, dynamics, objectives)
+    objectives_dat = objectives_data(T, constraints, objectives)
     constr_data = constraint_data(T, constraints)
-    bounds = isnothing(bounds) ? [Bound(T, d.num_control) for d in dynamics] : bounds
+    bounds = isnothing(bounds) ? [Bound(T, c.num_control) for c in constraints] : bounds
     @assert all(length(b.lower) == length(b.upper) for b in bounds)
-    @assert all(length(b.lower) == d.num_control for (b, d) in zip(bounds, dynamics))
+    @assert all(length(b.lower) == c.num_control for (b, c) in zip(bounds, constraints))
     
     horizon = length(objectives)
     

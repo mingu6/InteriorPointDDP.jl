@@ -13,7 +13,7 @@ n_benchmark = 10
 
 T = Float64
 Δ = 0.04
-N = 76
+N = 75
 n_ocp = 100
 
 options = Options{T}(verbose=verbose, optimality_tolerance=1e-6, μ_init=0.2, κ_ϵ=10.0)
@@ -81,11 +81,9 @@ for seed = 1:n_ocp
 
     # objective
 
-    stage_objective = Objective((x, u) -> 1e-2 * dot(u[1:2], u[1:2]) + 2. * sum(u[7:8]) + 2. * sum(u[11]), nx, nu)
-    objective = [
-        [stage_objective for k = 1:N-1]...,
-        Objective((x, u) -> 20.0 * dot(x - xN, x - xN), nx, 0),
-    ]
+    stage_obj = (x, u) -> 1e-2 * dot(u[1:2], u[1:2]) + 2. * sum(u[7:8]) + 2. * sum(u[11])
+    term_obj = (x, u) -> stage_obj(x, u) + 20.0 * dot(f(x, u) - xN, f(x, u) - xN)
+    objective = [[Objective(stage_obj, nx, nu) for k = 1:N-1]..., Objective(term_obj, nx, nu)]
 
     # constraints
 
@@ -106,20 +104,20 @@ for seed = 1:n_ocp
     end
 
     path_constr = Constraint(constr, nx, nu)
-    constraints = [path_constr for k = 1:N-1]
+    constraints = [path_constr for k = 1:N]
 
     # Bounds
 
     bound = Bound(T[0.0, -force_lim, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.9, 0.0, 0.0],
                 T[force_lim, force_lim, vel_lim, vel_lim, Inf, Inf, Inf, Inf, 0.9, Inf, Inf])
-    bounds = [bound for k = 1:N-1]
+    bounds = [bound for k = 1:N]
 
     solver = Solver(Float64, dynamics, objective, constraints, bounds, options=options)
     solver.options.verbose = verbose
         
     # ## Initialise solver and solve
     
-    ū = [0.01 .* ones(T, nu) for k = 1:N-1]
+    ū = [0.01 .* ones(T, nu) for k = 1:N]
     solve!(solver, x1, ū)
 
     if benchmark
@@ -147,11 +145,11 @@ for seed = 1:n_ocp
         fric_lim = map(u -> μ_fric * u[1], u_sol)
         negfric_lim = map(u -> -μ_fric * u[1], u_sol)
         ft = map(u -> u[2], u_sol)
-        plot(range(0, Δ * (N-1), N-1), phidot, xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylabel="meters per second",
+        plot(range(0, Δ * N, N), phidot, xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylabel="meters per second",
 			legendfontsize=14, linewidth=2, xlabelfontsize=14, ylabelfontsize=14, linestyle=:solid, linecolor=1, 
             legendposition=:bottom, legendtitleposition=:left, ylims=(-10, 10),
 			background_color_legend = nothing, label=L"$\dot{\phi}_t$")
-        plot!(twinx(), range(0, Δ * (N-1), N-1), [ft fric_lim negfric_lim], xtickfontsize=14, ytickfontsize=14, ylabel="Newtons (N)",
+        plot!(twinx(), range(0, Δ * N, N), [ft fric_lim negfric_lim], xtickfontsize=14, ytickfontsize=14, ylabel="Newtons (N)",
 			legendfontsize=14, linewidth=2, xlabelfontsize=14, ylabelfontsize=14, linestyle=[:dot :solid :solid], linecolor=[2 3 3], 
             legendposition=:top, legendtitleposition=:left, ylims=(-0.1, 0.1), alpha=[1. 0.5 0.5],
 			background_color_legend = nothing, label= [L"$f_t^T$" L"$c_f f_t^n$" L"$-c_f f_t^n$"])

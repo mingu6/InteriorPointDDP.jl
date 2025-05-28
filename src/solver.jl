@@ -12,7 +12,7 @@ function Solver(T, dynamics::Vector{Dynamics}, objectives::Objectives, constrain
             bounds::Union{Bounds, Nothing}=nothing; options::Union{Options, Nothing}=nothing)
 
     # allocate update rule data  
-    update_rule = update_rule_data(T, dynamics, constraints, bounds)
+    update_rule = update_rule_data(T, constraints)
 
     # allocate model data
     problem = problem_data(T, dynamics, objectives, constraints, bounds)
@@ -27,9 +27,7 @@ end
 
 function Solver(T, dynamics::Vector{Dynamics}, objectives::Objectives,
             bounds::Union{Bounds, Nothing}=nothing; options::Union{Options, Nothing}=nothing)
-    N = length(objectives)
-    constraint = Constraint()
-    constraints = [constraint for t = 1:N-1]
+    constraints = [Constraint(o.num_state, o.num_control) for o in objectives]
     
     # allocate update rule data  
     update_rule = update_rule_data(T, dynamics, constraints)
@@ -57,6 +55,7 @@ function initialize_trajectory!(solver::Solver{T}, controls::Vector{Vector{T}}, 
     bounds = solver.problem.bounds
     dynamics = solver.problem.model.dynamics
     options = solver.options
+    N = solver.problem.horizon
 
     solver.problem.nominal_states[1] .= x1
     ū = solver.problem.nominal_controls
@@ -67,7 +66,7 @@ function initialize_trajectory!(solver::Solver{T}, controls::Vector{Vector{T}}, 
     u_tmp1 = solver.update_rule.u_tmp1
     u_tmp2 = solver.update_rule.u_tmp2
 
-    for (t, ut) in enumerate(controls)
+    for t = 1:N
         # project primal variables within Bounds
 
         nu = length(controls[t])
@@ -101,7 +100,7 @@ function initialize_trajectory!(solver::Solver{T}, controls::Vector{Vector{T}}, 
         ūu[t] .= bounds[t].upper
         ūu[t] .-= ū[t]
 
-        dynamics!(dynamics[t], x̄[t+1], x̄[t], ū[t])
+        t < N && dynamics!(dynamics[t], x̄[t+1], x̄[t], ū[t])
     end
 end
 

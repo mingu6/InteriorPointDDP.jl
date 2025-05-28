@@ -64,7 +64,7 @@ function check_fraction_boundary(problem::ProblemData{T}, update_rule::UpdateRul
     _, _, _, il̄, iū = primal_trajectories(problem, mode=:nominal)
     _, zl̄, zū = dual_trajectories(problem, mode=:nominal)
 
-    for t = 1:N-1
+    for t = 1:N
         if any(c * (1. - τ) > d for (c, d) in zip(il̄[t], il[t]))
             return 2
         end
@@ -87,11 +87,10 @@ end
 function expected_decrease_objective(update_rule::UpdateRuleData{T}, problem::ProblemData{T}) where T
     Δφ = T(0.0)
     N = problem.horizon
-    Q̂u = update_rule.hamiltonian.gradient_control
-    parameters = update_rule.parameters
     
-    for t = N-1:-1:1
-        Δφ += dot(Q̂u[t], parameters.α[t])
+    for t = N:-1:1
+        Δφ += dot(update_rule.ĝ[t], update_rule.parameters.α[t])
+        # Δφ += dot(problem.nominal_constr[t], update_rule.parameters.ψ[t])
     end
     return Δφ
 end
@@ -99,6 +98,7 @@ end
 function rollout!(update_rule::UpdateRuleData{T}, data::SolverData{T}, problem::ProblemData{T}; step_size::T=1.0) where T
     dynamics = problem.model.dynamics
     bounds = problem.bounds
+    N = problem.horizon
     
     x, u, _, il, iu = primal_trajectories(problem, mode=:current)
     ϕ, zl, zu = dual_trajectories(problem, mode=:current)
@@ -114,7 +114,7 @@ function rollout!(update_rule::UpdateRuleData{T}, data::SolverData{T}, problem::
     
     δx = update_rule.x_tmp
 
-    for (t, d) in enumerate(dynamics)
+    for t in 1:N
         δx[t] .= x[t]
         δx[t] .-= x̄[t]
 
@@ -141,7 +141,7 @@ function rollout!(update_rule::UpdateRuleData{T}, data::SolverData{T}, problem::
         mul!(zu[t], ζu[t], δx[t], 1.0, 1.0)
         
         fn_eval_time_ = time()
-        dynamics!(d, x[t+1], x[t], u[t])
+        t < N && dynamics!(dynamics[t], x[t+1], x[t], u[t])
         
         # evaluate inequality constraints
         il[t] .= u[t]

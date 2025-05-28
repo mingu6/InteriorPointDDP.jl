@@ -68,16 +68,22 @@ for seed = 1:n_ocp
 
     # ## objective
 
-    stage_cost = (x, u) -> begin
+    stage_obj = (x, u) -> begin
         s = u[num_control .+ (1:num_obstacles)]    
         J = 0.0
         J += Δ * dot(u[1:2] .* [5.0, 1.0], u[1:2])
         J += 1000.0 * s' * s
         return J
     end
+    term_obj = (x, u) -> begin
+        J = stage_obj(x, u)
+        xplus = f(x, u)
+        J += 200.0 * dot(xplus - xN, xplus - xN)
+        return J
+    end
     objective = [
-        [Objective(stage_cost, num_state, num_primal) for k = 1:N-1]...,
-        Objective((x, u) -> 200.0 * dot(x - xN, x - xN), num_state, 0)
+        [Objective(stage_obj, num_state, num_primal) for k = 1:N-1]...,
+        Objective(term_obj, num_state, num_primal)
     ]
 
     # ## constraints
@@ -97,7 +103,7 @@ for seed = 1:n_ocp
     end
 
     obs_constr = Constraint(path_constr_fn, num_state, num_primal)
-    constraints = [obs_constr for k = 1:N-1]
+    constraints = [obs_constr for k = 1:N]
 
     # ## bounds
 
@@ -106,7 +112,7 @@ for seed = 1:n_ocp
         [ul; zeros(T, num_obstacles); zeros(T, num_obstacles)],
         [uu; T(Inf) * ones(T, num_obstacles); T(Inf) * ones(T, num_obstacles)]
     )
-    bounds = [bound for k in 1:N-1]
+    bounds = [bound for k in 1:N]
 
     # ## Initialise solver and solve
     
@@ -123,7 +129,7 @@ for seed = 1:n_ocp
     end
     
     x1 = T[0.0; 0.0; π / 8; 0.0] + rand(T, num_state) .* T[0.0; 0.0; π / 4; 0.0]
-    ū = [[0.00 * rand(T, 2); T(1e-2) * ones(T, 2 * num_obstacles)] for k = 1:N-1]
+    ū = [[0.00 * rand(T, 2); T(1e-2) * ones(T, 2 * num_obstacles)] for k = 1:N]
 
     solve!(solver, x1, ū)
     

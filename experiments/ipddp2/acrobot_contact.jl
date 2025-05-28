@@ -13,7 +13,7 @@ n_benchmark = 10
 
 T = Float64
 Δ = 0.05
-N = 101
+N = 100
 n_ocp = 100
 
 include("../models/acrobot.jl")
@@ -55,7 +55,8 @@ for seed = 1:n_ocp
 
 	# ## Dynamics - implicit variational integrator (midpoint)
 
-	dyn_acrobot = Dynamics((x, u) -> [x[nq .+ (1:nq)]; u[nτ .+ (1:nq)]], nx, nu)
+	f = (x, u) -> [x[nq .+ (1:nq)]; u[nτ .+ (1:nq)]]
+	dyn_acrobot = Dynamics(f, nx, nu)
 	dynamics = [dyn_acrobot for k = 1:N-1]
 
 	# ## Objective
@@ -68,10 +69,11 @@ for seed = 1:n_ocp
 	end
 
 	function term_obj(x, u)
-		J = 0.0 
-		
-		q⁻ = x[1:acrobot_impact.nq] 
-		q = x[acrobot_impact.nq .+ (1:acrobot_impact.nq)] 
+		J = stage_obj(x, u)
+
+        xplus = f(x, u)
+		q⁻ = xplus[1:acrobot_impact.nq] 
+		q = xplus[acrobot_impact.nq .+ (1:acrobot_impact.nq)] 
 		q̇ᵐ⁻ = (q - q⁻) ./ Δ
 
 		J += 200.0 * dot(q̇ᵐ⁻, q̇ᵐ⁻)
@@ -80,14 +82,14 @@ for seed = 1:n_ocp
 	end
 
 	stage = Objective(stage_obj, nx, nu)
-	objective = [[stage for k = 1:N-1]..., Objective(term_obj, nx, 0)]
+	objective = [[stage for k = 1:N-1]..., Objective(term_obj, nx, nu)]
 
 	# ## Constraints
 
 	path_constr = Constraint((x, u) -> implicit_contact_dynamics_slack(acrobot_impact, x, u, Δ),
 				nx, nu)
 
-	constraints = [path_constr for k = 1:N-1]
+	constraints = [path_constr for k = 1:N]
 
 	# ## Bounds
 
@@ -96,7 +98,7 @@ for seed = 1:n_ocp
 		[-limit; -T(Inf) * ones(T, nq); zeros(T, nc); zeros(T, nc); zeros(T, nc)],
 		[limit; T(Inf) * ones(T, nq); T(Inf) * ones(T, nc); T(Inf) * ones(T, 2 * nc)]
 	)
-	bounds = [bound for k in 1:N-1]
+	bounds = [bound for k in 1:N]
 
 	solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
 	solver.options.verbose = verbose
@@ -107,8 +109,8 @@ for seed = 1:n_ocp
 	q1_plus = zeros(T, 2)
 	x1 = [q1; q1_plus]
 
-	q_init = [zeros(T, 2) for k = 1:N-1]
-	ū = [[zeros(T, nτ); q_init[k]; T(0.01) * ones(T, nc); T(0.01) * ones(T, 2 * nc)] for k = 1:N-1]
+	q_init = [zeros(T, 2) for k = 1:N]
+	ū = [[zeros(T, nτ); q_init[k]; T(0.01) * ones(T, nc); T(0.01) * ones(T, 2 * nc)] for k = 1:N]
 	solve!(solver, x1, ū)
 
 	if benchmark
@@ -133,12 +135,12 @@ for seed = 1:n_ocp
 	# ## Plot solution
 	if seed == 1
 		x_sol, u_sol = get_trajectory(solver)
-		θe = map(x -> x[4], x_sol[1:end-1])
+		θe = map(x -> x[4], x_sol[1:end])
 		s1 = map(θ -> π / 2 - θ, θe)
 		s2 = map(θ -> θ + π / 2, θe)
 		λ1 = map(u -> u[4], u_sol)
 		λ2 = map(u -> u[5], u_sol)
-		plot(range(0, Δ * (N-1), N-1), [s1 s2 λ1 λ2], xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylims=(0,6),
+		plot(range(0, Δ * N, N), [s1 s2 λ1 λ2], xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylims=(0,6),
 			legendfontsize=12, linewidth=2, xlabelfontsize=14, linestyle=[:solid :solid :dot :dot], linecolor=[1 2 1 2], 
 			background_color_legend = nothing, label=[L"$s_t^{(1)}$" L"$s_t^{(2)}$" L"$\lambda^{(1)}_t$" L"$\lambda^{(2)}_t$"])
 		savefig("plots/acrobot_contact_IPDDP.pdf")
