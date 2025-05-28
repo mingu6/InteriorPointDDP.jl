@@ -13,7 +13,7 @@ n_benchmark = 10
 
 T = Float64
 Δ = 0.05
-N = 100
+N = 101
 n_ocp = 100
 
 include("../models/cartpole.jl")
@@ -63,26 +63,23 @@ for seed = 1:n_ocp
 	end
 
 	function term_obj(x, u)
-        J = stage_obj(x, u)
-
-        xplus = f(x, u)
-        q⁻ = xplus[1:cartpole.nq]
-		q = xplus[cartpole.nq .+ (1:cartpole.nq)] 
+        q⁻ = x[1:cartpole.nq]
+		q = x[cartpole.nq .+ (1:cartpole.nq)] 
 		q̇ᵐ⁻ = (q - q⁻) ./ Δ
 
-		J += 200.0 * dot(q̇ᵐ⁻, q̇ᵐ⁻)
+		J = 200.0 * dot(q̇ᵐ⁻, q̇ᵐ⁻)
 		J += 700.0 * dot(q - qN, q - qN)
 		return J
 	end
 
 	stage = Objective(stage_obj, nx, nu)
-	objective = [[stage for k = 1:N-1]..., Objective(term_obj, nx, nu)]
+	objective = [[stage for k = 1:N-1]..., Objective(term_obj, nx, 0)]
 
     # ## Constraints
 
     path_constr = Constraint((x, u) -> implicit_contact_dynamics_slack(cartpole, x, u, Δ), nx, nu)
 
-    constraints = [path_constr for k = 1:N]
+    constraints = [[path_constr for k = 1:N-1]..., Constraint(nx, 0)]
 
     # ## Bounds
 
@@ -91,7 +88,7 @@ for seed = 1:n_ocp
         [-limit * ones(T, nF); -T(Inf) * ones(T, nq); zeros(T, 6 * nc); zeros(T, 6)],
         [limit * ones(T, nF); T(Inf) * ones(T, nq); Inf * ones(T, 6 * nc); T(Inf) * ones(T, 6)]
     )
-    bounds = [bound for k in 1:N]
+    bounds = [[bound for k in 1:N-1]..., Bound(T, 0)]
 
     solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
     solver.options.verbose = verbose
@@ -102,9 +99,9 @@ for seed = 1:n_ocp
 	q1_plus = zeros(T, 2)
 	x1 = [q1; q1_plus]
 
-    q_init = [zeros(T, 2) for k = 1:N]
-    ū = [[zeros(T, nF); q_init[k]; T(0.01) * ones(T, 6 * nc); T(0.01) * ones(T, 6)] for k = 1:N-1]
-
+    q_init = [zeros(T, 2) for k = 1:N-1]
+    ū = [[[zeros(T, nF); q_init[k]; T(0.01) * ones(T, 6 * nc); T(0.01) * ones(T, 6)] for k = 1:N-1]..., zeros(T, 0)]
+    println(typeof(ū))
     solve!(solver, x1, ū)
 
     if benchmark
@@ -137,13 +134,13 @@ for seed = 1:n_ocp
     # ## Plot solution
 	if seed == 1
 		x_sol, u_sol = get_trajectory(solver)
-        qdotplus = map(x -> (x[3:4] - x[1:2]) / Δ , x_sol[1:end])
+        qdotplus = map(x -> (x[3:4] - x[1:2]) / Δ , x_sol[1:end-1])
         qd1 = map(q -> q[1], qdotplus)
         qd2 = map(q -> q[2], qdotplus)
-		λ1 = map(u -> (u[4] - u[5]) * 3.5, u_sol)
-		λ2 = map(u -> (u[6] - u[7]) * 15, u_sol)
-        F = map(u -> u[1], u_sol)
-		plot(range(0, Δ * N, N), [qd1 qd2 λ1 λ2 F], xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylims=(-9,9),
+		λ1 = map(u -> (u[4] - u[5]) * 3.5, u_sol[1:end-1])
+		λ2 = map(u -> (u[6] - u[7]) * 15, u_sol[1:end-1])
+        F = map(u -> u[1], u_sol[1:end-1])
+		plot(range(0, Δ * (N-1), N-1), [qd1 qd2 λ1 λ2 F], xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylims=(-9,9),
 			legendfontsize=10, linewidth=2, xlabelfontsize=14, linestyle=[:solid :solid :dot :dot :solid], linecolor=[1 2 1 2 3], 
             legendposition=:bottom, legendtitleposition=:left,
 			background_color_legend = nothing, label=[L"$p_t^{vm+}$" L"$\theta_t^{vm+}$" L"$\lambda^{(1)}_t$" L"$\lambda^{(2)}_t$" L"F_t"])

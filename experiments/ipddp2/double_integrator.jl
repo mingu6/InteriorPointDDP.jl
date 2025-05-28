@@ -10,7 +10,7 @@ n_benchmark = 10
 
 T = Float64
 Δ = 0.01
-N = 100
+N = 101
 x1 = T[0.0; 0.0]
     
 num_state = 2  # position and velocity
@@ -38,28 +38,28 @@ for seed = 1:n_ocp
     xN = T[xN_y; xN_v]
 
     stage_obj = (x, u) -> Δ * (u[2] + u[3])
-    term_obj = (x, u) -> stage_obj(x, u) + 500.0 * dot(f(x, u) - xN, f(x, u) - xN)
-    objective = [[Objective(stage_obj, 2, 3) for k = 1:N-1]..., Objective(term_obj, 2, 3)]
+    term_obj = (x, u) -> 500.0 * dot(x - xN, x - xN)
+    objective = [[Objective(stage_obj, 2, 3) for k = 1:N-1]..., Objective(term_obj, 2, 0)]
 
     # ## Constraints
 
     path_constr = Constraint((x, u) -> [
         u[2] - u[3] - u[1] * x[2]
     ], 2, 3)
-    constraints = [path_constr for k = 1:N]
+    constraints = [[path_constr for k = 1:N-1]..., Constraint(num_state, 0)]
 
     # ## Bounds
 
     limit = T(10.0)
     bound = Bound(T[-limit, 0.0, 0.0], T[limit, Inf, Inf])
-    bounds = [bound for k = 1:N]
+    bounds = [[bound for k in 1:N-1]..., Bound(T, 0)]
 
     solver = Solver(T, dynamics, objective, constraints, bounds, options=options)
     solver.options.verbose = verbose
     
     # ## Initialise solver and solve
     
-    ū = [[0.01; 0.01; 0.01] for k = 1:N]
+    ū = [[[0.01; 0.01; 0.01] for k = 1:N-1]..., zeros(T, 0)]
     solve!(solver, x1, ū)
 
     if benchmark
