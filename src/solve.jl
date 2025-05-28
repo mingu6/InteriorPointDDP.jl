@@ -1,7 +1,3 @@
-function solve!(solver::Solver{T}, args...; kwargs...) where T
-    solve!(solver, args...; kwargs...)
-end
-
 function solve!(solver::Solver{T}, x1::Vector{T}, controls::Vector{Vector{T}}; kwargs...) where T
     initialize_trajectory!(solver, controls, x1)
     solve!(solver; kwargs...)
