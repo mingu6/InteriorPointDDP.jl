@@ -18,17 +18,17 @@ min_objs = min(minimum(objs_ipd), minimum(objs_ipo))
 max_objs = max(maximum(objs_ipd), maximum(objs_ipo))
 objs_range = max_objs - min_objs
 ymin = 0.0
-ymax = 2.1
+ymax = 5.1
 
 # objective function value
 
 bplots = []
 push!(bplots, boxplot(objs_ipd, title=names[1], titlefontsize=fs, ytickfontsize=fs_y, legend=false, ylims=(ymin, ymax), xticks=[]))
 push!(bplots, boxplot(objs_ipo, title=names[2], titlefontsize=fs, ytickfontsize=fs_y, legend=false, ylims=(ymin, ymax), xticks=[]))
-push!(bplots, boxplot(objs_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, ylims=(ymin, 15), xticks=[]))
+push!(bplots, boxplot(objs_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, ylims=(ymin, ymax), xticks=[]))
 push!(bplots, boxplot(objs_al, title=names[4], titlefontsize=fs, ytickfontsize=fs_y, legend=false, ylims=(ymin, ymax), xticks=[]))
 plot!(bplots..., size=(650, 350), layout=(1, 4))
-savefig("plots/$problemclass/objective.svg")
+savefig("plots/$problemclass/objective3.svg")
 
 # constraint violation value
 
@@ -42,17 +42,17 @@ push!(bplots, boxplot(constrs_ipob, title=names[3], titlefontsize=fs, ytickfonts
 push!(bplots, boxplot(constrs_al, title=names[4], titlefontsize=fs, ytickfontsize=fs_y, legend=false, yaxis=:log10, xticks=[],
                         ylims=(1e-16, 1e1), yticks=[1e-16, 1e-12, 1e-8, 1e-4, 1]))
 plot(bplots..., size=(650, 350), layout=(1, 4))
-savefig("plots/$problemclass/constr.svg")
+savefig("plots/$problemclass/constr3.svg")
 
 # iteration count
 
 bplots = []
-push!(bplots, boxplot(iters_ipd, title=names[1], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 230)))
-push!(bplots, boxplot(iters_ipo, title=names[2], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 230)))
-push!(bplots, boxplot(iters_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 2200)))
-push!(bplots, boxplot(iters_al, title=names[4], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 2200)))
+push!(bplots, boxplot(iters_ipd, title=names[1], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 1030)))
+push!(bplots, boxplot(iters_ipo, title=names[2], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 1030)))
+push!(bplots, boxplot(iters_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 1030)))
+push!(bplots, boxplot(iters_al, title=names[4], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 1030)))
 plot(bplots..., size=(650, 350), layout=(1, 4))
-savefig("plots/$problemclass/iterations.svg")
+savefig("plots/$problemclass/iterations3.svg")
 
 # wall time per iteration
 
@@ -61,7 +61,7 @@ push!(bplots, boxplot(wall_ipd ./ iters_ipd, title=names[1], titlefontsize=fs, y
 push!(bplots, boxplot(wall_ipo ./ iters_ipo, title=names[2], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 5.9)))
 push!(bplots, boxplot(wall_ipob ./ iters_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 5.9)))
 plot(bplots..., size=(500, 350), layout=(1, 3))
-savefig("plots/$problemclass/time.svg")
+savefig("plots/$problemclass/time3.svg")
 
 println("Cartpole")
 println()

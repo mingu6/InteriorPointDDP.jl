@@ -47,10 +47,10 @@ savefig("plots/$problemclass/constr.svg")
 # iteration count
 
 bplots = []
-push!(bplots, boxplot(iters_ipd, title=names[1], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 1150)))
-push!(bplots, boxplot(iters_ipo, title=names[2], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 1150)))
-push!(bplots, boxplot(iters_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 1150)))
-push!(bplots, boxplot(iters_al, title=names[4], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 2150)))
+push!(bplots, boxplot(iters_ipd, title=names[1], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 1550)))
+push!(bplots, boxplot(iters_ipo, title=names[2], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 1550)))
+push!(bplots, boxplot(iters_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 1550)))
+push!(bplots, boxplot(iters_al, title=names[4], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 1550)))
 plot(bplots..., size=(650, 350), layout=(1, 4))
 savefig("plots/$problemclass/iterations.svg")
 
