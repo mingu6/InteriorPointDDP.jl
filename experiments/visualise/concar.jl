@@ -12,6 +12,5 @@ end
 function plotTrajectory!(x̄)
     x = map(x -> x[1], x̄)
     y = map(x -> x[2], x̄)
-    plot!(x, y, linealpha=0.3, linecolor=1)
-    scatter!([x[1]], [y[1]], color=2, markersize=2, markershape=:star4)
+    plot!(x, y, linealpha=0.8, linecolor=1, linewidth=2)
 end
