@@ -16,7 +16,20 @@ T = Float64
 N = 76
 n_ocp = 100
 
-options = Options{T}(verbose=verbose, optimality_tolerance=1e-6, μ_init=10.0)
+options = Options{T}(verbose=verbose, optimality_tolerance=1e-6, μ_init=0.5)
+
+function circleShape(xc, yc, r)
+    θ = LinRange(0, 2*π, 500)
+    xc .+ r * sin.(θ), yc .+ r * cos.(θ)
+end
+
+function plotCircle!(xc, yc, r, color=:blue)
+    plot!(circleShape(xc, yc, r), seriestype = [:shape], lw = 2.0,
+            c = color, linecolor = :black,
+            legend = false, fillalpha = 1.0, aspect_ratio = 1)
+end
+
+rectangle(w, h, x, y) = Shape(x .+ [0,w,w,0], y .+ [0,0,h,h])
 
 results = Vector{Vector{Any}}()
 params = Vector{Vector{T}}()
@@ -75,6 +88,13 @@ for seed = 1:n_ocp
 
     function f(x, u)
         return x + Δ .* fc(x, u)
+    end
+
+    function xy_pusher(x)
+        xl = xyc[1]
+        θ = x[3]
+        ϕ = x[4]
+        return R(θ)[1:2, 1:2] * [-xl / 2 - r_push; -(xl / 2) * tan(ϕ)] + x[1:2]
     end
 
     dynamics = [Dynamics(f, nx, nu) for k = 1:N-1]
@@ -150,14 +170,47 @@ for seed = 1:n_ocp
             legendposition=:bottomleft, legendtitleposition=:left, ylims=(-10, 10),
 			background_color_legend = nothing, label=L"$\dot{\phi}_t$")
         plot!(twinx(), range(0, Δ * (N-1), N-1), [ft fric_lim negfric_lim], xtickfontsize=14, ytickfontsize=14, ylabel="Newtons (N)",
-			legendfontsize=14, linewidth=2, xlabelfontsize=14, ylabelfontsize=14, linestyle=[:dot :solid :solid], linecolor=[2 3 3], 
+			legendfontsize=14, linewidth=2, xlabelfontsize=14, ylabelfontsize=14, linestyle=[:dash :solid :solid], linecolor=[2 3 3], 
             legendposition=:topright, legendtitleposition=:left, ylims=(-0.15, 0.15), alpha=[1. 0.5 0.5], legend_columns=-1,
-			background_color_legend = nothing, label= [L"$f_t^T$" L"$c_f f_t^n$" L"$-c_f f_t^n$"])
+			background_color_legend = nothing, label= [L"$f_t^T$" L"$+/-c_f f_t^n$" false])
 		savefig("plots/pushing_IPDDP.svg")
 	end
+
+    # ## Plot state get_trajectory
+    if seed == 1
+        indices = [1 25 50 70]
+		x_sol, u_sol = get_trajectory(solver)
+        xs = map(x -> x[1], x_sol[1:end-1])  # slider position
+        ys = map(x -> x[2], x_sol[1:end-1])
+        ps = map(x -> x[3], x_sol[1:end-1])
+        xyp = map(xy_pusher, x_sol[1:end-1])
+        xp = map(x -> x[1], xyp)
+        yp = map(x -> x[2], xyp)
+        plot(xs, ys, linecolor=:brown4, linestyle=:dash, linewidth=2, ylims=(-0.07, 0.5), xlims=(-0.07, 0.5))
+        plotCircle!(obstacle[1], obstacle[2], obstacle[3], :deeppink3)
+        for ind in indices
+            plotCircle!(xp[ind], yp[ind], r_push, :blue)
+            vertices = [
+                [-zx / 2,  -zy / 2],
+                [zx / 2, -zy / 2],
+                [zx / 2,  zy / 2],
+                [-zx / 2,  zy / 2]
+                ]
+            rot = R(ps[ind])
+            vertices_rot = [rot[1:2, 1:2] * v + [xs[ind]; ys[ind]] for v in vertices]
+            push_vert_x = map(v -> v[1], vertices_rot)
+            push_vert_y = map(v -> v[2], vertices_rot)
+            plot!(Shape(push_vert_x, push_vert_y), lw = 2.0,
+                    c = :yellow, linecolor = :black, 
+                    legend = false, fillalpha = 0.2, aspect_ratio = 1)
+            scatter!([xN[1]], [xN[2]], markershape=:star, color=:gold, markersize=10)
+        end
+        savefig("plots/pushing_qual.svg")
+    end
+    rectangle(w, h, x, y) = Shape(x .+ [0,w,w,0], y .+ [0,0,h,h])
 end
 
-open("results/pushing_1_obs10.txt", "w") do io
+open("results/pushing_1_obs.txt", "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")
     for i = 1:length(results)
         if benchmark
