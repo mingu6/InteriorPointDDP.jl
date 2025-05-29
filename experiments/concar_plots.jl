@@ -2,8 +2,8 @@ using StatsPlots
 using Statistics
 
 problemclass = "concar"
-fs = 16
-fs_y = 12
+fs_x = 21
+fs_y = 22
 
 include("utils.jl")
 
@@ -14,49 +14,28 @@ _, iters_ipo, _, objs_ipo, constrs_ipo, wall_ipo, _ = read_results("ipopt/result
 _, iters_ipob, _, objs_ipob, constrs_ipob, wall_ipob, _ = read_results("ipopt/results/bfgs_$problemclass.txt")
 _, iters_al, _, objs_al, constrs_al, _, _ = read_results("proxddp/results/$problemclass.txt")
 
-min_objs = min(minimum(objs_ipd), minimum(objs_ipo))
-max_objs = max(maximum(objs_ipd), maximum(objs_ipo))
-objs_range = max_objs - min_objs
-ymin = 0.0
-ymax = 19.3
-
 # objective function value
 
-bplots = []
-push!(bplots, boxplot(objs_ipd, title=names[1], titlefontsize=fs, ytickfontsize=fs_y, legend=false, ylims=(ymin, ymax), xticks=[]))
-push!(bplots, boxplot(objs_ipo, title=names[2], titlefontsize=fs, ytickfontsize=fs_y, legend=false, ylims=(ymin, ymax), xticks=[]))
-push!(bplots, boxplot(objs_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, ylims=(ymin, ymax),xticks=[]))
-push!(bplots, boxplot(objs_al, title=names[4], titlefontsize=fs, ytickfontsize=fs_y, legend=false, ylims=(ymin, ymax), xticks=[]))
-plot!(bplots..., size=(650, 350), layout=(1, 4))
+boxplot(names, [objs_ipd objs_ipo objs_ipob objs_al], legend=false,
+    xtickfontsize=fs_x, ytickfontsize=fs_y, ylims=(0.0, 19.3), size=(650, 500))
 savefig("plots/$problemclass/objective1.svg")
 
 # constraint violation value
 
-bplots = []
-push!(bplots, boxplot(constrs_ipd, title=names[1], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], yaxis=:log10, ylims=(1e-16, 11)))
-push!(bplots, boxplot(constrs_ipo, title=names[2], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], yaxis=:log10, ylims=(1e-16, 11)))
-push!(bplots, boxplot(constrs_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], yaxis=:log10, ylims=(1e-16, 11), yticks=[1e-10, 1e-5, 1]))
-push!(bplots, boxplot(constrs_al, title=names[4], titlefontsize=fs, ytickfontsize=fs_y, legend=false, yaxis=:log10, xticks=[], ylims=(1e-16, 11), yticks=[1e-10, 1e-5, 1]))
-plot(bplots..., size=(650, 350), layout=(1, 4))
+boxplot(names, [constrs_ipd constrs_ipo constrs_ipob constrs_al], legend=false,
+    xtickfontsize=fs_x, ytickfontsize=fs_y-3, yaxis=:log10, ylims=(1e-16, 11), size=(650, 500), yticks=[1e-10, 1e-5, 1])
 savefig("plots/$problemclass/constr1.svg")
 
 # iteration count
 
-bplots = []
-push!(bplots, boxplot(iters_ipd, title=names[1], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 1550)))
-push!(bplots, boxplot(iters_ipo, title=names[2], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 1550)))
-push!(bplots, boxplot(iters_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 1550)))
-push!(bplots, boxplot(iters_al, title=names[4], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 1550)))
-plot(bplots..., size=(650, 350), layout=(1, 4))
+boxplot(names, [iters_ipd iters_ipo iters_ipob iters_al], legend=false,
+    xtickfontsize=fs_x, ytickfontsize=fs_y-3, ylims=(0, 1550), size=(650, 500))
 savefig("plots/$problemclass/iterations1.svg")
 
 # wall time
 
-bplots = []
-push!(bplots, boxplot(wall_ipd ./ iters_ipd, title=names[1], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 3.9)))
-push!(bplots, boxplot(wall_ipo ./ iters_ipo, title=names[2], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 3.9)))
-push!(bplots, boxplot(wall_ipob ./ iters_ipob, title=names[3], titlefontsize=fs, ytickfontsize=fs_y, legend=false, xticks=[], ylims=(0, 3.9)))
-plot(bplots..., size=(500, 350), layout=(1, 3))
+boxplot(names[:, 1:3], [(wall_ipd ./ iters_ipd) (wall_ipo ./ iters_ipo) (wall_ipob ./ iters_ipob)], legend=false,
+    xtickfontsize=fs_x, ytickfontsize=fs_y, ylims=(0, 3.9), size=(500, 500))
 savefig("plots/$problemclass/time1.svg")
 
 println("Car Obstacle Avoidance (Linear)")
