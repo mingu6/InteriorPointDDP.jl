@@ -6,7 +6,7 @@ using Printf
 
 benchmark = false
 verbose = true
-visualise = false
+visualise = true
 n_benchmark = 10
 
 T = Float64
@@ -147,7 +147,7 @@ for seed = 1:n_ocp
     else
         push!(results, [seed, solver.data.k, solver.data.status, solver.data.objective, solver.data.primal_inf])
     end
-    visualise && savefig("plots/concar_IPDDP_$seed.pdf")
+    visualise && savefig("plots/concar_IPDDP_$seed.svg")
 
     push!(params, [F_lim; τ_lim; obs_1; obs_2; obs_3; obs_4; x1])
 end

@@ -142,7 +142,7 @@ for seed = 1:n_ocp
 		plot(range(0, Δ * (N-1), N-1), [s1 s2 λ1 λ2], xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylims=(0,6),
 			legendfontsize=12, linewidth=2, xlabelfontsize=14, linestyle=[:solid :solid :dot :dot], linecolor=[1 2 1 2], 
 			background_color_legend = nothing, label=[L"$s_t^{(1)}$" L"$s_t^{(2)}$" L"$\lambda^{(1)}_t$" L"$\lambda^{(2)}_t$"])
-		savefig("plots/acrobot_contact_IPDDP.pdf")
+		savefig("plots/acrobot_contact_IPDDP.svg")
 	end
 
 	# ## Visualise trajectory using MeshCat

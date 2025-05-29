@@ -144,7 +144,7 @@ for seed = 1:n_ocp
 			legendfontsize=10, linewidth=2, xlabelfontsize=14, linestyle=[:solid :solid :dot :dot :solid], linecolor=[1 2 1 2 3], 
             legendposition=:bottom, legendtitleposition=:left,
 			background_color_legend = nothing, label=[L"$p_t^{vm+}$" L"$\theta_t^{vm+}$" L"$\lambda^{(1)}_t$" L"$\lambda^{(2)}_t$" L"F_t"])
-		savefig("plots/cartpole_friction_IPDDP.pdf")
+		savefig("plots/cartpole_friction_IPDDP.svg")
 	end
 end
 

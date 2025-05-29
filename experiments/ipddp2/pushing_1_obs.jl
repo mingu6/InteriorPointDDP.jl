@@ -153,7 +153,7 @@ for seed = 1:n_ocp
 			legendfontsize=14, linewidth=2, xlabelfontsize=14, ylabelfontsize=14, linestyle=[:dot :solid :solid], linecolor=[2 3 3], 
             legendposition=:top, legendtitleposition=:left, ylims=(-0.1, 0.1), alpha=[1. 0.5 0.5],
 			background_color_legend = nothing, label= [L"$f_t^T$" L"$c_f f_t^n$" L"$-c_f f_t^n$"])
-		savefig("plots/pushing_IPDDP.pdf")
+		savefig("plots/pushing_IPDDP.svg")
 	end
 end
 
