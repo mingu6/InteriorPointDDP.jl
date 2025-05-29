@@ -24,7 +24,7 @@ if visualise
 	render(vis)
 end
 
-options = Options{T}(verbose=verbose, optimality_tolerance=1e-6, μ_init=1.0, κ_ϵ=1.0)
+options = Options{T}(verbose=verbose, optimality_tolerance=1e-6, μ_init=10.0, κ_ϵ=1.0)
 
 results = Vector{Vector{Any}}()
 params = Vector{Vector{T}}()
@@ -140,9 +140,9 @@ for seed = 1:n_ocp
 		λ1 = map(u -> (u[4] - u[5]) * 3.5, u_sol[1:end-1])
 		λ2 = map(u -> (u[6] - u[7]) * 15, u_sol[1:end-1])
         F = map(u -> u[1], u_sol[1:end-1])
-		plot(range(0, Δ * (N-1), N-1), [qd1 qd2 λ1 λ2 F], xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylims=(-9,9),
-			legendfontsize=10, linewidth=2, xlabelfontsize=14, linestyle=[:solid :solid :dot :dot :solid], linecolor=[1 2 1 2 3], 
-            legendposition=:bottom, legendtitleposition=:left,
+		plot(range(0, Δ * (N-1), N-1), [qd1 qd2 λ1 λ2 F], xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylims=(-10,14),
+			legendfontsize=14, linewidth=2, xlabelfontsize=14, linestyle=[:solid :solid :dot :dot :solid], linecolor=[1 2 1 2 3], 
+            legendposition=:top, legendtitleposition=:left, legend_columns=-1,
 			background_color_legend = nothing, label=[L"$p_t^{vm+}$" L"$\theta_t^{vm+}$" L"$\lambda^{(1)}_t$" L"$\lambda^{(2)}_t$" L"F_t"])
 		savefig("plots/cartpole_friction_IPDDP.svg")
 	end

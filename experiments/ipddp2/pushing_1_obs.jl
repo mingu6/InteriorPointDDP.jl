@@ -16,7 +16,7 @@ T = Float64
 N = 76
 n_ocp = 100
 
-options = Options{T}(verbose=verbose, optimality_tolerance=1e-6, μ_init=0.5)
+options = Options{T}(verbose=verbose, optimality_tolerance=1e-6, μ_init=10.0)
 
 results = Vector{Vector{Any}}()
 params = Vector{Vector{T}}()
@@ -147,17 +147,17 @@ for seed = 1:n_ocp
         ft = map(u -> u[2], u_sol[1:end-1])
         plot(range(0, Δ * (N-1), N-1), phidot, xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylabel="meters per second",
 			legendfontsize=14, linewidth=2, xlabelfontsize=14, ylabelfontsize=14, linestyle=:solid, linecolor=1, 
-            legendposition=:bottom, legendtitleposition=:left, ylims=(-10, 10),
+            legendposition=:bottomleft, legendtitleposition=:left, ylims=(-10, 10),
 			background_color_legend = nothing, label=L"$\dot{\phi}_t$")
         plot!(twinx(), range(0, Δ * (N-1), N-1), [ft fric_lim negfric_lim], xtickfontsize=14, ytickfontsize=14, ylabel="Newtons (N)",
 			legendfontsize=14, linewidth=2, xlabelfontsize=14, ylabelfontsize=14, linestyle=[:dot :solid :solid], linecolor=[2 3 3], 
-            legendposition=:top, legendtitleposition=:left, ylims=(-0.1, 0.1), alpha=[1. 0.5 0.5],
+            legendposition=:topright, legendtitleposition=:left, ylims=(-0.15, 0.15), alpha=[1. 0.5 0.5], legend_columns=-1,
 			background_color_legend = nothing, label= [L"$f_t^T$" L"$c_f f_t^n$" L"$-c_f f_t^n$"])
 		savefig("plots/pushing_IPDDP.svg")
 	end
 end
 
-open("results/pushing_1_obs.txt", "w") do io
+open("results/pushing_1_obs10.txt", "w") do io
 	@printf(io, " seed  iterations  status     objective           primal        wall (ms)   solver(ms)  \n")
     for i = 1:length(results)
         if benchmark
@@ -170,7 +170,7 @@ open("results/pushing_1_obs.txt", "w") do io
 end
 
 # save parameters of each experiment for ProxDDP comparison
-open("params/pushing_1_obs1.txt", "w") do io
+open("params/pushing_1_obs.txt", "w") do io
     for i = 1:n_ocp
         println(io, join(string.(params[i]), " "))
     end
