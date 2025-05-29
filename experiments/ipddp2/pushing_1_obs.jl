@@ -13,7 +13,7 @@ n_benchmark = 10
 
 T = Float64
 Δ = 0.04
-N = 76
+N = 101
 n_ocp = 100
 
 options = Options{T}(verbose=verbose, optimality_tolerance=1e-6, μ_init=0.5)
@@ -52,7 +52,7 @@ for seed = 1:n_ocp
     ]
     xyc = block_params[rand(1:length(block_params))]
 
-    obstacle = [T(0.2) + T(0.1) * (rand(T) - T(0.5)); T(0.2) + T(0.1) * (rand(T) - T(0.5)); T(0.05) + T(0.02) * (rand(T) - T(0.5))]
+    obstacle = [T(0.2) + T(0.3) * (rand(T) - T(0.5)); T(0.2) + T(0.1) * (rand(T) - T(0.5)); T(0.05) + T(0.02) * (rand(T) - T(0.5))]
 
     zx = xyc[1]
     zy = xyc[2]
@@ -159,7 +159,7 @@ for seed = 1:n_ocp
     push!(params, [xyc; μ_fric; obstacle])
 
     # ## Plot solution
-	if seed == 1
+	if seed == 4
 		x_sol, u_sol = get_trajectory(solver)
         phidot = map(u -> u[3] - u[4] , u_sol[1:end-1])
         fric_lim = map(u -> μ_fric * u[1], u_sol[1:end-1])
@@ -167,18 +167,18 @@ for seed = 1:n_ocp
         ft = map(u -> u[2], u_sol[1:end-1])
         plot(range(0, Δ * (N-1), N-1), phidot, xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylabel="meters per second",
 			legendfontsize=14, linewidth=2, xlabelfontsize=14, ylabelfontsize=14, linestyle=:solid, linecolor=1, 
-            legendposition=:bottomleft, legendtitleposition=:left, ylims=(-10, 10),
+            legendposition=:bottomleft, legendtitleposition=:left, ylims=(-5, 5),
 			background_color_legend = nothing, label=L"$\dot{\phi}_t$")
         plot!(twinx(), range(0, Δ * (N-1), N-1), [ft fric_lim negfric_lim], xtickfontsize=14, ytickfontsize=14, ylabel="Newtons (N)",
 			legendfontsize=14, linewidth=2, xlabelfontsize=14, ylabelfontsize=14, linestyle=[:dash :solid :solid], linecolor=[2 3 3], 
-            legendposition=:topright, legendtitleposition=:left, ylims=(-0.15, 0.15), alpha=[1. 0.5 0.5], legend_columns=-1,
+            legendposition=:topright, legendtitleposition=:left, ylims=(-0.10, 0.10), alpha=[1. 0.5 0.5], legend_columns=-1,
 			background_color_legend = nothing, label= [L"$f_t^T$" L"$\pm c_f f_t^n$" false])
 		savefig("plots/pushing_IPDDP.svg")
 	end
 
     # ## Plot state get_trajectory
-    if seed == 1
-        indices = [1 25 50 70]
+    if visualise
+        indices = [1 35 67 94]
 		x_sol, u_sol = get_trajectory(solver)
         xs = map(x -> x[1], x_sol[1:end-1])  # slider position
         ys = map(x -> x[2], x_sol[1:end-1])
@@ -187,6 +187,7 @@ for seed = 1:n_ocp
         xp = map(x -> x[1], xyp)
         yp = map(x -> x[2], xyp)
         plot(xs, ys, linecolor=:brown4, linestyle=:dash, linewidth=2, ylims=(-0.07, 0.5), xlims=(-0.07, 0.5))
+        plot!(xp, yp, linecolor=:blue, linestyle=:solid, linewidth=2, linealpha=0.5)
         plotCircle!(obstacle[1], obstacle[2], obstacle[3], :deeppink3)
         for ind in indices
             plotCircle!(xp[ind], yp[ind], r_push, :blue)
@@ -205,7 +206,7 @@ for seed = 1:n_ocp
                     legend = false, fillalpha = 0.2, aspect_ratio = 1)
             scatter!([xN[1]], [xN[2]], markershape=:star, color=:gold, markersize=10)
         end
-        savefig("plots/pushing_qual.svg")
+        savefig("plots/pushing_qual_$seed.svg")
     end
     rectangle(w, h, x, y) = Shape(x .+ [0,w,w,0], y .+ [0,0,h,h])
 end

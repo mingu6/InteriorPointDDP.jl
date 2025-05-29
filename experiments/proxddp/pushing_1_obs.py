@@ -11,7 +11,7 @@ r_push = 0.01
 
 nx = 4
 nu = 7
-N = 76
+N = 101
 
 tol = 1e-4
 mu_init = 0.05

@@ -14,7 +14,7 @@ n_benchmark = 10
 print_level = output ? 5 : 4
 
 Δ = 0.04
-N = 76
+N = 101
 
 n_ocp = 100
 
@@ -55,7 +55,7 @@ for seed = 1:n_ocp
     ]
     xyc = block_params[rand(1:length(block_params))]
 
-    obstacle = [0.2 + 0.1 * (rand() - 0.5); 0.2 + 0.1 * (rand() - 0.5); 0.05 + 0.02 * (rand() - 0.5)]
+    obstacle = [0.2 + 0.3 * (rand() - 0.5); 0.2 + 0.1 * (rand() - 0.5); 0.05 + 0.02 * (rand() - 0.5)]
 
     zx = xyc[1]
     zy = xyc[2]
