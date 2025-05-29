@@ -122,6 +122,7 @@ for seed = 1:n_ocp
         for xyr in xyr_obs
             plotCircle!(xyr[1], xyr[2], xyr[3])
         end
+        scatter!([xN[1]], [xN[2]], markershape=:star, color=:gold, markersize=10)
     end
     
     x1 = T[0.0; 0.0; π / 8; 0.0] + rand(T, num_state) .* T[0.0; 0.0; π / 4; 0.0]

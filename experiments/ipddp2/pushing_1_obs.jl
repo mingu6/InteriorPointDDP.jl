@@ -172,7 +172,7 @@ for seed = 1:n_ocp
         plot!(twinx(), range(0, Δ * (N-1), N-1), [ft fric_lim negfric_lim], xtickfontsize=14, ytickfontsize=14, ylabel="Newtons (N)",
 			legendfontsize=14, linewidth=2, xlabelfontsize=14, ylabelfontsize=14, linestyle=[:dash :solid :solid], linecolor=[2 3 3], 
             legendposition=:topright, legendtitleposition=:left, ylims=(-0.15, 0.15), alpha=[1. 0.5 0.5], legend_columns=-1,
-			background_color_legend = nothing, label= [L"$f_t^T$" L"$+/-c_f f_t^n$" false])
+			background_color_legend = nothing, label= [L"$f_t^T$" L"$\pm c_f f_t^n$" false])
 		savefig("plots/pushing_IPDDP.svg")
 	end
 
