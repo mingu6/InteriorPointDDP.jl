@@ -6,7 +6,7 @@ using MeshCat
 using Printf
 using LaTeXStrings
 
-visualise = false
+visualise = true
 benchmark = false
 verbose = true
 n_benchmark = 10
@@ -186,7 +186,8 @@ for seed = 1:n_ocp
         xyp = map(xy_pusher, x_sol[1:end-1])
         xp = map(x -> x[1], xyp)
         yp = map(x -> x[2], xyp)
-        plot(xs, ys, linecolor=:brown4, linestyle=:dash, linewidth=2, ylims=(-0.07, 0.5), xlims=(-0.07, 0.5))
+        plot(xs, ys, linecolor=:brown4, linestyle=:dash, linewidth=2,
+            ylims=(-0.07, 0.5), xlims=(-0.07, 0.5), xtickfontsize=14, ytickfontsize=14)
         plot!(xp, yp, linecolor=:blue, linestyle=:solid, linewidth=2, linealpha=0.5)
         plotCircle!(obstacle[1], obstacle[2], obstacle[3], :deeppink3)
         for ind in indices
