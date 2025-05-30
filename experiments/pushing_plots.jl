@@ -16,7 +16,7 @@ _, iters_al, _, objs_al, constrs_al, _, _ = read_results("proxddp/results/$probl
 
 # objective function value
 
-boxplot(names, [objs_ipd objs_ipo objs_ipob objs_al], legend=false, yaxis=:log10, ylims=(1e-2, 1e1),
+boxplot(names, [objs_ipd objs_ipo objs_ipob objs_al], legend=false, ylims=(0, 0.3),
     xtickfontsize=fs_x, ytickfontsize=fs_y, size=(650, 500))
 savefig("plots/$problemclass/objective4.svg")
 
@@ -35,7 +35,7 @@ savefig("plots/$problemclass/iterations4.svg")
 # wall time
 
 boxplot(names[:, 1:3], [(wall_ipd ./ iters_ipd) (wall_ipo ./ iters_ipo) (wall_ipob ./ iters_ipob)], legend=false,
-    xtickfontsize=fs_x, ytickfontsize=fs_y, ylims=(0, 6.9), size=(500, 500))
+    xtickfontsize=fs_x, ytickfontsize=fs_y, ylims=(0, 4.3), size=(500, 500))
 savefig("plots/$problemclass/time4.svg")
 
 println("Nonprehensile Pushing")
