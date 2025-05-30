@@ -29,8 +29,6 @@ function plotCircle!(xc, yc, r, color=:blue)
             legend = false, fillalpha = 1.0, aspect_ratio = 1)
 end
 
-rectangle(w, h, x, y) = Shape(x .+ [0,w,w,0], y .+ [0,0,h,h])
-
 results = Vector{Vector{Any}}()
 params = Vector{Vector{T}}()
 
@@ -209,7 +207,6 @@ for seed = 1:n_ocp
         end
         savefig("plots/pushing_qual_$seed.svg")
     end
-    rectangle(w, h, x, y) = Shape(x .+ [0,w,w,0], y .+ [0,0,h,h])
 end
 
 open("results/pushing_1_obs.txt", "w") do io
