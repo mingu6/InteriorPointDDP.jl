@@ -6,7 +6,7 @@ using MeshCat
 using Printf
 using LaTeXStrings
 
-visualise = true
+visualise = false
 benchmark = false
 verbose = true
 n_benchmark = 10
@@ -16,7 +16,7 @@ T = Float64
 N = 101
 n_ocp = 100
 
-options = Options{T}(verbose=verbose, optimality_tolerance=1e-6, μ_init=0.5)
+options = Options{T}(verbose=verbose, optimality_tolerance=1e-6)
 
 function circleShape(xc, yc, r)
     θ = LinRange(0, 2*π, 500)

@@ -24,7 +24,7 @@ if visualise
 	render(vis)
 end
 
-options = Options{T}(verbose=verbose, optimality_tolerance=1e-6, μ_init=1.0, κ_ϵ=1.0)
+options = Options{T}(verbose=verbose, optimality_tolerance=1e-6)
 
 results = Vector{Vector{Any}}()
 params = Vector{Vector{T}}()

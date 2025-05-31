@@ -22,9 +22,9 @@ mutable struct SolverData{T}
     primal_inf::T                 # ∞-norm of constraint violation (primal infeasibility)
     dual_inf::T                   # ∞-norm of gradient of Lagrangian (dual infeasibility)
     cs_inf::T                     # ∞-norm of complementary slackness error
-    barrier_obj_curr::T           # barrier objective function for subproblem at current iterate
+    barrier_lagrangian_curr::T    # barrier Lagrangian function for subproblem at current iterate
     primal_1_curr::T              # 1-norm of constraint violation at current iterate (primal infeasibility)
-    barrier_obj_next::T           # barrier objective function for subproblem at next iterate
+    barrier_lagrangian_next::T    # barrier Lagrangian function for subproblem at next iterate
     primal_1_next::T              # 1-norm of constraint violation at next iterate (primal infeasibility)
     update_filter::Bool           # updated filter at current iteration
     switching::Bool               # switching condition satisfied (sufficient decrease on barrier obj. relative to constr. viol.)
@@ -49,9 +49,9 @@ function solver_data(T)
     primal_inf = T(0.0)
     dual_inf = T(0.0)
     cs_inf = T(0.0)
-    barrier_obj_curr = T(0.0)
+    barrier_lagrangian_curr = T(0.0)
     primal_1_curr = T(0.0)
-    barrier_obj_next = T(0.0)
+    barrier_lagrangian_next = T(0.0)
     primal_1_next = T(0.0)
     update_filter = false
     switching = false
@@ -60,7 +60,7 @@ function solver_data(T)
 
     SolverData(max_primal_1, min_primal_1, step_size, status, j, k, l, wall_time, solver_time,
         fn_eval_time, μ, reg_last, objective, primal_inf, dual_inf, cs_inf, 
-        barrier_obj_curr, primal_1_curr, barrier_obj_next, primal_1_next, 
+        barrier_lagrangian_curr, primal_1_curr, barrier_lagrangian_next, primal_1_next, 
         update_filter, switching, armijo_passed, filter)
 end
 
@@ -81,9 +81,9 @@ function reset!(data::SolverData{T}) where T
     data.primal_inf = 0.0
     data.dual_inf = 0.0
     data.cs_inf = 0.0
-    data.barrier_obj_curr = 0.0
+    data.barrier_lagrangian_curr = 0.0
     data.primal_1_curr = 0.0
-    data.barrier_obj_next = 0.0
+    data.barrier_lagrangian_next = 0.0
     data.primal_1_next = 0.0
     data.update_filter = false
     data.switching = false

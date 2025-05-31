@@ -6,7 +6,7 @@ using Printf
 
 benchmark = false
 verbose = true
-visualise = true
+visualise = false
 n_benchmark = 10
 
 T = Float64
@@ -14,7 +14,7 @@ N = 101
 Δ = 0.05
 r_car = 0.02
 
-options = Options{T}(verbose=verbose, optimality_tolerance=1e-6, μ_init=0.5)
+options = Options{T}(verbose=verbose, optimality_tolerance=1e-6)
 
 visualise && include("../visualise/concar.jl")
 

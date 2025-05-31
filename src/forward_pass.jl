@@ -3,15 +3,15 @@ function forward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T}, 
     data.l = 0  # line search iteration counter
     data.status = 0
     data.step_size = T(1.0)
-    Δφ = T(0.0)
+    ΔL = T(0.0)
     μ = data.μ
     τ = max(options.τ_min, T(1.0) - μ)
 
     θ_prev = data.primal_1_curr
-    φ_prev = data.barrier_obj_curr
+    L_prev = data.barrier_lagrangian_curr
     θ = θ_prev
     
-    Δφ = expected_decrease_objective(update_rule, problem)
+    ΔL = expected_change_lagrangian(update_rule, problem)
 
     while data.step_size >= eps(T)
         γ = data.step_size
@@ -30,25 +30,25 @@ function forward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T}, 
         
         # used for sufficient decrease from current iterate step acceptance criterion
         θ = constraint_violation_1norm(problem, mode=:current)
-        φ = barrier_objective!(problem, data, update_rule, mode=:current)
+        L = barrier_lagrangian!(problem, data, update_rule, mode=:current)
         
         # check acceptability to filter
-        data.status = !any(x -> (θ >= x[1] && φ >= x[2]), data.filter) ? 0 : 3
+        data.status = !any(x -> (θ >= x[1] && L >= x[2]), data.filter) ? 0 : 3
         data.status != 0 && (data.step_size *= 0.5, data.l += 1, continue)  # failed, reduce step size
         
         # check for sufficient decrease conditions for the barrier objective/constraint violation
-        data.switching = (Δφ < 0.0) && 
-            ((-γ * Δφ) ^ options.s_φ * γ^(1-options.s_φ)  > options.δ * θ_prev ^ options.s_θ)
-        data.armijo_passed = φ - φ_prev - 10. * eps(Float64) * abs(φ_prev) <= options.η_φ * γ * Δφ
+        data.switching = (ΔL < 0.0) && 
+            ((-γ * ΔL) ^ options.s_φ * γ^(1-options.s_φ)  > options.δ * θ_prev ^ options.s_θ)
+        data.armijo_passed = L - L_prev - 10. * eps(Float64) * abs(L_prev) <= options.η_φ * γ * ΔL
         if (θ <= data.min_primal_1) && data.switching
             data.status = data.armijo_passed ? 0 : 4  #  sufficient decrease of barrier objective
         else
-            suff = (θ <= (1. - options.γ_θ) * θ_prev) || (φ <= φ_prev - options.γ_φ * θ_prev)
+            suff = (θ <= (1. - options.γ_θ) * θ_prev) || (L <= L_prev - options.γ_φ * θ_prev)
             data.status = suff ? 0 : 5
         end
         data.status != 0 && (data.step_size *= 0.5, data.l += 1, continue)  # failed, reduce step size
         
-        data.barrier_obj_next = φ
+        data.barrier_lagrangian_next = L
         data.primal_1_next = θ
         break
     end
@@ -84,15 +84,15 @@ function check_fraction_boundary(problem::ProblemData{T}, update_rule::UpdateRul
     return 0
 end
 
-function expected_decrease_objective(update_rule::UpdateRuleData{T}, problem::ProblemData{T}) where T
-    Δφ = T(0.0)
+function expected_change_lagrangian(update_rule::UpdateRuleData{T}, problem::ProblemData{T}) where T
+    ΔL = T(0.0)
     N = problem.horizon
     
     for t = N:-1:1
-        Δφ += dot(update_rule.ĝ[t], update_rule.parameters.α[t])
-        # Δφ += dot(problem.nominal_constr[t], update_rule.parameters.ψ[t])
+        ΔL += dot(update_rule.ĝ[t], update_rule.parameters.α[t])
+        ΔL += dot(problem.nominal_constraints[t], update_rule.parameters.ψ[t])
     end
-    return Δφ
+    return ΔL
 end
 
 function rollout!(update_rule::UpdateRuleData{T}, data::SolverData{T}, problem::ProblemData{T}; step_size::T=1.0) where T

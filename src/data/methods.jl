@@ -31,32 +31,39 @@ function constraint!(problem::ProblemData{T}, μ::T; mode=:nominal) where T
     end
 end
 
-function barrier_objective!(problem::ProblemData{T}, data::SolverData{T}, update_rule::UpdateRuleData{T}; mode=:nominal) where T
+function barrier_lagrangian!(problem::ProblemData{T}, data::SolverData{T}, update_rule::UpdateRuleData{T}; mode=:nominal) where T
     N = problem.horizon
     bounds = problem.bounds
-    _, _, _, il, iu = primal_trajectories(problem, mode=mode)
+    _, _, c, il, iu = primal_trajectories(problem, mode=mode)
+    ϕ, _, _, _ = dual_trajectories(problem, mode=mode)
     u_tmp1 = update_rule.u_tmp1
     
-    barrier_obj = 0.
-    for t = 1:N
+    fn_eval_time_ = time()
 
+    barrier_lagrangian = 0.
+    for t = 1:N
         u_tmp1[t] .= log.(il[t])
         for i in bounds[t].indices_lower
-            barrier_obj -= u_tmp1[t][i]
+            barrier_lagrangian -= u_tmp1[t][i]
         end
 
         u_tmp1[t] .= log.(iu[t])
         for i in bounds[t].indices_upper
-            barrier_obj -= u_tmp1[t][i]
+            barrier_lagrangian -= u_tmp1[t][i]
         end
     end
     
-    barrier_obj *= data.μ
-    fn_eval_time_ = time()
+    barrier_lagrangian *= data.μ
     objective!(data, problem, mode=mode)
+
     data.fn_eval_time += time() - fn_eval_time_
-    barrier_obj += data.objective
-    return barrier_obj
+    
+    barrier_lagrangian += data.objective
+
+    for t = 1:N
+        barrier_lagrangian += dot(c[t], ϕ[t])
+    end
+    return barrier_lagrangian
 end
 
 function constraint_violation_1norm(problem::ProblemData{T}; mode=:nominal) where T

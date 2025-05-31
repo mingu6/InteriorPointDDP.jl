@@ -28,7 +28,7 @@ function solve!(solver::Solver{T}) where T
     
     # update performance measures for first iterate (req. for sufficient decrease conditions for step acceptance)
     data.primal_1_curr = constraint_violation_1norm(problem, mode=:nominal)
-    data.barrier_obj_curr = barrier_objective!(problem, data, update_rule, mode=:nominal)
+    data.barrier_lagrangian_curr = barrier_lagrangian!(problem, data, update_rule, mode=:nominal)
     
     # filter initialization for constraint violation and threshold for switching rule init. (step acceptance)
     data.max_primal_1 = 1e4 * max(1.0, data.primal_1_curr)
@@ -65,7 +65,7 @@ function solve!(solver::Solver{T}) where T
             fn_eval_time_ = time()
             constraint!(problem, data.μ; mode=:nominal)
             data.fn_eval_time += time() - fn_eval_time_
-            data.barrier_obj_curr = barrier_objective!(problem, data, update_rule, mode=:nominal)
+            data.barrier_lagrangian_curr = barrier_lagrangian!(problem, data, update_rule, mode=:nominal)
             
             data.primal_1_curr = constraint_violation_1norm(problem, mode=:nominal)
             data.j += 1
@@ -79,7 +79,7 @@ function solve!(solver::Solver{T}) where T
         
         update_nominal_trajectory!(problem)
         (!data.armijo_passed && !data.switching) && update_filter!(data, options)
-        data.barrier_obj_curr = data.barrier_obj_next
+        data.barrier_lagrangian_curr = data.barrier_lagrangian_next
         data.primal_1_curr = data.primal_1_next
         
         data.k += 1
@@ -94,7 +94,7 @@ end
 
 function update_filter!(data::SolverData{T}, options::Options{T}) where T
     new_filter_pt = [(1. - options.γ_θ) * data.primal_1_curr,
-                        data.barrier_obj_curr - options.γ_φ * data.primal_1_curr]
+                        data.barrier_lagrangian_curr - options.γ_φ * data.primal_1_curr]
     push!(data.filter, new_filter_pt)
 end
 
