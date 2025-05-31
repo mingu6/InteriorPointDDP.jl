@@ -101,7 +101,7 @@ for seed = 1:n_ocp
 
     q_init = [zeros(T, 2) for k = 1:N-1]
     ū = [[[zeros(T, nF); q_init[k]; T(0.01) * ones(T, 6 * nc); T(0.01) * ones(T, 6)] for k = 1:N-1]..., zeros(T, 0)]
-    println(typeof(ū))
+    
     solve!(solver, x1, ū)
 
     if benchmark
