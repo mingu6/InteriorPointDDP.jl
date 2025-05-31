@@ -22,7 +22,7 @@ Base.@kwdef mutable struct Options{T}
 
     κ_ϵ::T= 10.0                  # tolerance factor for lowering barrier parameter
     κ_μ::T= 0.2                   # linear decrease factor for barrier parameter
-    θ_μ::T= 1.5                   # superlinear decrease factor for barrier parameter
+    θ_μ::T= 1.2                   # superlinear decrease factor for barrier parameter
     τ_min::T= 0.99                # lower bound on fraction-to-boundary parameter
     
     s_max::T= 100.0               # scaling threshold for NLP error
