@@ -11,12 +11,12 @@ N = 101
 dt = 0.05
 r_car = 0.02
 
-tol = 1e-4
+tol = 1e-5
 mu_init = 0.05
 
 verbose = aligator.VerboseLevel.VERBOSE
 solver = aligator.SolverProxDDP(tol, mu_init, verbose=verbose)
-solver.max_iters = 2000
+solver.max_iters = 3000
 solver.reg_min = 1e-5
 
 res = []

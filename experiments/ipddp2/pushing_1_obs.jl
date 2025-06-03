@@ -16,7 +16,7 @@ T = Float64
 N = 101
 n_ocp = 100
 
-options = Options{T}(verbose=verbose, optimality_tolerance=1e-6)
+options = Options{T}(verbose=verbose, optimality_tolerance=1e-7)
 
 function circleShape(xc, yc, r)
     θ = LinRange(0, 2*π, 500)

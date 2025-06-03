@@ -27,15 +27,16 @@ for seed = 1:n_ocp
 
     if bfgs
         model = Model(
-                optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 1000,
-                    "nlp_scaling_method" => "none", "tol" => 1e-6,
+                optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 3000,
+                    "nlp_scaling_method" => "none", "tol" => 1e-5,
                     "print_level" => print_level, "print_timing_statistics" => "yes",
                     "hessian_approximation" => "limited-memory")
                 );
     else
         model = Model(
                 optimizer_with_attributes(Ipopt.Optimizer, "max_iter" => 1000,
-                    "nlp_scaling_method" => "none", "tol" => 1e-6,
+                    "nlp_scaling_method" => "none", "tol" => 1e-7,
+                    "max_soc" => 0, "max_filter_resets" => 0, "max_resto_iter" => 0,
                     "print_level" => print_level, "print_timing_statistics" => "yes")
                 );
     end

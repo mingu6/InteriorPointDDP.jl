@@ -29,7 +29,7 @@ savefig("plots/$problemclass/constr3.svg")
 # iteration count
 
 boxplot(names, [iters_ipd iters_ipo iters_ipob iters_al], legend=false,
-    xtickfontsize=fs_x, ytickfontsize=fs_y-3, ylims=(0, 1030), size=(650, 500))
+    xtickfontsize=fs_x, ytickfontsize=fs_y-3, ylims=(0, 1130), size=(650, 500))
 savefig("plots/$problemclass/iterations3.svg")
 
 # wall time per iteration

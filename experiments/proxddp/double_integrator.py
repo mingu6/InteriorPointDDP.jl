@@ -97,7 +97,7 @@ nx = 2
 nu = 3
 N = 101
 
-tol = 1e-8
+tol = 1e-5
 mu_init = 0.01
 
 x0 = np.zeros(2)

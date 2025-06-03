@@ -17,7 +17,7 @@ num_state = 2  # position and velocity
 num_control = 3  # pushing force, 2x slacks for + and - components of abs work
 n_ocp = 1
 
-options = Options{T}(verbose=verbose)
+options = Options{T}(verbose=verbose, optimality_tolerance=1e-7)
 
 results = Vector{Vector{Any}}()
 

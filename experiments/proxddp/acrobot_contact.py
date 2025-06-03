@@ -13,12 +13,12 @@ nc = 2
 nx = 2 * nq
 nu = 1 + nq + 2 * nc
 
-tol = 1e-4
+tol = 1e-5
 mu_init = 0.03
 
 verbose = aligator.VerboseLevel.VERBOSE
 solver = aligator.SolverProxDDP(tol, mu_init, verbose=verbose)
-solver.max_iters = 2000
+solver.max_iters = 3000
 solver.reg_min = 1e-5
 
 res = []
