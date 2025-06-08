@@ -94,7 +94,7 @@ end
 
 function update_filter!(data::SolverData{T}, options::Options{T}) where T
     new_filter_pt = [(1. - options.γ_θ) * data.primal_1_curr,
-                        data.barrier_lagrangian_curr - options.γ_φ * data.primal_1_curr]
+                        data.barrier_lagrangian_curr - options.γ_L * data.primal_1_curr]
     push!(data.filter, new_filter_pt)
 end
 

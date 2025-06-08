@@ -25,7 +25,7 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
     luu = problem.objective_data.hessian_control_control
     lux = problem.objective_data.hessian_control_state
     # DDP intermediate variables
-    ĝ = update_rule.ĝ
+    Qû = update_rule.Qû
     C = update_rule.C
     Ĥ = update_rule.Ĥ
     B = update_rule.B
@@ -39,8 +39,8 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
     χu = update_rule.parameters.χu
     ζu = update_rule.parameters.ζu
     # Value function
-    V̄x = update_rule.value.gradient
-    V̄xx = update_rule.value.hessian
+    Vx = update_rule.value.gradient
+    Vxx = update_rule.value.hessian
 
     u_tmp1 = update_rule.u_tmp1
     u_tmp2 = update_rule.u_tmp2
@@ -67,21 +67,21 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
             χu[t] .= u_tmp2[t]
             χu[t] .*= μ
 
-            # ĝ = Lu' -μŪ^{-1}e + fu' * V̂x
-            ĝ[t] .= lu[t]
-            mul!(ĝ[t], transpose(cu[t]), ϕ[t], 1.0, 1.0)
-            t < N && mul!(ĝ[t], transpose(fu[t]), V̄x[t+1], 1.0, 1.0)
-            ĝ[t] .-= χl[t]  # barrier gradient
-            ĝ[t] .+= χu[t]  # barrier gradient
+            # Qû = Lu' -μŪ^{-1}e + fu' * V̂x
+            Qû[t] .= lu[t]
+            mul!(Qû[t], transpose(cu[t]), ϕ[t], 1.0, 1.0)
+            t < N && mul!(Qû[t], transpose(fu[t]), Vx[t+1], 1.0, 1.0)
+            Qû[t] .-= χl[t]  # barrier gradient
+            Qû[t] .+= χu[t]  # barrier gradient
             
-            # C = Lxx + fx' * V̄xx * fx + V̄x ⋅ fxx
+            # C = Lxx + fx' * Vxx * fx + V̄x ⋅ fxx
             C[t] .= lxx[t]
             if t < N
-                mul!(update_rule.xx_tmp[t], transpose(fx[t]), V̄xx[t+1])
+                mul!(update_rule.xx_tmp[t], transpose(fx[t]), Vxx[t+1])
                 mul!(C[t], update_rule.xx_tmp[t], fx[t], 1.0, 1.0)
             end
     
-            # Ĥ = Luu + Σ + fu' * V̄xx * fu + V̄x ⋅ fuu
+            # Ĥ = Luu + Σ + fu' * Vxx * fu + V̄x ⋅ fuu
             u_tmp1[t] .*= zl[t]   # Σ^L
             u_tmp2[t] .*= zu[t]   # Σ^U
             fill!(Ĥ[t], 0.0)
@@ -89,12 +89,12 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
                 Ĥ[t][i, i] = u_tmp1[t][i] + u_tmp2[t][i]
             end
             if t < N
-                mul!(update_rule.ux_tmp[t], transpose(fu[t]), V̄xx[t+1])
+                mul!(update_rule.ux_tmp[t], transpose(fu[t]), Vxx[t+1])
                 mul!(Ĥ[t], update_rule.ux_tmp[t], fu[t], 1.0, 1.0)
             end
             Ĥ[t] .+= luu[t]
     
-            # B = Lux + fu' * V̄xx * fx + V̄x ⋅ fxu
+            # B = Lux + fu' * Vxx * fx + V̄x ⋅ fxu
             B[t] .= lux[t]
             t < N && mul!(B[t], update_rule.ux_tmp[t], fx[t], 1.0, 1.0)
             
@@ -126,7 +126,7 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
             update_rule.lhs_tr[t] .= transpose(cu[t])
             fill!(update_rule.lhs_br[t], 0.0)
 
-            α[t] .= ĝ[t]
+            α[t] .= Qû[t]
             α[t] .*= -1.0
             ψ[t] .= c[t]
             ψ[t] .*= -1.0
@@ -172,18 +172,18 @@ function backward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T},
             χu[t] .+= u_tmp2[t]
 
             # Update return function approx. for next timestep 
-            # V̄xx = C + β' * B + ω' cx
-            mul!(V̄xx[t], transpose(β[t]), B[t])
-            mul!(V̄xx[t], transpose(ω[t]), cx[t], 1.0, 1.0)
-            V̄xx[t] .+= C[t]
+            # Vxx = C + β' * B + ω' cx
+            mul!(Vxx[t], transpose(β[t]), B[t])
+            mul!(Vxx[t], transpose(ω[t]), cx[t], 1.0, 1.0)
+            Vxx[t] .+= C[t]
 
-            # V̄x = Lx' + β' * ĝ + ω' c + fx' V̄x+
-            V̄x[t] .= lx[t]
-            mul!(V̄x[t], transpose(cx[t]), ϕ[t], 1.0, 1.0)
-            λ[t] .= V̄x[t]
-            mul!(V̄x[t], transpose(β[t]), ĝ[t], 1.0, 1.0)
-            mul!(V̄x[t], transpose(ω[t]), c[t], 1.0, 1.0)
-            t < N && mul!(V̄x[t], transpose(fx[t]), V̄x[t+1], 1.0, 1.0)
+            # Vx = Lx' + β' * Qû + ω' c + fx' Vx+
+            Vx[t] .= lx[t]
+            mul!(Vx[t], transpose(cx[t]), ϕ[t], 1.0, 1.0)
+            λ[t] .= Vx[t]
+            mul!(Vx[t], transpose(β[t]), Qû[t], 1.0, 1.0)
+            mul!(Vx[t], transpose(ω[t]), c[t], 1.0, 1.0)
+            t < N && mul!(Vx[t], transpose(fx[t]), Vx[t+1], 1.0, 1.0)
 
             # λ = Lx' + fx' λ+
             t < N && mul!(λ[t], transpose(fx[t]), λ[t+1], 1.0, 1.0)

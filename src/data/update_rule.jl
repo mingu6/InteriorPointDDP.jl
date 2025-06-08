@@ -39,7 +39,7 @@ struct UpdateRuleData{T}
     value::Value{T}
 
     # intermediate variables for value function
-    ĝ::Vector{Vector{T}}
+    Qû::Vector{Vector{T}}
     C::Vector{Matrix{T}}
     Ĥ::Vector{Matrix{T}}
     B::Vector{Matrix{T}}
@@ -95,7 +95,7 @@ function update_rule_data(T, constraints::Constraints)
     value = Value(V̄x, V̄xx)
 
     # control-value function approximation
-    ĝ = [zeros(T, c.num_control) for c in constraints]
+    Qû = [zeros(T, c.num_control) for c in constraints]
     C = deepcopy(V̄xx)
     Ĥ = [zeros(T, c.num_control, c.num_control) for c in constraints]
     B = [zeros(T, c.num_control, c.num_state) for c in constraints]
@@ -120,7 +120,7 @@ function update_rule_data(T, constraints::Constraints)
     kkt_matrix_ws = [BunchKaufmanWs(L) for L in lhs]
     D_cache = [Pair(zeros(T, c.num_constraint + c.num_control), zeros(T, c.num_constraint + c.num_control)) for c in constraints]
 
-    UpdateRuleData{T}(parameters, value, ĝ, C, Ĥ, B,
+    UpdateRuleData{T}(parameters, value, Qû, C, Ĥ, B,
         x_tmp, u_tmp1, u_tmp2, c_tmp, uu_tmp, ux_tmp, xx_tmp, cu_tmp, cx_tmp,
         lhs, lhs_tl, lhs_tr, lhs_bl, lhs_br, kkt_matrix_ws, D_cache)
 end

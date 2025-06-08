@@ -11,7 +11,7 @@ function forward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T}, 
     L_prev = data.barrier_lagrangian_curr
     θ = θ_prev
     
-    ΔL = expected_change_lagrangian(update_rule, problem)
+    ΔL = expected_change_lagrangian(update_rule, problem)  # m(γ) / γ
 
     while data.step_size >= eps(T)
         γ = data.step_size
@@ -38,12 +38,12 @@ function forward_pass!(update_rule::UpdateRuleData{T}, problem::ProblemData{T}, 
         
         # check for sufficient decrease conditions for the barrier objective/constraint violation
         data.switching = (ΔL < 0.0) && 
-            ((-γ * ΔL) ^ options.s_φ * γ^(1-options.s_φ)  > options.δ * θ_prev ^ options.s_θ)
-        data.armijo_passed = L - L_prev - 10. * eps(Float64) * abs(L_prev) <= options.η_φ * γ * ΔL
+            ((-γ * ΔL) ^ options.s_L * γ^(1-options.s_L)  > options.δ * θ_prev ^ options.s_θ)
+        data.armijo_passed = L - L_prev - 10. * eps(Float64) * abs(L_prev) <= options.η_L * γ * ΔL
         if (θ <= data.min_primal_1) && data.switching
             data.status = data.armijo_passed ? 0 : 4  #  sufficient decrease of barrier objective
         else
-            suff = (θ <= (1. - options.γ_θ) * θ_prev) || (L <= L_prev - options.γ_φ * θ_prev)
+            suff = (θ <= (1. - options.γ_θ) * θ_prev) || (L <= L_prev - options.γ_L * θ_prev)
             data.status = suff ? 0 : 5
         end
         data.status != 0 && (data.step_size *= 0.5, data.l += 1, continue)  # failed, reduce step size
@@ -89,7 +89,7 @@ function expected_change_lagrangian(update_rule::UpdateRuleData{T}, problem::Pro
     N = problem.horizon
     
     for t = N:-1:1
-        ΔL += dot(update_rule.ĝ[t], update_rule.parameters.α[t])
+        ΔL += dot(update_rule.Qû[t], update_rule.parameters.α[t])
         ΔL += dot(problem.nominal_constraints[t], update_rule.parameters.ψ[t])
     end
     return ΔL

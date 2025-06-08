@@ -26,13 +26,13 @@ Base.@kwdef mutable struct Options{T}
     τ_min::T= 0.99                # lower bound on fraction-to-boundary parameter
     
     s_max::T= 100.0               # scaling threshold for NLP error
-    η_φ::T= 1e-4                  # relaxation factor in the armijo condition
-    s_φ::T= 2.3                   # exponent for linear barrier function model in switching rule
+    η_L::T= 1e-4                  # relaxation factor in the armijo condition
+    s_L::T= 2.3                   # exponent for linear barrier function model in switching rule
     δ::T= 1.0                     # multiplier for constraint violation in the switching rule
     s_θ::T= 1.1                   # exponent for current constraint violation in the switching rule
     γ_α::T= 0.05                  # safety factor for minimum step size (in (0, 1))
     γ_θ::T= 1e-5                  # relaxation factor in the filter margin for constraint violation (in (0, 1))
-    γ_φ::T= 1e-5                  # relaxation factor in the filter margin for barrier function (in (0, 1))
+    γ_L::T= 1e-5                  # relaxation factor in the filter margin for barrier function (in (0, 1))
 
     κ_Σ::T= 1e10                  # dual variable rescaling threshold param.
 end
