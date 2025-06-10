@@ -5,14 +5,14 @@ This repository contains a Julia package for solving constrained optimal control
 OCPs must be expressed in the form
 ```math
 \begin{array}{rl}
-    \underset{\mathbf{x}, \mathbf{u}}{\text{minimize}}  & J(\mathbf{x}, \mathbf{u}) \coloneqq \sum_{t=1}^{N} \ell^t(x_t, u_t) \\
-    \text{subject to} & x_1 = \hat{x}_0, \\
-    & x_{t+1} = f^t(x_t, u_t), \\
-    & c^t(x_t, u_t) = 0, \\
+    \underset{\mathbf{x}, \mathbf{u}}{\text{minimize}}  & J(\mathbf{x}, \mathbf{u}) = \sum_{t=1}^{N} \ell^t(x_t, u_t) \\
+    \text{subject to} & x_1 = \hat{x}_1, \\
+    & x_{t+1} = f^t(x_t, u_t) \quad \text{for } t \in\{1,\dots, N-1\}, \\
+    & c^t(x_t, u_t) = 0 \quad \text{for } t \in\{1,\dots, N\}, \\
     & b_L \leq u_t \leq b_U \quad \text{for } t \in\{1,\dots, N\},
 \end{array}
 ```
-where $\mathbf{x} \coloneqq (x_1, \dots, x_{N})$ is the state trajectory and $\mathbf{u} \coloneqq (u_1, \dots, u_{N})$ is the control trajectory. Bounds are specified as $b_L \in [-\infty, \infty)$ and $b_U \in (-\infty, \infty]$.
+where $\mathbf{x} = (x_1, \dots, x_{N})$ is the state trajectory and $\mathbf{u} = (u_1, \dots, u_{N})$ is the control trajectory. Bounds are specified as $b_L \in [-\infty, \infty)$ and $b_U \in (-\infty, \infty]$.
 
 - All derivatives, including Jacobians and Hessians are automatically generated using [Symbolics.jl](https://github.com/JuliaSymbolics/Symbolics.jl) for user-provided costs/objectives, constraints, and dynamics.
 
