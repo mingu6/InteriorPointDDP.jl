@@ -118,7 +118,7 @@ for seed = 1:n_ocp
     # ## Plots
 
     if visualise
-        plot(xlims=(-0.1, 1.1), ylims=(-0.1, 1.1), xtickfontsize=14, ytickfontsize=14)
+        plot(xlims=(-0.1, 1.1), ylims=(-0.1, 1.1), xtickfontsize=14, ytickfontsize=14, fontfamily="Computer Modern")
         for xyr in xyr_obs
             plotCircle!(xyr[1], xyr[2], xyr[3])
         end
@@ -148,7 +148,7 @@ for seed = 1:n_ocp
     else
         push!(results, [seed, solver.data.k, solver.data.status, solver.data.objective, solver.data.primal_inf])
     end
-    visualise && savefig("plots/concar_IPDDP_$seed.svg")
+    visualise && savefig("plots/concar_IPDDP_$seed.pdf")
 
     push!(params, [F_lim; τ_lim; obs_1; obs_2; obs_3; obs_4; x1])
 end

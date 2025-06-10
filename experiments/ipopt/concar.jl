@@ -131,7 +131,7 @@ for seed = 1:n_ocp
     # ## Plots
 
     if visualise
-        plot(xlims=(-0.1, 1.1), ylims=(-0.1, 1.1), xtickfontsize=14, ytickfontsize=14)
+        plot(xlims=(-0.1, 1.1), ylims=(-0.1, 1.1), xtickfontsize=14, ytickfontsize=14, fontfamily="Computer Modern")
         for xyr in xyr_obs
             plotCircle!(xyr[1], xyr[2], xyr[3])
         end

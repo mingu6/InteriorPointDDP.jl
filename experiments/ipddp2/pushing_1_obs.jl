@@ -165,13 +165,13 @@ for seed = 1:n_ocp
         ft = map(u -> u[2], u_sol[1:end-1])
         plot(range(0, Δ * (N-1), N-1), phidot, xtickfontsize=14, ytickfontsize=14, xlabel=L"$t$", ylabel="meters per second",
 			legendfontsize=14, linewidth=2, xlabelfontsize=14, ylabelfontsize=14, linestyle=:solid, linecolor=1, 
-            legendposition=:bottomleft, legendtitleposition=:left, ylims=(-5, 5),
+            legendposition=:bottomleft, legendtitleposition=:left, ylims=(-5, 5), fontfamily="Computer Modern",
 			background_color_legend = nothing, label=L"$\dot{\phi}_t$")
         plot!(twinx(), range(0, Δ * (N-1), N-1), [ft fric_lim negfric_lim], xtickfontsize=14, ytickfontsize=14, ylabel="Newtons (N)",
 			legendfontsize=14, linewidth=2, xlabelfontsize=14, ylabelfontsize=14, linestyle=[:dash :solid :solid], linecolor=[2 3 3], 
-            legendposition=:topright, legendtitleposition=:left, ylims=(-0.10, 0.10), alpha=[1. 0.5 0.5], legend_columns=-1,
+            legendposition=:topright, legendtitleposition=:left, ylims=(-0.10, 0.10), alpha=[1. 0.5 0.5], legend_columns=-1, fontfamily="Computer Modern",
 			background_color_legend = nothing, label= [L"$f_t^T$" L"$\pm c_f f_t^n$" false])
-		savefig("plots/pushing_IPDDP.svg")
+		savefig("plots/pushing_IPDDP.pdf")
 	end
 
     # ## Plot state get_trajectory
@@ -184,7 +184,7 @@ for seed = 1:n_ocp
         xyp = map(xy_pusher, x_sol[1:end-1])
         xp = map(x -> x[1], xyp)
         yp = map(x -> x[2], xyp)
-        plot(xs, ys, linecolor=:brown4, linestyle=:dash, linewidth=2,
+        plot(xs, ys, linecolor=:brown4, linestyle=:dash, linewidth=2, fontfamily="Computer Modern",
             ylims=(-0.07, 0.5), xlims=(-0.07, 0.5), xtickfontsize=14, ytickfontsize=14)
         plot!(xp, yp, linecolor=:blue, linestyle=:solid, linewidth=2, linealpha=0.5)
         plotCircle!(obstacle[1], obstacle[2], obstacle[3], :deeppink3)
@@ -205,7 +205,7 @@ for seed = 1:n_ocp
                     legend = false, fillalpha = 0.2, aspect_ratio = 1)
             scatter!([xN[1]], [xN[2]], markershape=:star, color=:gold, markersize=10)
         end
-        savefig("plots/pushing_qual_$seed.svg")
+        savefig("plots/pushing_qual_$seed.pdf")
     end
 end
 
